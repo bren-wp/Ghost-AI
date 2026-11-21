@@ -27,6 +27,16 @@ try {
     if ($process.MainWindowHandle -ne [IntPtr]::Zero) { $windowSeen = $true; break }
   } while ((Get-Date) -lt $deadline)
 
+  # A fleeting splash/early window is not a successful application startup.
+  # Re-check that the window and its owning process survive initialization.
+  if ($windowSeen -and -not $process.HasExited) {
+    Start-Sleep -Seconds 2
+    $process.Refresh()
+    if ($process.HasExited -or $process.MainWindowHandle -eq [IntPtr]::Zero) {
+      $windowSeen = $false
+    }
+  }
+
   $process.Refresh()
   $exited = $process.HasExited
   $exitCode = if ($exited) { $process.ExitCode } else { 'running' }
@@ -69,7 +79,7 @@ try {
 
   Write-Host ($description -join [Environment]::NewLine)
   if ($exited) { throw "Ghost AI exited before displaying its main window (exit code: $exitCode)" }
-  if (-not $windowSeen) { Write-Warning 'Process stayed alive but no main window was detected in the CI session' }
+  if (-not $windowSeen) { throw 'Ghost AI did not maintain a visible main window during the startup health check' }
 } finally {
   if ($null -ne $process) {
     $process.Refresh()
