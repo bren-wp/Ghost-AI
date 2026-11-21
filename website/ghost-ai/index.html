@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#080f1a">
+<meta name="description" content="Ghost AI by Brendigo. One desktop workspace for AI conversations, files, research and coding.">
+<title>Ghost AI — Your AI. Your Desktop. | Brendigo</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:#e5e7eb;background:#080f1a}
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:radial-gradient(ellipse at 80% 12%,#45225a70,transparent 38%),radial-gradient(ellipse at 14% 30%,#04476770,transparent 42%),#080f1a}
+a{color:inherit}a:focus-visible,button:focus-visible{outline:2px solid #00e5ff;outline-offset:4px}
+main,header,footer{width:min(1120px,calc(100% - 40px));margin:auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:24px 0;border-bottom:1px solid #33415550}
+.brand{display:flex;align-items:center;gap:12px;font-weight:760;font-size:20px;text-decoration:none}.brand img{width:40px;height:40px}
+.small-link{text-decoration:none;color:#bec8dd;font-size:14px}
+.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:48px;align-items:center;padding:110px 0 86px}
+.eyebrow{font-size:13px;color:#00e5ff;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+h1{font-size:clamp(46px,6vw,84px);letter-spacing:-.06em;line-height:1.05;margin:20px 0}h1 span{background:linear-gradient(120deg,#00e5ff,#874cff);color:transparent;background-clip:text}
+p{line-height:1.7;color:#b6c0d2;font-size:17px}.logo{width:min(90%,440px);margin:auto;filter:drop-shadow(0 14px 80px #1745a2a0)}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.button{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:12px 18px;border-radius:11px;font-weight:650;text-decoration:none;border:1px solid #35415a}
+.primary{background:linear-gradient(110deg,#00e5ff,#874cff);color:#080f1a;border:0}.secondary{background:#142239}
+.info{font-size:13px;margin-top:14px}
+h2{font-size:clamp(24px,3vw,38px);letter-spacing:-.025em}
+.features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin:25px 0 90px}
+.feature{background:#111827c9;border:1px solid #324057;border-radius:16px;padding:25px}
+.feature .symbol{color:#00e5ff;font-size:30px}.feature h3{margin:16px 0 8px}.feature p{font-size:14px;margin:0}
+#downloads{padding-bottom:100px}.download-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.download{border:1px solid #334155;padding:22px;border-radius:14px;background:#111827}.download p{font-size:13px}
+.download .button{width:100%;margin-top:12px}
+footer{border-top:1px solid #33415555;padding:28px 0 50px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:#bac4d8}
+@media(max-width:800px){.hero{padding:60px 0;grid-template-columns:1fr;gap:10px;text-align:center}.actions{justify-content:center}.logo{max-height:260px}.features,.download-grid{grid-template-columns:1fr}.eyebrow{margin-top:8px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header><a class="brand" href="/" aria-label="Brendigo home"><img src="./ghost-ai-logo.svg" alt=""><span>Ghost AI</span></a><a class="small-link" href="https://brendigo.com">Brendigo.com</a></header>
+<main>
+<section class="hero">
+<div><div class="eyebrow">Ghost AI by Brendigo</div><h1>Your AI.<br><span>Your desktop.</span></h1><p>Make room for bigger ideas. Chat with your preferred AI models, explore documents, research complex topics, write code, and move forward in one beautifully focused workspace.</p><div class="actions"><a class="button primary" href="#downloads">Download Ghost AI</a><a class="button secondary" href="#features">Explore features</a></div><p class="info">Choose your AI provider. Your workspace, your way.</p></div>
+<div><img class="logo" alt="Ghost AI luminous ghost mark" src="./ghost-ai-logo.svg"></div>
+</section>
+<section id="features"><h2>Everything you need to think bigger.</h2><div class="features">
+<div class="feature"><div class="symbol">✦</div><h3>Models, together</h3><p>Connect compatible cloud providers or models running on your own computer.</p></div>
+<div class="feature"><div class="symbol">▣</div><h3>Work with files</h3><p>Explore, summarize and understand the documents you choose to share.</p></div>
+<div class="feature"><div class="symbol">◇</div><h3>Tools and agents</h3><p>Streamline research, coding and repeatable tasks with permission-aware workflows.</p></div>
+</div></section>
+<section id="downloads"><h2>Choose your Ghost AI.</h2><p>Download the latest verified package for your operating system. Availability depends on the published release.</p>
+<div class="download-grid">
+<div class="download"><h3>Windows</h3><p>Simple setup, a portable package, or an update for an existing installation.</p><a class="button primary" href="./downloads/Ghost-AI-v0.1.0-Setup.exe">Setup.exe</a><a class="button secondary" href="./downloads/Ghost-AI-v0.1.0-Portable.zip">Portable.zip</a><a class="button secondary" href="./downloads/Ghost-AI-v0.1.0-Update.exe">Update.exe</a></div>
+<div class="download"><h3>macOS</h3><p>A clean desktop experience for supported Mac systems.</p><a class="button secondary" href="./downloads/Ghost-AI-v0.1.0-macOS.dmg">Download DMG</a></div>
+<div class="download"><h3>Linux</h3><p>Use Ghost AI on supported Linux desktop environments.</p><a class="button secondary" href="./downloads/Ghost-AI-v0.1.0-Linux.AppImage">Download AppImage</a></div>
+</div><p class="info">Deploy this page only after uploading verified packages. Download URLs shown here are placeholders until the relevant binaries exist.</p></section>
+</main>
+<footer><span>© 2026 Brendigo · Ghost AI</span><span><a href="https://brendigo.com">Official website</a> · <a href="./legal/EULA-HR.html">Terms</a> · <a href="./legal/PRIVACY-HR.html">Privacy</a></span></footer>
+</body></html>
