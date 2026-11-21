@@ -121,8 +121,8 @@ const FETCH_METHOD_LABELS: Record<WebFetchLocalMethod, string> = {
 }
 
 // External destinations for the About section.
-const GITHUB_REPO_URL = 'https://github.com/ghost_aiapp/ghost-ai-desktop'
-const GITHUB_ISSUES_URL = `${GITHUB_REPO_URL}/issues`
+const OFFICIAL_SITE_URL = 'https://brendigo.com'
+const SUPPORT_URL = 'https://brendigo.com'
 
 const data = {
   nav: [
@@ -1594,12 +1594,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       return (
         <div className="grid gap-6">
           <p className="text-sm text-muted-foreground max-w-md">{t('aboutNoTelemetry')}</p>
+          <p className="text-xs text-muted-foreground">Ghost AI · Brendigo · <button className="underline underline-offset-4 hover:text-primary" onClick={() => openExternal(OFFICIAL_SITE_URL)}>brendigo.com</button></p>
 
           <div className="grid gap-2">
             <Label>{t('aboutSupportTitle')}</Label>
             <p className="text-xs text-muted-foreground max-w-md">{t('aboutSupportDescription')}</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => openExternal(GITHUB_REPO_URL)}>
+              <Button variant="outline" size="sm" onClick={() => openExternal(OFFICIAL_SITE_URL)}>
                 <Star className="mr-2 h-4 w-4" />
                 {t('aboutStarButton')}
               </Button>
@@ -1614,7 +1615,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <Label>{t('aboutIssuesTitle')}</Label>
             <p className="text-xs text-muted-foreground max-w-md">{t('aboutIssuesDescription')}</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => openExternal(GITHUB_ISSUES_URL)}>
+              <Button variant="outline" size="sm" onClick={() => openExternal(SUPPORT_URL)}>
                 <Bug className="mr-2 h-4 w-4" />
                 {t('aboutFileIssueButton')}
               </Button>
@@ -1736,7 +1737,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 md:max-h-[600px] md:max-w-[700px] lg:max-w-[900px]">
+      <DialogContent className="max-h-[min(92vh,800px)] w-[min(96vw,940px)] max-w-[96vw] overflow-hidden p-0 md:max-w-[94vw] lg:max-w-[940px]">
         <DialogTitle className="sr-only">{tc('settings')}</DialogTitle>
         <DialogDescription className="sr-only">{tc('settings')}</DialogDescription>
         <SidebarProvider className="items-start">
@@ -1761,9 +1762,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </SidebarGroup>
             </SidebarContent>
           </Sidebar>
-          <main className="flex h-[600px] flex-1 flex-col overflow-hidden">
-            <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-              <div className="flex items-center gap-2 px-4">
+          <main className="flex min-h-0 h-[min(84vh,680px)] flex-1 flex-col overflow-hidden">
+            <header className="flex min-h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+              <div className="flex min-w-0 items-center gap-2 px-4">
+                <label className="sr-only" htmlFor="ghost-settings-navigation">Settings section</label>
+                <select id="ghost-settings-navigation" className="min-w-0 max-w-[calc(95vw-5rem)] rounded-md border bg-background p-2 text-sm text-foreground md:hidden" value={activeSection} onChange={(event) => setActiveSection(event.target.value)}>
+                  {data.nav.map((item) => <option key={item.name} value={item.name}>{t(item.name)}</option>)}
+                </select>
                 <Breadcrumb>
                   <BreadcrumbList>
                     <BreadcrumbItem className="hidden md:block">
