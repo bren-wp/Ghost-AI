@@ -43,6 +43,15 @@ Section "Update installed Ghost AI"
   InitPluginsDir
   SetOutPath "$PLUGINSDIR"
   File /oname=Ghost-AI-Setup.exe "${SETUP_FILE}"
+  ClearErrors
   ExecWait '"$PLUGINSDIR\Ghost-AI-Setup.exe" /P' $0
-  SetErrorLevel $0
+  IfErrors update_error
+  StrCmp $0 0 update_ok update_error
+update_error:
+  MessageBox MB_OK|MB_ICONSTOP "The Ghost AI update was not completed. Visit brendigo.com for help."
+  SetErrorLevel 1
+  Goto update_end
+update_ok:
+  SetErrorLevel 0
+update_end:
 SectionEnd
