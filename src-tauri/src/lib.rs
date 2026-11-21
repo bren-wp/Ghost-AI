@@ -3,6 +3,7 @@ mod attachment_gc;
 pub mod blob_sync;
 pub mod commands;
 mod crypto;
+mod ghost_ai_startup;
 pub mod db;
 mod keychain;
 mod language_detect;
@@ -39,6 +40,7 @@ use tokio::sync::RwLock;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    ghost_ai_startup::install_panic_reporter();
     // macOS GUI apps launched from Finder/Spotlight inherit a minimal PATH
     // (/usr/bin:/bin:/usr/sbin:/sbin) that doesn't include user-installed
     // tools like node/npx. Resolve the full PATH from the user's login shell.
@@ -659,6 +661,7 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
+            ghost_ai_startup::record_startup_failure(&format!("Application initialization failed: {e}"));
             tracing::error!("FATAL: Error while building tauri application: {}", e);
             std::process::exit(1);
         })
