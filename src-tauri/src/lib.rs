@@ -52,8 +52,17 @@ pub fn run() {
         }
     }
 
-    tauri::Builder::default()
-        .register_uri_scheme_protocol(web_fetch::WEBVIEW_SCHEME, |_ctx, request| {
+    // Only register the updater when this binary was built with a trusted public key.
+    let builder = tauri::Builder::default();
+    let builder = if option_env!("GHOST_AI_UPDATER_PUBLIC_KEY")
+        .is_some_and(|key| !key.trim().is_empty())
+    {
+        builder.plugin(tauri_plugin_updater::Builder::new().build())
+    } else {
+        builder
+    };
+
+    builder.register_uri_scheme_protocol(web_fetch::WEBVIEW_SCHEME, |_ctx, request| {
             let uri = request.uri().to_string();
             let status = web_fetch::webview_deliver(&uri, request.body());
             tauri::http::Response::builder()
@@ -62,7 +71,6 @@ pub fn run() {
                 .body(status.as_bytes().to_vec().into())
                 .unwrap_or_else(|_| tauri::http::Response::new(Vec::new()))
         })
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
