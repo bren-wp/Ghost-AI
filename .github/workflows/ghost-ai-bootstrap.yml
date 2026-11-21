@@ -1,9 +1,11 @@
-name: Ghost AI v0.1.0 Bootstrap
+name: Ghost AI Bootstrap v0.1.0
 
 on:
   push:
     paths:
       - .github/workflows/ghost-ai-bootstrap.yml
+      - scripts/ghost_import.py
+      - scripts/ghost_icons.py
   workflow_dispatch:
 
 concurrency:
