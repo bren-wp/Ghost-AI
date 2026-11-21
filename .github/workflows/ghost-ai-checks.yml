@@ -52,3 +52,55 @@ jobs:
           test -s brand/logo.svg
           test -s src-tauri/icons/icon.ico
           ! grep -RIl --include='*.tsx' 'github.com/ghost_aiapp' src
+
+  windows-startup:
+    name: Build and open Ghost AI on Windows
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+      - name: Build production Windows binary
+        run: pnpm tauri build --no-bundle
+      - name: Stage packaged resources as in Portable.zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force 'smoke/Portable' | Out-Null
+          Copy-Item 'src-tauri/target/release/ghost-ai-desktop.exe' 'smoke/Portable/Ghost-AI.exe'
+          foreach ($part in @('resources', 'builtin-skills')) {
+            Copy-Item "src-tauri/$part" "smoke/Portable/$part" -Recurse -Force
+          }
+          Copy-Item 'legal' 'smoke/Portable/legal' -Recurse -Force
+          if (-not (Test-Path 'smoke/Portable/resources/models_dev.json')) {
+            throw 'Bundled model capabilities data missing'
+          }
+      - name: Require a persistent visible Ghost AI window
+        id: startup
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          ./scripts/ghost-ai-startup-diagnostics.ps1 -Executable 'smoke/Portable/Ghost-AI.exe' -OutputDirectory 'smoke/diagnostics' -ObserveSeconds 30
+      - name: Save startup evidence even after failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-PR-Windows-Startup
+          path: smoke/diagnostics/
+          if-no-files-found: warn
+      - name: Block merge when the application does not open
+        if: steps.startup.outcome != 'success'
+        shell: pwsh
+        run: throw 'Ghost AI Windows startup smoke test failed: no stable main window'
