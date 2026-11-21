@@ -1,33 +1,46 @@
-GHOST AI END USER LICENSE AGREEMENT
-Effective: November 21, 2026
-Publisher and product brand: Brendigo
+GHOST AI - END USER LICENSE AGREEMENT
+Publisher: Brendigo
 Official website: https://brendigo.com
+Version 1.0 - November 21, 2026
 
-1. ACCEPTANCE
-By installing or using the Ghost AI distribution you agree to these terms to the extent permitted by applicable law. Mandatory consumer protections remain in force.
+1. LICENSE. Brendigo grants users of an official Ghost AI build a limited,
+non-exclusive right to install and use the software for lawful personal and
+business purposes in accordance with these terms and applicable law.
 
-2. OPEN-SOURCE SOFTWARE
-Ghost AI includes MIT- and Apache-2.0-licensed components. Nothing here revokes or limits any rights granted directly by those licenses. Copyright notices and applicable source licenses remain provided with the distribution.
+2. THIRD-PARTY RIGHTS. Ghost AI contains open-source and separately licensed
+components. Their licenses and attribution notices remain applicable and are
+not replaced or restricted by this agreement.
 
-3. PERMISSION TO USE
-Subject to the preceding paragraph, Brendigo grants permission to install and use the Ghost AI desktop distribution. Brand identifiers, logos and marks are not licensed for misleading endorsement or impersonation.
+3. AI PROVIDERS. Some functions require separate accounts, API keys, internet
+access, subscriptions or usage-based fees. The user is responsible for
+configuring providers, approving tool actions and verifying model outputs.
 
-4. THIRD-PARTY PROVIDERS
-You select and configure your AI service providers. Your provider may charge for API access. Their terms and privacy policies apply to prompts and files sent to them.
+4. DATA AND SECURITY. Local conversations and settings may be stored on the
+device. Documents, prompts and related data submitted to cloud providers
+may be processed by them under their own policies. Review permissions for
+file access, shell commands and automated actions.
 
-5. YOUR DATA AND TOOLS
-Conversation history may be stored locally on your computer. Agent actions affecting files, commands and online services may have real consequences. Review permissions before approving sensitive operations.
+5. RESTRICTIONS. You may not misrepresent modified builds as official Ghost AI
+releases or misuse the Ghost AI name, trade dress or logos. Mandatory legal
+rights, rights to interoperability and third-party open-source licenses
+remain unaffected.
 
-6. UPDATES
-When enabled, the product checks a Brendigo-controlled HTTPS endpoint for available updates. Automatic installation must verify the release signature. An update is not guaranteed for all devices.
+6. UPDATES. Security and feature updates may be available through Brendigo's
+official channels. Keep important backups before installing new versions.
+Support availability may vary by version.
 
-7. LIMITED WARRANTIES
-To the maximum extent allowed by law, the distribution is provided without additional commercial warranties. Non-waivable consumer rights and liability under applicable law are not excluded.
+7. WARRANTY AND LIABILITY. To the extent permitted by law, no guarantee is
+made of error-free AI results or continuous availability of independent
+providers. No clause excludes mandatory consumer rights or liability that
+cannot lawfully be excluded.
 
-8. GOVERNING LAW
-Croatian law applies, subject to mandatory consumer protection rules, including applicable rights in the user's habitual residence.
+8. GOVERNING LAW. Croatian law applies, without limiting mandatory consumer
+protections in the consumer's home jurisdiction. Applicable mandatory court
+jurisdiction rules control.
 
-9. CONTACT
-For current product and legal information visit https://brendigo.com.
+9. SUPPORT AND CONTACT. See https://brendigo.com.
 
-This draft requires review by qualified legal counsel and identification of the contracting legal entity prior to commercial launch.
+Full language versions and mandatory third-party notices are included in
+the Ghost AI legal documentation.
+
+These terms are a working draft pending review before commercial release.

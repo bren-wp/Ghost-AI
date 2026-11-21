@@ -1,48 +1,44 @@
-# GHOST AI — UGOVOR O LICENCI S KRAJNJIM KORISNIKOM (EULA)
+# Ghost AI — Licencni ugovor s krajnjim korisnikom (EULA)
 
-Izdanje uvjeta: 21. studenoga 2026.  
-Proizvod: **Ghost AI**  
-Izdavatelj i autor Ghost AI brenda: **Brendigo**  
-Službena mrežna stranica: **https://brendigo.com**
+**Izdavatelj:** Brendigo · **Službena mrežna stranica:** https://brendigo.com  
+**Izdanje uvjeta:** 1.0 · **Datum:** 21. studenoga 2026.
 
-## 1. Opseg ugovora
+## 1. Predmet ugovora i prihvat
+Ovim ugovorom uređuje se korištenje desktop aplikacije **Ghost AI** („Aplikacija”), koju izdaje Brendigo („Izdavatelj”). Instalacijom ili korištenjem Aplikacije prihvaćate ove uvjete, osim ako primjenjivo pravo nalaže drukčiji način prihvata. Ako ih ne prihvaćate, nemojte instalirati Aplikaciju.
 
-Ovi uvjeti uređuju instalaciju i uporabu distribucije Ghost AI koju osigurava Brendigo. Uporabom ili instalacijom prihvaćate uvjete u dijelu koji je dopušten primjenjivim pravom. Ako se s uvjetima ne slažete, nemojte instalirati ili koristiti program; potrošačka zakonska prava ostaju nepromijenjena.
+## 2. Dodijeljena licenca
+Uz poštovanje ovih uvjeta Izdavatelj vam daje ograničeno, neisključivo pravo instaliranja i korištenja isporučene Aplikacije u zakonite privatne i poslovne svrhe. Ovaj ugovor ne prenosi vlasništvo nad robnim oznakama, vizualnim identitetom, izvornim kodom ili drugim pravima intelektualnog vlasništva. Prava na softver otvorenoga koda i dijelove trećih strana uređena su njihovim odgovarajućim licencama; ovaj ih ugovor **ne ograničava niti mijenja**.
 
-## 2. Komponente otvorenoga koda
+## 3. Dopušteno korištenje
+Korisnik smije koristiti funkcije razgovora, rada s dokumentima, povezivanja AI pružatelja i automatizacije u okviru zakonitih djelatnosti i pravila odabranih usluga. Korisnik je odgovoran za API ključeve, konfiguraciju dopuštenja, podatke koje šalje vanjskim uslugama, rezultate rada modela i svoje odluke temeljene na tim rezultatima.
 
-Ghost AI uključuje komponente pod zasebnim licencijama otvorenoga koda, među ostalim MIT i Apache 2.0. Odredbe ovoga ugovora **ne ograničavaju** prava koja vam te licence izravno daju u odnosu na odgovarajući kod i pripadajuće komponente. Potpuni obvezni tekstovi licenci i autorske obavijesti dostupni su u datotekama `LICENSE` i `legal/THIRD_PARTY_NOTICES.md` te pripadajućim licencnim datotekama.
+## 4. Ograničenja
+Osim u mjeri u kojoj to dopušta zakon ili licenca odgovarajuće komponente, nije dopušteno: predstavljati se kao Brendigo; koristiti logotipe ili naziv Ghost AI za zavaravajuće proizvode; distribuirati izmijenjene vlasničke dijelove proizvoda kao službena izdanja; namjerno zaobilaziti tehničke i sigurnosne mehanizme koji štite korisnike i podatke; koristiti Aplikaciju za nezakonite radnje. Ništa iz ove odredbe ne oduzima prava zajamčena zakonima ili slobodnim licencama.
 
-## 3. Licenca za Brendigo komponente i brend
+## 5. AI modeli i usluge trećih strana
+Aplikacija je sučelje za više modela, uključujući lokalne modele i neovisne vanjske pružatelje. Usluge trećih strana mogu zahtijevati vlastite račune, posebne uvjete, API ključeve i naplatu. Pretplata na jedan servis ne podrazumijeva pravo korištenja njegova API-ja. Izdavatelj nije odgovoran za sadržaj i dostupnost neovisnih servisa. Generirani odgovori mogu sadržavati pogreške; prije primjene provjerite informacije, osobito za pravne, medicinske, financijske i sigurnosno važne odluke.
 
-Pod uvjetima iz točke 2., Brendigo daje neisključivo, neprenosivo pravo korištenja vlastite komercijalno distribuirane konfiguracije, izvorne grafike i usluga u granicama primjenjivih ugovora. Žigovi, nazivi, logotip i vizualni identitet Ghost AI / Brendigo nisu uključeni u dozvole za upotrebu tuđih žigova ili lažno predstavljanje. Samo ova EULA ne dokazuje postojanje registriranog žiga.
+## 6. Lokalni podaci, dozvole i pristup uređaju
+Aplikacija može pohraniti razgovore, konfiguraciju i lokalne radne datoteke na korisnikov uređaj. Funkcije koje čitaju, stvaraju, premještaju ili mijenjaju datoteke i pokreću naredbe mogu imati značajne posljedice; korisnik mora pregledati dozvole i tražene radnje. Vanjskim modelima prenose se podaci potrebni za uslugu koju korisnik aktivira. Politika privatnosti objašnjava pojedinosti.
 
-## 4. Vanjski AI pružatelji i troškovi
+## 7. Ažuriranja
+Izdavatelj može nuditi zakrpana ili funkcionalna izdanja putem službene mrežne stranice ili ugrađenog sustava ažuriranja. Instalaciju ažuriranja moguće je uvjetovati provjerom autentičnog potpisa. Korisnik treba sigurnosno kopirati važne podatke prije većih promjena. Izdavatelj može prestati podržavati zastarjele verzije.
 
-Korisnik bira kompatibilnog AI pružatelja i odgovoran je za njegove uvjete, naknade te pravila obrade podataka. Pretplata na jedan AI proizvod ne daje automatski API pristup drugom klijentu. Brendigo ne jamči neprekidnu dostupnost, kvalitetu ili sigurnost usluga trećih strana.
+## 8. Jamstva i ograničenje odgovornosti
+Aplikacija se isporučuje u stanju u kojem jest, u mjeri dopuštenoj primjenjivim pravom. Izdavatelj ne jamči neprekinutu dostupnost svih vanjskih AI usluga ni potpunu točnost njihovih odgovora. Odgovornost Izdavatelja ograničena je isključivo u granicama koje dopušta mjerodavno pravo. **Ovim se ugovorom ne isključuju prava potrošača, odgovornost koju nije dopušteno isključiti ni obvezna zakonska jamstva.**
 
-## 5. Podaci i sigurnost
+## 9. Prestanak prava korištenja
+Korisnik može prestati koristiti Aplikaciju i deinstalirati je. U slučaju bitne povrede uvjeta, pravo korištenja dijelova koje licencira Izdavatelj može prestati nakon odgovarajuće obavijesti, osim ako zakon propisuje drugačije. Prava odobrena posebnim licencama trećih strana ostaju pod njihovim uvjetima.
 
-Razgovori se, kada je podržano, spremaju lokalno. Podaci poslani odabranom AI pružatelju obrađuju se prema njegovim uvjetima. Alati koji rade s lokalnim datotekama, naredbama ili mrežnim izvorima mogu promijeniti korisnikovo okruženje. Potvrđujte dozvole i redovito izrađujte sigurnosne kopije važnih podataka.
+## 10. Mjerodavno pravo i rješavanje sporova
+Ovaj ugovor uređuje pravo Republike Hrvatske, ne dovodeći u pitanje obvezne odredbe o zaštiti potrošača u državi njihova uobičajenog boravišta i druga prava koja se ne mogu isključiti. Stranke će nastojati spor riješiti sporazumno preko službenog kontakta na https://brendigo.com. Nadležnost suda određuje se prema obveznim primjenjivim propisima.
 
-## 6. Ažuriranja
+## 11. Izmjene uvjeta
+Nove verzije ovih uvjeta bit će dostupne na službenoj stranici ili u pratećoj dokumentaciji. Bitne izmjene ne djeluju retroaktivno protivno primjenjivom pravu.
 
-Ako uključite provjeru ažuriranja, program može kontaktirati službenu HTTPS adresu radi dohvaćanja metapodataka o izdanju. Automatska instalacija dopuštena je isključivo uz uspješnu provjeru digitalnog potpisa kada je takav način ažuriranja omogućen. Prijenos novih izdanja nije zajamčen za nepodržane sustave ili konfiguracije.
+## 12. Napomena o komponentama drugih autora
+Ghost AI sadrži zasebno licencirane komponente. Njihove obvezne obavijesti, tekstovi licenci i podaci o autorstvu nalaze se u datoteci **THIRD_PARTY_NOTICES.md** i odgovarajućim licencnim datotekama. Za Ghost AI vizualni identitet i izvorne doprinose izdavatelj je Brendigo.
 
-## 7. Nedopuštena uporaba
+**Kontakt i službene informacije:** https://brendigo.com
 
-Zabranjeno je koristiti program protivno zakonu, za neovlašten pristup sustavima, kršenje tuđih prava ili zaobilaženje zaštitnih mehanizama. Ova odredba ne ograničava prava zakonita istraživanja sigurnosti niti prava iz licenci otvorenoga koda.
-
-## 8. Jamstva i odgovornost
-
-U mjeri dopuštenoj zakonom program se pruža bez dodatnih komercijalnih jamstava. Ništa u ovom dokumentu ne isključuje odgovornost koju nije moguće ograničiti, uključujući obveznu zaštitu potrošača i prava koja proizlaze iz prisilnih propisa EU-a i Republike Hrvatske.
-
-## 9. Izmjene i kontakt
-
-Važeće inačice uvjeta dostupne su preko službene stranice https://brendigo.com. Za pravna pitanja i podršku koristite kontaktni kanal objavljen na toj stranici. Materijalne promjene uvjeta za postojeća prava podliježu primjenjivom zakonu.
-
-## 10. Mjerodavno pravo
-
-Na ugovor se primjenjuje pravo Republike Hrvatske, uz očuvanje prisilnih prava potrošača iz države njihova uobičajenog boravišta kada je to propisano. Nadležnost sudova određuje se prema primjenjivom zakonu.
-
-**Napomena:** Ovaj dokument je nacrt ugovornih uvjeta koji treba pravno pregledati prije komercijalne distribucije, osobito identitet pravne osobe, kontaktne podatke, uvjete prodaje i porezne obveze.
+*Ovaj tekst je radna pravna dokumentacija; prije tržišne distribucije, naplate i prihvata kroz instalacijski postupak potreban je pregled ovlaštenog pravnog stručnjaka za planirani poslovni model i jurisdikcije.*

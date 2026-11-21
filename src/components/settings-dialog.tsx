@@ -4,7 +4,6 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Bot,
-  Bug,
   Check,
   Cloud,
   ChevronDown,
@@ -21,7 +20,6 @@ import {
   Search,
   Share2,
   Sparkles,
-  Star,
   Settings,
   Stethoscope,
   Trash2,
@@ -121,8 +119,8 @@ const FETCH_METHOD_LABELS: Record<WebFetchLocalMethod, string> = {
 }
 
 // External destinations for the About section.
-const OFFICIAL_SITE_URL = 'https://brendigo.com'
-const SUPPORT_URL = 'https://brendigo.com'
+const AUTHOR_WEBSITE_URL = 'https://brendigo.com'
+const SUPPORT_WEBSITE_URL = 'https://brendigo.com'
 
 const data = {
   nav: [
@@ -243,7 +241,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [logDiagnosing, setLogDiagnosing] = React.useState(false)
 
   // About section state (updater store also owns the app version)
-  const signedUpdaterEnabled = import.meta.env.VITE_GHOST_AI_UPDATES === 'true'
   const updaterStatus = useUpdaterStore((s) => s.status)
   const updaterUpdate = useUpdaterStore((s) => s.update)
   const updaterVersion = useUpdaterStore((s) => s.currentVersion)
@@ -1594,16 +1591,16 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     if (activeSection === 'about') {
       return (
         <div className="grid gap-6">
+          <div className="rounded-xl border border-border bg-card p-4"><p className="text-base font-semibold">Ghost AI</p><p className="text-sm text-muted-foreground">By Brendigo · https://brendigo.com</p></div>
           <p className="text-sm text-muted-foreground max-w-md">{t('aboutNoTelemetry')}</p>
-          <p className="text-xs text-muted-foreground">Ghost AI · Brendigo · <button className="underline underline-offset-4 hover:text-primary" onClick={() => openExternal(OFFICIAL_SITE_URL)}>brendigo.com</button></p>
 
           <div className="grid gap-2">
             <Label>{t('aboutSupportTitle')}</Label>
             <p className="text-xs text-muted-foreground max-w-md">{t('aboutSupportDescription')}</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => openExternal(OFFICIAL_SITE_URL)}>
-                <Star className="mr-2 h-4 w-4" />
-                {t('aboutStarButton')}
+              <Button variant="outline" size="sm" onClick={() => openExternal(AUTHOR_WEBSITE_URL)}>
+                <Globe className="mr-2 h-4 w-4" />
+                Official website
               </Button>
               <Button variant="outline" size="sm" onClick={handleCopyRecommendation}>
                 <Share2 className="mr-2 h-4 w-4" />
@@ -1616,21 +1613,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <Label>{t('aboutIssuesTitle')}</Label>
             <p className="text-xs text-muted-foreground max-w-md">{t('aboutIssuesDescription')}</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => openExternal(SUPPORT_URL)}>
-                <Bug className="mr-2 h-4 w-4" />
-                {t('aboutFileIssueButton')}
+              <Button variant="outline" size="sm" onClick={() => openExternal(SUPPORT_WEBSITE_URL)}>
+                <Heart className="mr-2 h-4 w-4" />
+                Contact Brendigo
               </Button>
             </div>
           </div>
 
           <div className="grid gap-2">
             <Label>{t('updateSectionTitle')}</Label>
-            {!signedUpdaterEnabled && <p className="max-w-md text-xs text-muted-foreground">Verified in-app updates will be enabled when Ghost AI signing is configured. Downloads and support: brendigo.com.</p>}
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => signedUpdaterEnabled ? handleManualUpdateCheck() : openExternal(OFFICIAL_SITE_URL)}
+                onClick={handleManualUpdateCheck}
                 disabled={
                   updaterStatus === 'checking' ||
                   updaterStatus === 'downloading' ||
@@ -1642,7 +1638,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 ) : (
                   <RefreshCw className="mr-2 h-4 w-4" />
                 )}
-                {signedUpdaterEnabled ? (updaterStatus === 'checking' ? t('updateChecking') : t('updateCheckButton')) : 'Official downloads'}
+                {updaterStatus === 'checking' ? t('updateChecking') : t('updateCheckButton')}
               </Button>
               {updaterUpdate && updaterStatus === 'idle' && (
                 <>
@@ -1704,7 +1700,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
             {updaterError && <p className="text-xs text-destructive max-w-md">{updaterError}</p>}
 
-            {signedUpdaterEnabled && <div className="flex items-center justify-between gap-4 max-w-md pt-2">
+            <div className="flex items-center justify-between gap-4 max-w-md pt-2">
               <div className="grid gap-1">
                 <Label htmlFor="update-auto-check">{t('updateAutoCheckLabel')}</Label>
                 <p className="text-xs text-muted-foreground">{t('updateAutoCheckDescription')}</p>
@@ -1714,7 +1710,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 checked={autoCheckEnabled}
                 onCheckedChange={(checked) => void setAutoCheck(checked)}
               />
-            </div>}
+            </div>
           </div>
 
           {updaterVersion !== null && (
@@ -1765,7 +1761,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             </SidebarContent>
           </Sidebar>
           <main className="flex min-h-0 h-[min(84vh,680px)] flex-1 flex-col overflow-hidden">
-            <header className="flex min-h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+            <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
               <div className="flex min-w-0 items-center gap-2 px-4">
                 <label className="sr-only" htmlFor="ghost-settings-navigation">Settings section</label>
                 <select id="ghost-settings-navigation" className="min-w-0 max-w-[calc(95vw-5rem)] rounded-md border bg-background p-2 text-sm text-foreground md:hidden" value={activeSection} onChange={(event) => setActiveSection(event.target.value)}>

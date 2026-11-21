@@ -1,24 +1,24 @@
-# GHOST AI — INFORMACIJE O PRIVATNOSTI
+# Ghost AI — Pravila privatnosti
 
-Datum: 21. studenoga 2026.  
-Proizvod: Ghost AI · Brendigo · https://brendigo.com
+**Izdavatelj proizvoda:** Brendigo · **Službena mrežna stranica:** https://brendigo.com  
+**Verzija dokumenta:** 1.0 · **Datum:** 21. studenoga 2026.
 
-## Pohrana na uređaju
+## Lokalna pohrana
+Aplikacija može obrađivati i pohranjivati razgovore, postavke, konfiguracije modela, povijest i radne datoteke lokalno na uređaju. Korisnik kontrolira datoteke i odobrenja funkcija s pristupom uređaju. Samo deinstaliranje ne jamči automatsko uklanjanje svih korisničkih podataka iz profilnih direktorija.
 
-Aplikacija ima lokalnu povijest razgovora, postavke i datoteke koje korisnik odabere obraditi. Sam lokalni zapis ne zahtijeva zasebnu poslužiteljsku bazu podataka. Korisnik može uklanjati lokalne podatke pomoću dostupnih alata i deinstalacijom, uz pažnju na sigurnosne kopije.
+## Prijenos podataka
+Kada korisnik odabere vanjskog AI pružatelja, promptovi i odabrani dokumenti ili drugi sadržaji mogu se prenijeti na njegovu infrastrukturu. Obrada podliježe pravilima tog pružatelja. Za lokalne modele prijenos prema vanjskom API-ju nije potreban za samu inferenciju, ali druge aktivirane funkcije mogu koristiti mrežu.
 
-## Obrada kod vanjskih pružatelja
+## API ključevi i sigurnost
+Autentikacijski podaci trebaju se pohranjivati zaštićeno, s pristupom ograničenim na aplikaciju i odgovarajuće funkcije operacijskog sustava. Nije dopušteno upisivati tajne u izvještaje o pogreškama ili javne zapisnike. Prije prijave problema korisnik mora ukloniti osobne i povjerljive podatke.
 
-Kod cloud AI usluga poruke, datoteke i druge eksplicitno poslane informacije odlaze odabranom AI pružatelju. Pravila pohrane, prijenosa i zadržavanja podataka ovise o pružatelju; korisnik treba provjeriti njegove uvjete prije slanja povjerljivih podataka.
+## Automatska ažuriranja
+Kada je provjera ažuriranja uključena, aplikacija može zatražiti javni statički manifest na domeni https://brendigo.com radi usporedbe verzija. Poslužitelj može tehnički obraditi podatke tipične za HTTP zahtjev (npr. IP adresu) prema vlastitim pravilima i zakonskim obvezama. Manifest ne zahtijeva račun korisnika ni bazu podataka.
 
-## Ažuriranja
+## Zadržavanje i brisanje
+Lokalnim podatcima korisnik upravlja putem mogućnosti aplikacije i operacijskog sustava. Brisanje na uređaju ne znači automatsko brisanje ranije poslanih podataka u sustavima vanjskih pružatelja.
 
-Provjera izdanja, ako je omogućena, koristi službeni HTTPS izvor statičkog manifestnog zapisa. HTTP poslužitelj može obrađivati standardne tehničke zapise kao što su IP adresa i vrijeme pristupa. Ne koristi se baza podataka korisničkih računa za sam sustav ažuriranja.
+## Prava korisnika i kontakt
+Za pitanja o zaštiti podataka obratite se Brendigu putem službene stranice https://brendigo.com. Kada su primjenjivi, korisnici imaju prava propisana GDPR-om i nacionalnim pravom, uključujući prava na pristup, ispravak, brisanje i prigovor, uz pripadajuća ograničenja. Korisnik se može obratiti i nadležnom nadzornom tijelu.
 
-## Sigurnost
-
-API vjerodajnice treba spremati u sustav zaštićene pohrane gdje je dostupan. Agentima, alatima datotečnog sustava i izvršavanju naredbi treba dodijeliti najmanje potrebne ovlasti.
-
-## Obveze prije objave
-
-Prije komercijalnog lansiranja treba objaviti puni podatkovni identitet voditelja obrade, pravnu osnovu za eventualnu telemetriju, kategorije primatelja i razdoblja čuvanja, prava ispitanika i službeni kontakt. Ovaj tehničko-pravni nacrt nije zamjena za konačnu GDPR obavijest.
+**Napomena:** Prije javne distribucije potrebno je potvrditi identitet voditelja obrade, kontakt, stvarne tokove podataka, pravne osnove, rokove zadržavanja, međunarodne prijenose i ugovore s izvršiteljima obrade. Ovaj tekst nije potvrda usklađenosti.
