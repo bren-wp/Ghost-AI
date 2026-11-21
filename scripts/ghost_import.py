@@ -87,7 +87,55 @@ def configure():
     p=ROOT/"index.html"
     s=p.read_text()
     s=re.sub(r'<link rel="icon"[^>]*>','<link rel="icon" type="image/png" href="/ghost-ai-icon.png" />',s)
+    s=re.sub(
+        r'(?s)<div id="splash">.*?</div>',
+        '<div id="splash"><img src="/ghost-ai-icon.png" width="94" height="94" alt="Ghost AI" /><strong>Ghost AI</strong></div>',
+        s,
+        count=1,
+    )
+    s=s.replace("</style>", "#splash{flex-direction:column;gap:16px;color:#e5e7eb;font:600 22px Arial,sans-serif}#splash img{border-radius:20px;box-shadow:0 0 45px #00e5ff33}html,html.dark{background-color:#080f1a}</style>")
     p.write_text(s)
+    # Default to Ghost AI dark mode while retaining optional user overrides.
+    p=ROOT/"public/theme-init.js"
+    value=p.read_text().replace("var preference = 'system'", "var preference = 'dark'")
+    p.write_text(value)
+    p=ROOT/"src/lib/theme.ts"
+    value=p.read_text().replace("  return 'system'\n}", "  return 'dark'\n}")
+    p.write_text(value)
+    p=ROOT/"src/App.css"
+    value=p.read_text()+"""
+
+/* Ghost AI visual identity: consistent dark surfaces across all screens. */
+.dark {
+  --background: #080f1a;
+  --foreground: #e5e7eb;
+  --card: #111827;
+  --card-foreground: #e5e7eb;
+  --popover: #111827;
+  --popover-foreground: #e5e7eb;
+  --primary: #00e5ff;
+  --primary-foreground: #080f1a;
+  --secondary: #1a263d;
+  --secondary-foreground: #e5e7eb;
+  --muted: #1f2937;
+  --muted-foreground: #a8b3c8;
+  --accent: #24264c;
+  --accent-foreground: #e5e7eb;
+  --border: #324057;
+  --input: #34435d;
+  --ring: #874cff;
+  --sidebar: #0b1425;
+  --sidebar-foreground: #e5e7eb;
+  --sidebar-primary: #00e5ff;
+  --sidebar-primary-foreground: #080f1a;
+  --sidebar-accent: #1d2540;
+  --sidebar-accent-foreground: #e5e7eb;
+  --sidebar-border: #263450;
+  --sidebar-ring: #874cff;
+}
+.dark :focus-visible { outline-color: #874cff; }
+"""
+    p.write_text(value)
 
 def assets():
     p=ROOT/"brand"
