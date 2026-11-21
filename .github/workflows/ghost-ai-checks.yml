@@ -1,3 +1,4 @@
+# Ghost AI by Brendigo
 name: Ghost AI Quality Gates
 
 on:
@@ -33,6 +34,14 @@ jobs:
         run: pnpm test
       - name: Signed manifest tests
         run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Review first-party code for maintainability and risk
+        run: python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
+      - name: Save Ghost AI source review
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-Code-Review
+          path: reports/ghost-ai-code-audit.md
+          if-no-files-found: error
       - name: Verify legal notices and brand assets
         shell: bash
         run: |

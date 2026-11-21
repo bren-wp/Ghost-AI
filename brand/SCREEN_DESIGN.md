@@ -6,12 +6,12 @@ These six editable SVGs are **design concepts**, not captured application screen
 
 | Surface | Reference |
 | --- | --- |
-| New workspace | [Home](screens/home-concept.svg) |
-| Conversation | [Conversations](screens/conversations-concept.svg) |
-| Tool permissions and agents | [Agents](screens/agents-concept.svg) |
-| Document analysis | [Documents](screens/documents-concept.svg) |
-| Cloud and local AI configuration | [Providers](screens/providers-concept.svg) |
-| App preferences and signed updates | [Settings](screens/settings-concept.svg) |
+| New workspace | [Home](screens/ghost-ai-home-concept.svg) |
+| Conversation | [Conversations](screens/ghost-ai-conversations-concept.svg) |
+| Tool permissions and agents | [Agents](screens/ghost-ai-agents-concept.svg) |
+| Document analysis | [Documents](screens/ghost-ai-documents-concept.svg) |
+| Cloud and local AI configuration | [Providers](screens/ghost-ai-providers-concept.svg) |
+| App preferences and signed updates | [Settings](screens/ghost-ai-settings-concept.svg) |
 
 ## Visual foundation
 

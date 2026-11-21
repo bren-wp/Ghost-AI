@@ -1,3 +1,4 @@
+# Ghost AI by Brendigo
 name: Ghost AI — Release Packages
 
 on:
@@ -127,6 +128,17 @@ jobs:
           Get-ChildItem 'release/Ghost-AI-*' -File | ForEach-Object {
             (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLower() + '  ' + $_.Name
           } | Set-Content -Encoding utf8 'release/SHA256SUMS.txt'
+      - name: Capture a real first-run Ghost AI screenshot
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          pwsh -NoProfile -File scripts/ghost-ai-capture-screenshot.ps1 -Executable 'release/Portable/Ghost-AI.exe' -Output 'screenshots/ghost-ai-first-run.png'
+      - name: Save real Ghost AI screenshots for visual review
+        uses: actions/upload-artifact@v4
+        with:
+          name: GhostAI-Screenshots
+          path: screenshots/*.png
+          if-no-files-found: ignore
       - name: Publish Windows artifact
         uses: actions/upload-artifact@v4
         with:

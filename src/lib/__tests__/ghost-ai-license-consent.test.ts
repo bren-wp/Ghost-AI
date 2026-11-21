@@ -1,6 +1,6 @@
 // Ghost AI by Brendigo
 import { describe, expect, it, beforeEach } from 'vitest'
-import { LICENSE_ACCEPTANCE_KEY, hasAcceptedLicense, acceptLicense } from '../license-consent'
+import { LICENSE_ACCEPTANCE_KEY, hasAcceptedLicense, acceptLicense } from '../ghost-ai-license-consent'
 
 describe('Ghost AI EULA consent', () => {
   beforeEach(() => localStorage.clear())

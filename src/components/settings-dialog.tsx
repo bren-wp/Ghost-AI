@@ -101,7 +101,7 @@ import { BuiltinToolIcon } from '@/components/builtin-tool-icon'
 import { SyncSettingsSection } from '@/components/sync/sync-settings-section'
 import { VisualsSettings } from '@/components/settings-dialog/visuals-settings'
 import { AppearanceSettings } from '@/components/settings-dialog/appearance-settings'
-import { GhostAboutSettings } from '@/components/settings-dialog/ghost-about-settings'
+import { GhostAboutSettings } from '@/components/settings-dialog/ghost-ai-about-settings'
 import { McpServerConfigModal } from '@/components/mcp-server-config-modal'
 
 // Translation key per fetch strategy. Record<> forces exhaustiveness: adding
