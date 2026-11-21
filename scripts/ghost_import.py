@@ -188,7 +188,7 @@ are retained in [legal](legal/THIRD_PARTY_NOTICES.md).
 def main():
     if not (CORE/"src-tauri/Cargo.toml").exists() or not (AGENT/"Cargo.toml").exists():
         raise SystemExit("Missing pinned upstream sources")
-    copy_into(CORE,ROOT,{".git",".github","LICENSE","README.md","CHANGELOG.md","docs","node_modules"})
+    copy_into(CORE,ROOT,{".git",".github","LICENSE","README.md","CHANGELOG.md","docs","node_modules","scripts"})
     copy_into(AGENT,ROOT/"vendor/agent",{".git",".github","README.md"})
     migrate()
     configure()
