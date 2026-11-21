@@ -4,7 +4,6 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Bot,
-  Bug,
   Check,
   Cloud,
   ChevronDown,
@@ -21,7 +20,6 @@ import {
   Search,
   Share2,
   Sparkles,
-  Star,
   Settings,
   Stethoscope,
   Trash2,
@@ -121,8 +119,8 @@ const FETCH_METHOD_LABELS: Record<WebFetchLocalMethod, string> = {
 }
 
 // External destinations for the About section.
-const GITHUB_REPO_URL = 'https://github.com/ghost_aiapp/ghost-ai-desktop'
-const GITHUB_ISSUES_URL = `${GITHUB_REPO_URL}/issues`
+const AUTHOR_WEBSITE_URL = 'https://brendigo.com'
+const SUPPORT_WEBSITE_URL = 'https://brendigo.com'
 
 const data = {
   nav: [
@@ -1593,15 +1591,16 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     if (activeSection === 'about') {
       return (
         <div className="grid gap-6">
+          <div className="rounded-xl border border-border bg-card p-4"><p className="text-base font-semibold">Ghost AI</p><p className="text-sm text-muted-foreground">By Brendigo · https://brendigo.com</p></div>
           <p className="text-sm text-muted-foreground max-w-md">{t('aboutNoTelemetry')}</p>
 
           <div className="grid gap-2">
             <Label>{t('aboutSupportTitle')}</Label>
             <p className="text-xs text-muted-foreground max-w-md">{t('aboutSupportDescription')}</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => openExternal(GITHUB_REPO_URL)}>
-                <Star className="mr-2 h-4 w-4" />
-                {t('aboutStarButton')}
+              <Button variant="outline" size="sm" onClick={() => openExternal(AUTHOR_WEBSITE_URL)}>
+                <Globe className="mr-2 h-4 w-4" />
+                Official website
               </Button>
               <Button variant="outline" size="sm" onClick={handleCopyRecommendation}>
                 <Share2 className="mr-2 h-4 w-4" />
@@ -1614,9 +1613,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <Label>{t('aboutIssuesTitle')}</Label>
             <p className="text-xs text-muted-foreground max-w-md">{t('aboutIssuesDescription')}</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => openExternal(GITHUB_ISSUES_URL)}>
-                <Bug className="mr-2 h-4 w-4" />
-                {t('aboutFileIssueButton')}
+              <Button variant="outline" size="sm" onClick={() => openExternal(SUPPORT_WEBSITE_URL)}>
+                <Heart className="mr-2 h-4 w-4" />
+                Contact Brendigo
               </Button>
             </div>
           </div>
