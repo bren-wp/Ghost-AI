@@ -3,6 +3,7 @@ import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { exit } from '@tauri-apps/plugin-process'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import eulaEnglish from '../../../legal/EULA-EN.md?raw'
 import eulaCroatian from '../../../legal/EULA-HR.md?raw'
 import commercialTerms from '../../../legal/COMMERCIAL-LICENSE-HR.md?raw'
@@ -69,8 +70,17 @@ export function GhostLicenseScreen({ onAccept }: Props) {
           ))}
         </nav>
         <div tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-5 py-4 text-[13px] leading-6 text-[#C8D4E8] sm:px-7">
-          <article className="prose prose-invert prose-sm max-w-none prose-headings:text-[#E5E7EB] prose-a:text-[#00E5FF]">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml>{documents[selected]}</ReactMarkdown>
+          <article className="ghost-legal-markdown">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              skipHtml
+              components={{
+                a: ({ href, children }) =>
+                  href && /^https:\/\/(www\.)?brendigo\.com(\/|$)/i.test(href) ? (
+                    <button type="button" className="underline underline-offset-4 text-[#00E5FF]" onClick={() => void openUrl(href)}>{children}</button>
+                  ) : <span>{children}</span>,
+              }}
+            >{documents[selected]}</ReactMarkdown>
           </article>
         </div>
         <footer className="flex flex-col gap-3 border-t border-[#324057] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
