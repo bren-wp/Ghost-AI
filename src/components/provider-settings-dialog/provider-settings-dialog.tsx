@@ -212,7 +212,7 @@ export function ProviderSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 gap-0 md:max-h-[600px] md:max-w-[700px] lg:max-w-[900px]">
+      <DialogContent className="w-[min(96vw,900px)] max-w-[96vw] max-h-[92vh] overflow-hidden p-0 gap-0">
         <DialogTitle className="sr-only">{t('dialogTitle')}</DialogTitle>
         <DialogDescription className="sr-only">{t('dialogDescription')}</DialogDescription>
         <SidebarProvider className="min-h-0">
@@ -228,7 +228,14 @@ export function ProviderSettingsDialog({
             storeProviders={storeProviders}
             editingCustomProviderId={editingCustomProviderId}
           />
-          <main className="flex h-[600px] flex-1 flex-col overflow-hidden">
+          <main className="flex h-[min(86vh,640px)] min-h-0 flex-1 flex-col overflow-hidden">
+            {!isDataLoaded ? (
+              <div role="status" aria-live="polite" className="flex flex-1 items-center justify-center gap-3 text-sm text-muted-foreground">
+                <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+                {t("common:loading")}
+              </div>
+            ) : (
+              <>
             <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
               <div className="flex items-center gap-2 px-4">
                 <Breadcrumb>
@@ -315,6 +322,8 @@ export function ProviderSettingsDialog({
                 )}
               </Button>
             </DialogFooter>
+              </>
+            )}
           </main>
         </SidebarProvider>
       </DialogContent>
