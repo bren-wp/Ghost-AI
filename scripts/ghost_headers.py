@@ -18,7 +18,6 @@ ROOTS = (
     ROOT / "src-tauri" / "src",
     ROOT / "scripts",
     ROOT / "public",
-    ROOT / ".github" / "workflows",
 )
 EXCLUDED = {"node_modules", "vendor", "generated", "gen", "target", "dist", "legal", "icons", "assets"}
 
