@@ -70,25 +70,10 @@ function MorphSpinner({ className, size = 24, ...props }: MorphSpinnerProps) {
       aria-label={t('loading')}
       {...props}
     >
-      {/* Brand metadata */}
-      <title>Ghost AI Loading Spinner</title>
-      <desc>A morphing shape spinner. Designed for Ghost AI.</desc>
-      <metadata>
-        {`
-          <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-                   xmlns:dc="http://purl.org/dc/elements/1.1/">
-            <rdf:Description>
-              <dc:title>Ghost AI MorphSpinner</dc:title>
-              <dc:creator>Ghost AI Team</dc:creator>
-              <dc:rights>Copyright © 2025 Ghost AI</dc:rights>
-              <dc:source>https://github.com/bren-wp/Ghost-AI</dc:source>
-            </rdf:Description>
-          </rdf:RDF>
-        `}
-      </metadata>
+      <title>Ghost AI — loading</title>
+      <desc>Animated Ghost AI activity indicator.</desc>
 
       <defs>
-        {/* Subtle glow filter */}
         <filter id="morphSpinnerGlow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="1.5" result="coloredBlur" />
           <feMerge>
@@ -99,7 +84,6 @@ function MorphSpinner({ className, size = 24, ...props }: MorphSpinnerProps) {
       </defs>
 
       <g>
-        {/* Main morphing shape */}
         <path
           fill="none"
           strokeWidth="5"
