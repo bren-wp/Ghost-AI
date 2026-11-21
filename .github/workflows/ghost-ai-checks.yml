@@ -1,14 +1,14 @@
 name: Ghost AI Quality Gates
 
 on:
-  push:
-    branches:
-      - 'feat/**'
-      - 'fix/**'
   pull_request:
     branches:
       - main
   workflow_dispatch:
+
+concurrency:
+  group: ghost-ai-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
