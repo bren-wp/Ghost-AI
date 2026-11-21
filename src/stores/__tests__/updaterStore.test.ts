@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
 import { check } from '@tauri-apps/plugin-updater'
@@ -64,6 +64,7 @@ let settingsBykey: Record<string, string> = {}
 
 describe('useUpdaterStore', () => {
   beforeEach(() => {
+    vi.stubEnv('VITE_GHOST_AI_UPDATES', 'true')
     vi.clearAllMocks()
     settingsBykey = {}
     mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
@@ -88,6 +89,18 @@ describe('useUpdaterStore', () => {
       autoCheckEnabled: true,
       skippedVersion: null,
     })
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('does not contact an unconfigured update endpoint', async () => {
+    vi.stubEnv('VITE_GHOST_AI_UPDATES', 'false')
+    const found = await useUpdaterStore.getState().checkForUpdates({ silent: false })
+    expect(found).toBeNull()
+    expect(mockCheck).not.toHaveBeenCalled()
+    expect(useUpdaterStore.getState().error).toContain('brendigo.com')
   })
 
   describe('compareVersions', () => {
