@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 /**
  * Sidebar list filtering (Library and Contacts header filter).
  *

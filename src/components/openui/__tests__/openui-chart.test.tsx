@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { beforeAll, describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { Bar, BarChart, Line, LineChart, YAxis } from 'recharts'

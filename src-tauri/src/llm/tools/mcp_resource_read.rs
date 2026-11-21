@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! MCP resource reads (`resources/read`).
 //!
 //! The model finds resources in the `mcp_schema` catalog and reads one by

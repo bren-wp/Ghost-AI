@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, fireEvent, screen, act } from '@testing-library/react'
 import { useInputResize, type UseInputResizeReturn } from '../useInputResize'

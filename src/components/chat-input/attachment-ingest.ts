@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Shared attachment intake for the composer's entry points (file picker,
 // image picker, drag-and-drop, paste): size gates, the image fit ladder,
 // and rejection toasts that name every file and the next step.

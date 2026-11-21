@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Detection of JavaScript-shell pages fetched over plain HTTP.
 //!
 //! A JS-dependent page can answer 200 with a static shell: Readability

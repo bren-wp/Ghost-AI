@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, expect, it, vi } from 'vitest'
 import {
   TRANSLATION_LANGUAGES,

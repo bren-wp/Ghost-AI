@@ -6,7 +6,6 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
-    env: { VITE_GHOST_AI_UPDATES_ENABLED: 'true' },
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
     css: true,

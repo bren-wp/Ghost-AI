@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // OOXML documents are ZIP containers: they must never be decoded as
 // UTF-8. They travel as base64 and are read through the read tool or the
 // office text extractor (extract_office_text_* commands).

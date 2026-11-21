@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { invoke } from '@tauri-apps/api/core'
 
 /** Whether a file name or MIME type denotes a PDF. */

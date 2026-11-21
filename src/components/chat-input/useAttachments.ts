@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { type Attachment, type AttachmentType } from './types'
 import {
   useAttachmentState,

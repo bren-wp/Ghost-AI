@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

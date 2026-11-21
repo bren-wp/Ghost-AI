@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // App theme: Light, Dark, or System (follow the OS appearance).
 //
 // The preference is a per-device choice stored in localStorage (like the UI

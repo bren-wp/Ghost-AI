@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! File and image attachment processing
 
 use super::super::AppState;

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Desktop vision-model responder for the read tool's image questions.
 //!
 //! Implements the agent-core [`ImageQuestionResponder`] seam: the read tool

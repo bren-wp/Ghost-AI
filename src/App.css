@@ -1,4 +1,3 @@
-/* Ghost AI by Brendigo */
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -311,20 +310,3 @@
   --sidebar-ring: #874cff;
 }
 .dark :focus-visible { outline-color: #874cff; }
-
-/* Ghost AI by Brendigo — License presentation */
-.ghost-legal-markdown { overflow-wrap: anywhere; }
-.ghost-legal-markdown h1,
-.ghost-legal-markdown h2,
-.ghost-legal-markdown h3 { margin: 1.15rem 0 .45rem; color: #e5e7eb; font-weight: 700; line-height: 1.35; }
-.ghost-legal-markdown h1 { font-size: 1.15rem; }
-.ghost-legal-markdown h2 { font-size: 1rem; }
-.ghost-legal-markdown h3 { font-size: .9rem; }
-.ghost-legal-markdown p { margin: .45rem 0 .8rem; }
-.ghost-legal-markdown ul,
-.ghost-legal-markdown ol { margin: .5rem 0 .8rem; padding-left: 1.5rem; }
-.ghost-legal-markdown ul { list-style: disc; }
-.ghost-legal-markdown ol { list-style: decimal; }
-.ghost-legal-markdown li { padding-left: .2rem; margin-bottom: .35rem; }
-.ghost-legal-markdown strong { color: #e5e7eb; font-weight: 650; }
-.ghost-legal-markdown button:focus-visible { outline: 2px solid #00e5ff; outline-offset: 3px; }

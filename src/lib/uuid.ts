@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // UUID v7 (RFC 9562): 48-bit Unix millisecond timestamp, then version,
 // variant and random bits. Matches the backend's `Uuid::now_v7()`.
 export function uuidv7(): string {

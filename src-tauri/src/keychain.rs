@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use anyhow::{Result, anyhow};
 use keyring::Entry;
 use std::collections::HashMap;

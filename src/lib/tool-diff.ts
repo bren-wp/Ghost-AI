@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { structuredPatch, diffWordsWithSpace } from 'diff'
 
 export type DiffRowType = 'context' | 'add' | 'remove' | 'hunk'

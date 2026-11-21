@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! On-device language detection for the translation page.
 //!
 //! Detection only suggests a translation direction, so it favors reporting

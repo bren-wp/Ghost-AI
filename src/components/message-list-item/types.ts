@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 export interface AvatarData {
   type: 'text' | 'image'
   // For text avatars

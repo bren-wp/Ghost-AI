@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use crate::crypto;
 
 #[tauri::command]

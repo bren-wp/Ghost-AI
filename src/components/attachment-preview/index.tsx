@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { Globe } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import type { FetchResult, SearchResult, FileAttachment, SearchDecision, ToolCall } from '@/types'

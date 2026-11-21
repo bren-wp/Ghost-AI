@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 export { ProviderSettingsDialog } from './provider-settings-dialog'
 export type {
   ProviderSettingsDialogProps,

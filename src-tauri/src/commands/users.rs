@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use super::AppState;
 use crate::models::{CreateUserRequest, User};
 use tauri::State;

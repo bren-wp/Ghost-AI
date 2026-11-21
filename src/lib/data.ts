@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import type { ModelVendor } from '@/components/model-list'
 import type { AssistantGroup } from '@/components/assistant-list'
 import gptAvatar from '@/assets/avatars/models/gpt.png'

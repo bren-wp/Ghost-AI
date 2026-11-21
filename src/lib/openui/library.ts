@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Ghost AI's OpenUI component library: statistical charts and KPI cards,
 // drawn with shadcn's Card and Chart (Recharts). Only the OpenUI language,
 // parser, and Renderer come from OpenUI; the components are Ghost AI's own,

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use crate::language_detect::{self, LanguageDetection};
 
 /// Detects the dominant language of translation input. Runs locally; no

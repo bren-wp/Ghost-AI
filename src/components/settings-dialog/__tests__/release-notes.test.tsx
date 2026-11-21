@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -10,7 +9,7 @@ const mockedOpenUrl = vi.mocked(openUrl)
 const NOTES = `### Added
 
 - In-app updates.
-- See the [docs](https://brendigo.com/ghost-ai/docs/) and [a local file](file:///etc/passwd).
+- See the [docs](https://github.com/bren-wp/Ghost-AI/docs/) and [a local file](file:///etc/passwd).
 
 ### Fixed
 
@@ -50,7 +49,7 @@ describe('ReleaseNotes', () => {
     expect(screen.getByText(/a local file/)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'docs' }))
-    await waitFor(() => expect(mockedOpenUrl).toHaveBeenCalledWith('https://brendigo.com/ghost-ai/docs/'))
+    await waitFor(() => expect(mockedOpenUrl).toHaveBeenCalledWith('https://github.com/bren-wp/Ghost-AI/docs/'))
   })
 
   it('links to the version on the website changelog', async () => {
@@ -59,7 +58,7 @@ describe('ReleaseNotes', () => {
     expect(screen.queryByTestId('release-notes')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Full changelog' }))
     await waitFor(() =>
-      expect(mockedOpenUrl).toHaveBeenCalledWith('https://brendigo.com')
+      expect(mockedOpenUrl).toHaveBeenCalledWith('https://github.com/bren-wp/Ghost-AI/changelog/#v0.9.2')
     )
   })
 })

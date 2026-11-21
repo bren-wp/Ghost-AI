@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Pending tool-approval state fed by `permission-requested` /
 // `permission-resolved` backend events. Held in RAM only: grants never
 // persist and never sync (a grant made on one device must not take

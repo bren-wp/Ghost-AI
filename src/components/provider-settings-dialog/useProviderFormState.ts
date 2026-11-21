@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import * as React from 'react'
 import type { LLMProvider } from './types'
 import { isCustomProvider } from './types'

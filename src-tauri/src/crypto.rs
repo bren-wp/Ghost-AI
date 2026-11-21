@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
 use serde::{Deserialize, Serialize};

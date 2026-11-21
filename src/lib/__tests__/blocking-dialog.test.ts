@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { afterEach, describe, expect, it } from 'vitest'
 import { hasBlockingDialog } from '../blocking-dialog'
 

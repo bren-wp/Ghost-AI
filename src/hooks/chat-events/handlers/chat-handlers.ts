@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMessageStore } from '@/stores/message'

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const setTheme = vi.fn(() => Promise.resolve())
@@ -42,18 +41,16 @@ describe('theme', () => {
     delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
   })
 
-  it('defaults to Dark and follows the OS only when System is selected', async () => {
+  it('defaults to System and follows the OS appearance', async () => {
     const setSystemDark = mockSystemDark(true)
     const { initTheme, useThemeStore } = await loadTheme()
     initTheme()
 
-    expect(useThemeStore.getState().preference).toBe('dark')
+    expect(useThemeStore.getState().preference).toBe('system')
     expect(useThemeStore.getState().resolved).toBe('dark')
     expect(isDarkClass()).toBe(true)
-    expect(setTheme).toHaveBeenCalledWith('dark')
+    expect(setTheme).toHaveBeenCalledWith(null)
 
-    useThemeStore.getState().setPreference('system')
-    expect(setTheme).toHaveBeenLastCalledWith(null)
     setSystemDark(false)
     expect(useThemeStore.getState().resolved).toBe('light')
     expect(isDarkClass()).toBe(false)
@@ -76,7 +73,7 @@ describe('theme', () => {
     localStorage.setItem('ghost_ai_theme', 'sepia')
     const { useThemeStore } = await loadTheme()
 
-    expect(useThemeStore.getState().preference).toBe('dark')
+    expect(useThemeStore.getState().preference).toBe('system')
   })
 
   it('persists and applies an explicit choice, ignoring OS changes', async () => {

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   PRESET_COLORS,

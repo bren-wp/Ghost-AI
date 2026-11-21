@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {

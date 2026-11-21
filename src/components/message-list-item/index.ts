@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Types
 export type { AvatarData, MessageListItemProps } from './types'
 

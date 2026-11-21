@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Chat commands module
 //!
 //! This module handles sending messages, streaming LLM responses, and related functionality.

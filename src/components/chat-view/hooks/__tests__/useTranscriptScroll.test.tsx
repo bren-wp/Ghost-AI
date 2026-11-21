@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { act, fireEvent, render } from '@testing-library/react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { Message } from '@/types'

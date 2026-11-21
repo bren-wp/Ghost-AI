@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { logger } from '@/lib/logger'
 import type { CreatePromptRequest, Prompt } from '@/types'
 

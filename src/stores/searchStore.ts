@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import type { SearchResults } from '@/types'

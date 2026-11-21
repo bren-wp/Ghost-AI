@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Agent-based streaming for LLM responses
 
 use super::super::AppState;

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Agent streaming module for handling streaming chat responses.
 //!
 //! This module provides the streaming implementation for all agent types,

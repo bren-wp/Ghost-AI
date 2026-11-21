@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { invoke } from '@tauri-apps/api/core'

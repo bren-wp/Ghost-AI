@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use serde::{Deserialize, Serialize};
 
 use super::conversation_settings::deserialize_double_option;

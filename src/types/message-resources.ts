@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Message resources type is generated from Rust models (src-tauri/src/models/message_resources.rs)
 // via ts-rs. Run `pnpm types:generate` in src-tauri to regenerate.
 

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Throttling mechanism for streaming updates
 export const THROTTLE_MS = 50 // Update UI every 50ms for smooth rendering
 

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { getModelLogo, getModelLogoById } from '@/lib/model-logos'
 import type { ParticipantSummary, Model } from '@/types'
 import type { AvatarData } from '@/components/message-list-item'

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Auto-mode transcript markers (permission v3): one per judged tool call,
 // keyed by tool call id. Live markers arrive on `auto-review-decided`;
 // markers of earlier turns load from the device-local decision log

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 /**
  * Mermaid theme from the app's visual palette (`--chart-1`..`--chart-6`:
  * cyan, pink, purple, amber, green, indigo), so diagrams use the same colors,

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, expect, it } from 'vitest'
 import type { Model, Provider } from '@/types'
 import { computeModelSetupState, modelCountsByProvider, pickDefaultModel } from '@/lib/model-setup'

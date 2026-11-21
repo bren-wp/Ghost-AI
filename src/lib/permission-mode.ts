@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Permission-mode defaults, sandbox availability, and auto-review
 // eligibility, shared by the chat input, the conversation settings store,
 // and Settings.

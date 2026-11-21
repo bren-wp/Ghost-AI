@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Durable store for spilled tool output (`tool-output://` references).
 //!
 //! Bash output past the inline cap streams to

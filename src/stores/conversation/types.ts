@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import type { Conversation, ConversationParticipant, Model, Assistant } from '@/types'
 import type { Draft } from 'immer'
 

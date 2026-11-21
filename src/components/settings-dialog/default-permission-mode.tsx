@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Default permission mode for new conversations (device setting
 // `default_permission_mode`). Fresh installs start in `auto`, offered on
 // every platform and resolved per conversation at first use (auto

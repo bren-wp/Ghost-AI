@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Remembered tool approvals ("remember on this device" answers on the
 // approval card). They live in a per-device file outside the synced
 // database; this card shows how many are kept and clears them.

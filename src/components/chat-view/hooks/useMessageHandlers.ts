@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useCallback, type RefObject } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'

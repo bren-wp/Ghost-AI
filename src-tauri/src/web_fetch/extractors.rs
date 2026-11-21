@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use scraper::{Html, Selector};
 use std::collections::HashSet;
 use url::Url;

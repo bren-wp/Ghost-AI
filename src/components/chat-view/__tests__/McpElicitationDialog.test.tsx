@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { McpElicitationDialog, buildContent } from '../McpElicitationDialog'

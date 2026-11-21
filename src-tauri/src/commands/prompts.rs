@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use tauri::State;
 
 use crate::commands::AppState;

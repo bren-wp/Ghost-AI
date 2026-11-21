@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import type { Message } from './message'
 
 // Event payloads

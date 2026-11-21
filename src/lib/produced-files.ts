@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Files an assistant turn created or modified, derived from its tool calls
 // (no stored state): `write` reports "Created" for new files and "Wrote"
 // for overwrites, `edit` always modifies. Failed calls produce nothing.

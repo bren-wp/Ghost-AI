@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Web search commands
 
 use crate::web_search::{SearchProvider, WebSearchResponse};

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Real-network E2E for the web tools (`web_fetch`, `web_search`).
 //!
 //! Test-only; excluded from normal runs. These hit the real internet —

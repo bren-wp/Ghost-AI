@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { canRunAnyway, useAutoReviewStore } from '../autoReviewStore'
 

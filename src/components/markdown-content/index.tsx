@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'

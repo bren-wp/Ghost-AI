@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 /**
  * Model logo mapping utility - simplified version
  * Maps model IDs/names to their corresponding logo images using regex patterns

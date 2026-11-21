@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Pending MCP elicitation requests (FR-12), fed by
 // `mcp-elicitation-requested` / `mcp-elicitation-resolved`. A FIFO queue
 // across servers and conversations: the dialog shows the oldest. RAM only.

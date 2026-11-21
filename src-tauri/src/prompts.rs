@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Centralized prompt management for Ghost AI
 //!
 //! This module contains all system prompts and prompt templates used throughout the application.

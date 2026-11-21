@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import type { LucideIcon } from 'lucide-react'
 import {
   BookOpen,

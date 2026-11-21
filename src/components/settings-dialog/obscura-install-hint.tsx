@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 'use client'
 
 import { useTranslation } from 'react-i18next'

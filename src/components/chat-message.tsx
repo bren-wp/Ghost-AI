@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,

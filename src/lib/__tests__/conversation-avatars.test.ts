@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, it, expect } from 'vitest'
 import { buildConversationAvatars } from '../conversation-avatars'
 import type { Model, ParticipantSummary } from '@/types'

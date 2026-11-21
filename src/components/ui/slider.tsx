@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import * as React from 'react'
 import * as SliderPrimitive from '@radix-ui/react-slider'
 
