@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! System-WebView browser tier for web fetch and search.
 //!
 //! Uses the OS webview engine already required by Tauri (WKWebView on macOS,

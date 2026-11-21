@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Pending `ask_user` requests: questions the model asks the user mid-turn,
 // fed by `ask-user-requested` / `ask-user-resolved`. A FIFO queue across
 // conversations: the dialog shows the oldest. RAM only.

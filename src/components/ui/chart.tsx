@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 import * as RechartsPrimitive from 'recharts'

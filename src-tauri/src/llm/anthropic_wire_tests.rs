@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Streaming-path regression: the Anthropic wire must authenticate with
 //! `x-api-key` on the full desktop chain (`call_provider` → agent streaming
 //! → SSE), not only at the client-construction level.

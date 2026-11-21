@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useState, useEffect, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import {

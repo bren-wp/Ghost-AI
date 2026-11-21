@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 export { useTranscriptScroll } from './useTranscriptScroll'
 export { useInputResize } from './useInputResize'
 export { useMessageResources } from './useMessageResources'

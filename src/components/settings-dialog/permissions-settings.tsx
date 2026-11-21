@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Settings > Permissions: how tool calls (built-in and MCP) are approved,
 // the OS sandbox behind Auto mode, and what the terminal can see.
 

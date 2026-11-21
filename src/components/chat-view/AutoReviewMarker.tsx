@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Auto-mode review card under a tool call (permission v3), styled like the
 // tool call cards it sits between: a collapsible header with the reviewed
 // action, the outcome and risk as badges, and the review time; the body

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Web search module
 //!
 //! This module provides web search functionality with support for multiple providers.

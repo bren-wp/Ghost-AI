@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Skill Scanner - discovers and parses SKILL.md files from the filesystem.
 //!
 //! Skills are stored as directories containing a SKILL.md file with optional YAML frontmatter.

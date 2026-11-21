@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, expect, it } from 'vitest'
 
 import { dateTicks, isoDay, isoDays, valueFormat } from '../chart-format'

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Re-exported from `ghost_ai_agent_core`.
 //!
 //! The OpenAI Chat Completions-compatible `CompletionModel` - with custom

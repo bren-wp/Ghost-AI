@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useEffect } from 'react'
 import { useConversationStore } from '@/stores/conversation'
 import { useMessageStore, type MessageStore } from '@/stores/message'

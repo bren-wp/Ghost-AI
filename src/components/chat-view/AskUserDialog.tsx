@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Dialog for the `ask_user` tool: the model asks the user one to four
 // questions mid-turn. Fed by the ask-user store (FIFO, oldest first);
 // answers go back through `resolve_ask_user`. Each question offers its

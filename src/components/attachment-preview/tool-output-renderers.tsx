@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useMemo, useState } from 'react'
 import { ExternalLink, Copy, Check } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import i18n from '@/lib/i18n'

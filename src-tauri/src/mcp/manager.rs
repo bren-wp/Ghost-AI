@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! MCP Connection Manager
 //!
 //! Manages connections to MCP servers via Streamable HTTP and STDIO transports.

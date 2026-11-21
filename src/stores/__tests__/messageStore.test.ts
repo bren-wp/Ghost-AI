@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { invoke } from '@tauri-apps/api/core'
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { useMessageStore, createDefaultConversationState } from '../message'

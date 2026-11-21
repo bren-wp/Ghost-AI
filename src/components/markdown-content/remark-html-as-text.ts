@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 interface MdNode {
   type: string
   value?: string

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { DETECTION_DEBOUNCE_MS, LONG_INPUT_CHARS, TranslationContent } from '../translation-content'

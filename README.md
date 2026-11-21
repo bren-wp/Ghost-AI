@@ -1,67 +1,48 @@
-<p align="center">
-  <img src="brand/banner.svg" width="100%" alt="Ghost AI by Brendigo">
-</p>
+<p align="center"><img src="brand/banner.svg" width="100%" alt="Ghost AI"></p>
 
-<h1 align="center">Ghost AI</h1>
-<p align="center"><strong>Your AI. Your desktop. Endless possibilities.</strong></p>
-<p align="center">One beautifully focused place to chat, create, research, analyze and get things done.</p>
+<p align="center"><b>One desktop. Infinite possibilities.</b><br>
+Your AI-powered desktop workspace for chat, research, documents, coding and creation.</p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Ghost_AI-v0.1.1-874CFF" alt="Ghost AI version">
-  <img src="https://img.shields.io/badge/Windows-Desktop-00E5FF" alt="Windows">
-  <img src="https://img.shields.io/badge/Local_%26_Cloud_AI-Multiple_models-1F2937" alt="AI models">
-</p>
+## Your work, powered by AI
 
-## Meet a smarter way to work
+Ghost AI brings powerful cloud and local models to one focused desktop experience.
+Discover ideas, ask questions, analyze documents and take control of your workflow.
 
-Ghost AI brings your favorite compatible AI services and local models into a powerful, distraction-free workspace. Explore new ideas, understand files, write, research and work with specialized AI assistants — all from one app.
+### Features
 
-### Made for the way you think
+- Multiple cloud and locally hosted AI models
+- Conversation history and advanced search
+- File and document analysis
+- Research and developer tools
+- AI assistants and MCP integrations
+- Privacy-conscious permissions and local data storage
+- Responsive Tauri desktop application
 
-| ✦ Powerful AI conversations | ◈ Intelligent document insights | ⌘ Coding, research and tools |
-| :--- | :--- | :--- |
-| Work with compatible AI services and local models. | Analyze documents you choose and uncover important details. | Discover tools, assistants and new ways to make progress. |
+## The Ghost AI experience
 
-### One workspace. More freedom.
+<p align="center"><img src="brand/logo.svg" width="160" alt="Ghost AI icon"></p>
 
-- **Your AI choice:** connect supported cloud AI providers or local runtimes.
-- **Your conversations:** keep projects and important discussions organized.
-- **Your files:** review documents and research with helpful AI tools.
-- **Your control:** understand permissions before sensitive actions.
-- **Your look:** elegant dark surfaces, cyan highlights and violet accents.
-- **Your workflow:** tools, assistants and extensible integrations.
+Designed for clarity with dark surfaces, glowing cyan and violet accents,
+accessible controls and responsive windows.
 
-## Designed to feel right, everywhere
+Graphics are brand concepts, not verified app screenshots. Actual screen captures
+will be added after release verification.
 
-<p align="center"><img src="brand/logo.svg" width="152" alt="Ghost AI app icon"></p>
+## Download
 
-Ghost AI uses a responsive interface designed for laptop screens, external monitors and different display scales. Its window opens at a comfortable size without filling the whole screen.
+See [Ghost AI releases](https://github.com/bren-wp/Ghost-AI/releases).
+Windows is the first priority. Other platforms follow validation.
+Release assets are published only after build checks succeed.
 
-The visuals currently included in this repository are original brand designs. Screenshots of the real app are added only after the matching build and visual tests are complete.
+## Security & privacy
 
-## Available platforms
+Conversation history is stored locally. Cloud models process submitted prompts under
+their own policies. Sensitive tool actions and credentials require explicit review.
 
-**Windows:** setup, portable package and installer-based update package.  
-**macOS and Linux:** planned release builds subject to compatibility and distribution checks.
+## License and credits
 
-Download the latest verified packages from **[brendigo.com](https://brendigo.com)** when released. Public preview builds, when available, are also attached to releases in this repository.
+Ghost AI branding and Brendigo-owned contributions are covered by this repository's
+MIT license where applicable. Third-party Apache-2.0 software and mandatory credits
+are retained in [legal](legal/THIRD_PARTY_NOTICES.md).
 
-## Safe by design
-
-Ghost AI keeps local data on your computer and lets you choose the services you connect. Requests sent to external AI providers are governed by those providers' privacy practices and pricing. File and command tools require appropriate care and permissions.
-
-## Publisher and legal information
-
-**Ghost AI is published by Brendigo.**  
-Official website: **https://brendigo.com**
-
-- [End-user terms (EULA)](legal/EULA-HR.md)
-- [Commercial distribution terms](legal/COMMERCIAL-LICENSE-HR.md)
-- [Privacy information](legal/PRIVACY-HR.md)
-- [Required third-party license notices](legal/THIRD_PARTY_NOTICES.md)
-
-Ghost AI includes properly licensed open-source software. These notices are preserved as legally required and do not imply endorsement of the Ghost AI brand.
-
----
-
-<p align="center"><strong>Ghost AI by Brendigo.</strong><br>Your ideas are just the beginning.</p>
+**Ghost AI by Brendigo.**

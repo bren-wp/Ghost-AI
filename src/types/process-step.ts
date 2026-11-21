@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Process step types are generated from Rust models (src-tauri/src/models/process_step.rs)
 // via ts-rs. Run `pnpm types:generate` in src-tauri to regenerate.
 

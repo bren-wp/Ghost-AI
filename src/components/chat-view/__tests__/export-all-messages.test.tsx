@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useRef } from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'

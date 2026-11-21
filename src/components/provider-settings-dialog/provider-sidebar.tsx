@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 'use client'
 
 import { useMemo } from 'react'

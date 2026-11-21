@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Agent builder module for unified LLM agent creation across all providers.
 //!
 //! This module provides a unified interface for creating rig agents with full configuration

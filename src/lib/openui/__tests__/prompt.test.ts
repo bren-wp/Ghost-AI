@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 
@@ -12,7 +11,7 @@ import { generateOpenUiPrompt, OPENUI_EXAMPLE_PROGRAMS, OPENUI_SIGNATURES } from
 // prompt written here. Rewrite it with UPDATE_OPENUI_PROMPT=1.
 const CORE_PROMPT_PATH = path.resolve(
   __dirname,
-  '../../../../vendor/agent/crates/ghost-ai-agent-core/src/visual_output/openui_prompt.txt'
+  '../../../../../ghost-ai-agent/crates/ghost-ai-agent-core/src/visual_output/openui_prompt.txt'
 )
 
 /** `Name(a, b, c?)` from a component's zod schema, in argument order. */

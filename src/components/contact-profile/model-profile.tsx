@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageSquarePlus, Settings2, Trash2 } from 'lucide-react'

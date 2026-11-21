@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Web search tool for LLM agents
 //!
 //! Allows the AI to actively search the web for information.

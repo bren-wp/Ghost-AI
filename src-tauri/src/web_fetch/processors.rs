@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use chrono::Utc;
 use readability::extractor::extract;
 use scraper::{Html, Selector};

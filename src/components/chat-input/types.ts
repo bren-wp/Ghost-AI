@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { Globe, FileText, Image, Plug } from 'lucide-react'
 import React from 'react'
 

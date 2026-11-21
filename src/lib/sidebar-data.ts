@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { MessagesSquare, Users, Library, Package, Settings, Languages } from 'lucide-react'
 import type { PromptGroup } from '@/components/prompt-list'
 import type { NavItem } from '@/components/sidebar/sidebar-navigation'

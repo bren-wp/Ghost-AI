@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Auxiliary model resolution.
 //!
 //! Two settings route cheap or vision-only work away from the conversation's

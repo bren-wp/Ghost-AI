@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, it, expect } from 'vitest'
 import {
   IMAGE_MAX_BASE64_CHARS,

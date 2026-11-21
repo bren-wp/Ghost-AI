@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { AskUserOutput, getToolInputSummary, parseAskUserOutput } from '../tool-output-renderers'

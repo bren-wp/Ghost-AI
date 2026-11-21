@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useState, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'

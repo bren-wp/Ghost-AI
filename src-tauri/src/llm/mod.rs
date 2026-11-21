@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 pub mod agent_builder;
 pub mod agent_streaming;
 #[cfg(test)]

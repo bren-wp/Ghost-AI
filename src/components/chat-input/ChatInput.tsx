@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { open } from '@tauri-apps/plugin-dialog'

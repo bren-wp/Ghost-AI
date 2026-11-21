@@ -1,13 +1,8 @@
-// Ghost AI by Brendigo
-import { useState } from 'react'
-import { ChatPage } from './pages/chat-page'
-import { GhostLicenseScreen } from './components/license/ghost-license-screen'
-import { hasAcceptedLicense, acceptLicense } from './lib/license-consent'
 import './App.css'
+import { ChatPage } from './pages/chat-page'
 
-export default function App() {
-  const [accepted, setAccepted] = useState(hasAcceptedLicense)
-
-  if (accepted) return <ChatPage />
-  return <GhostLicenseScreen onAccept={() => { if (acceptLicense()) setAccepted(true) }} />
+function App() {
+  return <ChatPage />
 }
+
+export default App

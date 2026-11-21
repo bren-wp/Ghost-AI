@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Classify MCP failures as "the server rejected our credentials".
 //!
 //! Only transport/protocol failures are classified: connect errors,

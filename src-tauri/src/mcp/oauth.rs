@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! MCP OAuth 2.0/2.1 authorization flow.
 //!
 //! Implements discovery (RFC 9728 Protected Resource Metadata, RFC 8414 AS Metadata),

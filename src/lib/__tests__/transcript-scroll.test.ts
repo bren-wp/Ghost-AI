@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, it, expect, vi } from 'vitest'
 import {
   requestTranscriptScroll,

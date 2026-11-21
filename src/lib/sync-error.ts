@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import i18n from '@/lib/i18n'
 import { logger } from '@/lib/logger'
 

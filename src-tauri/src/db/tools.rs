@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Database operations for tools (including MCP servers and builtin tools)
 
 use anyhow::Result;

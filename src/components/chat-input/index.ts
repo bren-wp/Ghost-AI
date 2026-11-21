@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Main component
 export { ChatInput } from './ChatInput'
 

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useState, useCallback } from 'react'
 import { type Attachment, type AttachmentType } from '../types'
 

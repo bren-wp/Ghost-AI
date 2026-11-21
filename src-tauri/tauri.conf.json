@@ -13,15 +13,11 @@
     "windows": [
       {
         "title": "Ghost AI",
-        "width": 1160,
-        "height": 760,
+        "width": 1220,
+        "height": 790,
         "dragDropEnabled": false,
-        "minWidth": 820,
-        "minHeight": 580,
-        "center": true,
-        "fullscreen": false,
-        "maximized": false,
-        "resizable": true
+        "minWidth": 800,
+        "minHeight": 560
       }
     ],
     "security": {
@@ -68,10 +64,7 @@
     "createUpdaterArtifacts": false,
     "resources": [
       "resources/models_dev.json",
-      "builtin-skills",
-      "../legal/EULA-EN.txt",
-      "../legal/COMMERCIAL-LICENSE-HR.md",
-      "../legal/THIRD_PARTY_NOTICES.md"
+      "builtin-skills"
     ],
     "icon": [
       "icons/32x32.png",
@@ -80,28 +73,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "macOS": {},
-    "publisher": "Brendigo",
-    "copyright": "Copyright © 2026 Brendigo",
-    "homepage": "https://brendigo.com",
-    "shortDescription": "Your AI. Your desktop.",
-    "longDescription": "Ghost AI brings conversations, documents, research and intelligent tools into one beautifully focused workspace.",
-    "licenseFile": "../legal/EULA-EN.txt",
-    "windows": {
-      "nsis": {
-        "installMode": "currentUser",
-        "displayLanguageSelector": true,
-        "languages": [
-          "English",
-          "Croatian"
-        ],
-        "headerImage": "windows/installer-header.bmp",
-        "sidebarImage": "windows/installer-sidebar.bmp",
-        "installerIcon": "icons/icon.ico",
-        "uninstallerIcon": "icons/icon.ico"
-      }
-    },
-    "category": "Productivity"
+    "macOS": {}
   },
   "plugins": {}
 }

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import type { ProcessStep, ToolCall } from '@/types'
 import { isThinkingStep, isToolCall, isContentBlock } from '@/types/process-step'
 

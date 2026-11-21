@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! MCP server management commands
 
 use super::AppState;

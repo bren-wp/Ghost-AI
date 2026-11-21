@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, GitBranch } from 'lucide-react'
 import { Button } from '@/components/ui/button'

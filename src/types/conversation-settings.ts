@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Conversation settings types are generated from Rust models
 // (src-tauri/src/models/conversation_settings.rs) via ts-rs.
 // Run `pnpm types:generate` in src-tauri to regenerate.

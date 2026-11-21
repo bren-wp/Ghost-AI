@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { toPng } from 'html-to-image'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeFile } from '@tauri-apps/plugin-fs'

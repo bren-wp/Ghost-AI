@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useAssistantGroups } from '../useAssistantGroups'

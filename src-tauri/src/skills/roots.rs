@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Where each skill source lives on this device.
 //!
 //! The `skills.path` column holds the skill's directory name relative to its

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Desktop approval gate: a rig `AgentHook` that resolves every tool call
 //! through the shared decision layer (`ghost_ai_agent_core::permission`)
 //! and round-trips prompts to the frontend over Tauri events.

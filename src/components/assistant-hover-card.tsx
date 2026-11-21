@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { AssistantAvatar } from '@/components/assistant-avatar'
 import { ModelAvatar } from '@/components/model-avatar'

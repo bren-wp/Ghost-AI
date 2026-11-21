@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Groq provider constants
 //!
 //! The actual client creation and streaming is handled by agent_builder.rs

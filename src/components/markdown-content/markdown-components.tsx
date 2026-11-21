@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useMemo, type ReactNode, type ComponentProps } from 'react'
 import { MermaidBlock } from './mermaid-block'
 import { CodeBlock } from './code-block'

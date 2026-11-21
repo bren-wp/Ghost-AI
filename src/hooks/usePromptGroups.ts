@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useMemo } from 'react'
 import { usePromptStore } from '@/stores/promptStore'
 import { useLibrarySelectionStore } from '@/stores/librarySelectionStore'

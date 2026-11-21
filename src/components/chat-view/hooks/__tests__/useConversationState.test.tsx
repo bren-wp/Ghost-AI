@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useConversationState } from '../useConversationState'

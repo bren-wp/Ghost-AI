@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Resolve the user's full shell PATH on macOS.
 //!
 //! macOS GUI apps launched from Finder/Spotlight inherit a minimal PATH

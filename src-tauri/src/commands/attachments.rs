@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use super::AppState;
 use crate::blob_sync;
 use crate::models::{BlobFetchStatus, FileAttachment, UserAttachment};

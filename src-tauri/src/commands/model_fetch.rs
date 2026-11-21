@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use crate::llm;
 use crate::llm::StreamChunkType;
 use crate::llm::agent_builder::{

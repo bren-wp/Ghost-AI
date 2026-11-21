@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Payload-wiping soft deletes.
 //!
 //! Soft-deleted rows keep only their identity skeleton: primary key, foreign

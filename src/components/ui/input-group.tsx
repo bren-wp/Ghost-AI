@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 

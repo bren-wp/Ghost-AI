@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import type { FetchResult } from '@/types'
 
 // Extract domain from URL

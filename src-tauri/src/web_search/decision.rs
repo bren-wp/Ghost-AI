@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! AI-powered search decision logic
 //!
 //! Uses LLM to determine if web search is needed for a given user query.

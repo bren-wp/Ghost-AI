@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { invoke } from '@tauri-apps/api/core'
 import type {
   Conversation,

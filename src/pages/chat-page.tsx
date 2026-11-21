@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, SquarePen, X } from 'lucide-react'

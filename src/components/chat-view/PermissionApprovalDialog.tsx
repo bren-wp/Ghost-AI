@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Approval dialog for the tool permission gate (ask mode). Fed by the
 // permission store (a FIFO queue: each stream has at most one pending
 // approval, but several conversations can stream at once — the dialog

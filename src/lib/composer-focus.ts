@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 /**
  * Ask the chat composer to take focus. Used when an action (e.g. "new
  * conversation" while the empty draft is already open) does not change the

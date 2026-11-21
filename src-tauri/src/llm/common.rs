@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use rig::message::{
     Document, DocumentMediaType, DocumentSourceKind, Image, ImageDetail, ImageMediaType,
     UserContent,

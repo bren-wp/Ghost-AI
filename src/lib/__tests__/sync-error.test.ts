@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { describe, it, expect, beforeAll } from 'vitest'
 import i18n from '@/lib/i18n'
 import zhSync from '@/locales/zh-CN/sync.json'

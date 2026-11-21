@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import type { Message, Conversation, UserAttachment } from '@/types'
 import type { Draft } from 'immer'
 

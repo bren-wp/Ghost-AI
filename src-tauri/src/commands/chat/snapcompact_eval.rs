@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Layer-4 vision read-back eval for snapcompact archives: prove that the
 //! model the archive was built for can actually retrieve facts planted in
 //! the imaged middle (never in the verbatim text edges).

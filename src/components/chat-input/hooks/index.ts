@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 export { useAttachmentState, type UseAttachmentStateReturn } from './useAttachmentState'
 export { useFileSelect, type UseFileSelectReturn } from './useFileSelect'
 export { useImageSelect, type UseImageSelectReturn } from './useImageSelect'

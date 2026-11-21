@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 use anyhow::Result;
 use chrono::Local;
 use std::fs::{File, OpenOptions};

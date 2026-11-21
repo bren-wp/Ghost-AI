@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // Closed or non-modal panels do not count: the OpenUI devtools, for example,
 // keep their drawers in the DOM as inert role="dialog" asides with
 // aria-modal="false".

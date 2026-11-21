@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { useState, useMemo } from 'react'
 import { useStreamingState } from './hooks/useStreamingState'
 import { ChatMessage } from '@/components/chat-message'

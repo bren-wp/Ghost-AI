@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 // The OpenUI section of the system prompt, written by hand for Ghost AI's
 // four-component library (`library.ts`). It is committed into
 // ghost-ai-agent-core (`visual_output/openui_prompt.txt`), which appends it

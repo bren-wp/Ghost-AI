@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 //! Conversation-scoped resolver for the read tool's host references.
 //!
 //! Attachments live under the app data directory, which `path_policy`

@@ -1,4 +1,3 @@
-// Ghost AI by Brendigo
 import { Bot, Drama, Users } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
