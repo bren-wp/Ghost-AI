@@ -43,7 +43,7 @@ jobs:
           python3 -m pip install --break-system-packages --quiet cairosvg
           python3 scripts/ghost_icons.py
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Set up pnpm
@@ -78,7 +78,7 @@ jobs:
         with:
           ref: ${{ needs.import-source.outputs.commit }}
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Set up pnpm
