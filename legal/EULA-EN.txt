@@ -1,0 +1,33 @@
+GHOST AI END USER LICENSE AGREEMENT
+Effective: November 21, 2026
+Publisher and product brand: Brendigo
+Official website: https://brendigo.com
+
+1. ACCEPTANCE
+By installing or using the Ghost AI distribution you agree to these terms to the extent permitted by applicable law. Mandatory consumer protections remain in force.
+
+2. OPEN-SOURCE SOFTWARE
+Ghost AI includes MIT- and Apache-2.0-licensed components. Nothing here revokes or limits any rights granted directly by those licenses. Copyright notices and applicable source licenses remain provided with the distribution.
+
+3. PERMISSION TO USE
+Subject to the preceding paragraph, Brendigo grants permission to install and use the Ghost AI desktop distribution. Brand identifiers, logos and marks are not licensed for misleading endorsement or impersonation.
+
+4. THIRD-PARTY PROVIDERS
+You select and configure your AI service providers. Your provider may charge for API access. Their terms and privacy policies apply to prompts and files sent to them.
+
+5. YOUR DATA AND TOOLS
+Conversation history may be stored locally on your computer. Agent actions affecting files, commands and online services may have real consequences. Review permissions before approving sensitive operations.
+
+6. UPDATES
+When enabled, the product checks a Brendigo-controlled HTTPS endpoint for available updates. Automatic installation must verify the release signature. An update is not guaranteed for all devices.
+
+7. LIMITED WARRANTIES
+To the maximum extent allowed by law, the distribution is provided without additional commercial warranties. Non-waivable consumer rights and liability under applicable law are not excluded.
+
+8. GOVERNING LAW
+Croatian law applies, subject to mandatory consumer protection rules, including applicable rights in the user's habitual residence.
+
+9. CONTACT
+For current product and legal information visit https://brendigo.com.
+
+This draft requires review by qualified legal counsel and identification of the contracting legal entity prior to commercial launch.
