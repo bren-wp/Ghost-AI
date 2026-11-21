@@ -23,7 +23,7 @@ jobs:
       commit: ${{ steps.push.outputs.commit }}
     steps:
       - name: Checkout Ghost AI
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           persist-credentials: true
@@ -74,7 +74,7 @@ jobs:
     timeout-minutes: 100
     steps:
       - name: Checkout imported source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.import-source.outputs.commit }}
       - name: Set up Node

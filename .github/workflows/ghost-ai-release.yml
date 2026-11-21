@@ -16,7 +16,7 @@ jobs:
     outputs:
       release_tag: ${{ steps.version.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -55,7 +55,7 @@ jobs:
       GHOST_AI_UPDATER_PUBLIC_KEY: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY }}
       VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -137,7 +137,7 @@ jobs:
       GHOST_AI_UPDATER_PUBLIC_KEY: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY }}
       VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Linux desktop dependencies
         run: |
           sudo apt-get update
@@ -180,7 +180,7 @@ jobs:
       GHOST_AI_UPDATER_PUBLIC_KEY: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY }}
       VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
