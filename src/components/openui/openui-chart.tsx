@@ -517,8 +517,12 @@ function SlicedChart({ type, labels, values, variant, format }: SlicedChartProps
   )
   const legend = (
     <ChartLegend
-      content={<ChartLegendContent nameKey="key" />}
-      className="-translate-y-2 flex-wrap gap-2 *:basis-1/4 *:justify-center"
+      content={
+        <ChartLegendContent
+          nameKey="key"
+          className="-translate-y-2 flex-wrap gap-2 *:basis-1/4 *:justify-center"
+        />
+      }
     />
   )
 
