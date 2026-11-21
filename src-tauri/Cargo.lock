@@ -1247,127 +1247,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ghost-ai-agent-core"
-version = "0.1.0"
-dependencies = [
- "ab_glyph",
- "aes-gcm",
- "anyhow",
- "argon2",
- "async-stream",
- "base64 0.22.1",
- "blake3",
- "calamine",
- "dirs 5.0.1",
- "encoding_rs",
- "futures",
- "grep-regex",
- "grep-searcher",
- "hkdf",
- "htmd",
- "ignore",
- "image",
- "jieba-rs 0.7.4",
- "libc",
- "lopdf 0.45.0",
- "nanoid",
- "pdf-extract",
- "png 0.17.16",
- "quick-xml 0.42.0",
- "rand 0.8.5",
- "readability",
- "regex",
- "reqwest 0.13.2",
- "rig",
- "rmcp",
- "rusqlite",
- "scraper",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "tracing",
- "tree-sitter",
- "tree-sitter-bash",
- "unicode-normalization",
- "url",
- "urlencoding",
- "uuid",
- "zip 9.0.4",
- "zstd",
-]
-
-[[package]]
-name = "ghost-ai-desktop"
-version = "0.12.0"
-dependencies = [
- "aes-gcm",
- "anyhow",
- "arboard",
- "async-stream",
- "async-trait",
- "base64 0.21.7",
- "blake3",
- "block2 0.6.2",
- "ghost-ai-agent-core",
- "chrono",
- "core-foundation 0.10.1",
- "dirs 5.0.1",
- "futures",
- "headless_chrome",
- "htmd",
- "http",
- "iana-time-zone",
- "image",
- "keyring",
- "lazy_static",
- "nanoid",
- "oauth2",
- "objc2 0.6.3",
- "objc2-app-kit",
- "objc2-foundation 0.3.2",
- "objc2-web-kit",
- "once_cell",
- "parking_lot",
- "rand 0.8.5",
- "readability",
- "regex",
- "reqwest 0.13.2",
- "rig",
- "rmcp",
- "rusqlite",
- "scraper",
- "security-framework 3.7.0",
- "security-framework-sys",
- "serde",
- "serde_json",
- "shell-words",
- "sqlx",
- "sys-locale",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-opener",
- "tauri-plugin-process",
- "tauri-plugin-updater",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "ts-rs",
- "url",
- "urlencoding",
- "uuid",
- "whatlang",
- "zstd",
-]
-
-[[package]]
 name = "chrono"
 version = "0.4.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3710,6 +3589,127 @@ checksum = "f0d8a4362ccb29cb0b265253fb0a2728f592895ee6854fd9bc13f2ffda266ff1"
 dependencies = [
  "opaque-debug",
  "polyval",
+]
+
+[[package]]
+name = "ghost-ai-agent-core"
+version = "0.1.0"
+dependencies = [
+ "ab_glyph",
+ "aes-gcm",
+ "anyhow",
+ "argon2",
+ "async-stream",
+ "base64 0.22.1",
+ "blake3",
+ "calamine",
+ "dirs 5.0.1",
+ "encoding_rs",
+ "futures",
+ "grep-regex",
+ "grep-searcher",
+ "hkdf",
+ "htmd",
+ "ignore",
+ "image",
+ "jieba-rs 0.7.4",
+ "libc",
+ "lopdf 0.45.0",
+ "nanoid",
+ "pdf-extract",
+ "png 0.17.16",
+ "quick-xml 0.42.0",
+ "rand 0.10.3",
+ "readability",
+ "regex",
+ "reqwest 0.13.2",
+ "rig",
+ "rmcp",
+ "rusqlite",
+ "scraper",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tree-sitter",
+ "tree-sitter-bash",
+ "unicode-normalization",
+ "url",
+ "urlencoding",
+ "uuid",
+ "zip 9.0.4",
+ "zstd",
+]
+
+[[package]]
+name = "ghost-ai-desktop"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "arboard",
+ "async-stream",
+ "async-trait",
+ "base64 0.21.7",
+ "blake3",
+ "block2 0.6.2",
+ "chrono",
+ "core-foundation 0.10.1",
+ "dirs 5.0.1",
+ "futures",
+ "ghost-ai-agent-core",
+ "headless_chrome",
+ "htmd",
+ "http",
+ "iana-time-zone",
+ "image",
+ "keyring",
+ "lazy_static",
+ "nanoid",
+ "oauth2",
+ "objc2 0.6.3",
+ "objc2-app-kit",
+ "objc2-foundation 0.3.2",
+ "objc2-web-kit",
+ "once_cell",
+ "parking_lot",
+ "rand 0.10.3",
+ "readability",
+ "regex",
+ "reqwest 0.13.2",
+ "rig",
+ "rmcp",
+ "rusqlite",
+ "scraper",
+ "security-framework 3.7.0",
+ "security-framework-sys",
+ "serde",
+ "serde_json",
+ "shell-words",
+ "sqlx",
+ "sys-locale",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-opener",
+ "tauri-plugin-process",
+ "tauri-plugin-updater",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "ts-rs",
+ "url",
+ "urlencoding",
+ "uuid",
+ "whatlang",
+ "zstd",
 ]
 
 [[package]]
@@ -6239,7 +6239,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ffa00dec017b5b1a8b7cf5e2c008bfda1aa7e0697ac1508b491fdf2622fb4d8"
 dependencies = [
- "rand 0.8.5",
+ "rand 0.8.8",
 ]
 
 [[package]]
@@ -6405,7 +6405,7 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.8",
  "smallvec",
  "zeroize",
 ]
@@ -6526,7 +6526,7 @@ dependencies = [
  "chrono",
  "getrandom 0.2.16",
  "http",
- "rand 0.8.5",
+ "rand 0.8.8",
  "reqwest 0.12.24",
  "serde",
  "serde_json",
@@ -7246,7 +7246,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d5285893bb5eb82e6aaf5d59ee909a06a16737a8970984dd7746ba9283498d6"
 dependencies = [
  "phf_shared 0.10.0",
- "rand 0.8.5",
+ "rand 0.8.8",
 ]
 
 [[package]]
@@ -7256,7 +7256,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c80231409c20246a13fddb31776fb942c38553c51e871f8cbd687a4cfb5843d"
 dependencies = [
  "phf_shared 0.11.3",
- "rand 0.8.5",
+ "rand 0.8.8",
 ]
 
 [[package]]
@@ -7917,9 +7917,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.8.5"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
@@ -9607,7 +9607,7 @@ dependencies = [
  "memchr",
  "once_cell",
  "percent-encoding",
- "rand 0.8.5",
+ "rand 0.8.8",
  "rsa",
  "serde",
  "sha1",
@@ -9645,7 +9645,7 @@ dependencies = [
  "md-5 0.10.6",
  "memchr",
  "once_cell",
- "rand 0.8.5",
+ "rand 0.8.8",
  "serde",
  "serde_json",
  "sha2 0.10.9",
