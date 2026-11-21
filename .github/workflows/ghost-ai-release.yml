@@ -3,6 +3,7 @@ name: Ghost AI — Release Packages
 on:
   push:
     tags: ['v*']
+    branches: ['release/v*']
   workflow_dispatch:
 
 permissions:
@@ -12,6 +13,8 @@ jobs:
   validate:
     name: Validate source and legal assets
     runs-on: ubuntu-24.04
+    outputs:
+      release_tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,11 +23,15 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: '10'
-      - name: Check matching release versions
+      - name: Verify matching release versions
+        id: version
         shell: bash
         run: |
-          expected="${GITHUB_REF_NAME#v}"
-          python3 -c 'import json,os; v=os.environ["GITHUB_REF_NAME"].removeprefix("v"); assert json.load(open("package.json"))["version"] == v; assert json.load(open("src-tauri/tauri.conf.json"))["version"] == v'
+          tag="${GITHUB_REF_NAME#release/}"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid release reference: $tag"; exit 1; }
+          version="${tag#v}"
+          python3 -c 'import json,sys; v=sys.argv[1]; assert json.load(open("package.json"))["version"] == v; assert json.load(open("src-tauri/tauri.conf.json"))["version"] == v' "$version"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Verify legal and brand files
         run: |
           for f in legal/EULA-EN.txt legal/EULA-HR.md legal/COMMERCIAL-LICENSE-HR.md legal/THIRD_PARTY_NOTICES.md brand/logo.svg brand/banner.svg; do test -s "$f"; done
@@ -75,7 +82,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = "$env:GITHUB_REF_NAME"
+          $version = "${{ needs.validate.outputs.release_tag }}"
           New-Item -ItemType Directory -Force release | Out-Null
           $installer = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
           if (-not $installer) { throw 'No Ghost AI Setup executable was built' }
@@ -212,12 +219,14 @@ jobs:
           merge-multiple: true
       - name: Verify release assets
         run: |
-          test -s "release/Ghost-AI-${GITHUB_REF_NAME}-Setup.exe"
-          test -s "release/Ghost-AI-${GITHUB_REF_NAME}-Portable.exe"
-          test -s "release/Ghost-AI-${GITHUB_REF_NAME}-Update.exe"
+          test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Setup.exe"
+          test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Portable.exe"
+          test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Update.exe"
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.validate.outputs.release_tag }}
+          target_commitish: ${{ github.sha }}
           prerelease: true
           generate_release_notes: true
           files: release/*
