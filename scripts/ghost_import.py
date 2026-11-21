@@ -24,6 +24,8 @@ def copy_into(src, dst, skip):
             shutil.copy2(child, output)
 
 def replace_names(s):
+    # Preserve TypeScript/Rust identifiers such as isChatShellSkill.
+    s = re.sub(r"ChatShell(?=[A-Za-z0-9_])", "GhostAI", s)
     for a,b in [
         ("CHATSHELL","GHOST_AI"), ("ChatShell","Ghost AI"),
         ("chatshell-agent","ghost-ai-agent"),
