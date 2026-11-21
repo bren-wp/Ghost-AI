@@ -1,0 +1,44 @@
+# Ghost AI by Brendigo
+name: Ghost AI Windows startup diagnosis
+on:
+  push:
+    branches:
+      - fix/ghost-ai-v0.1.2-startup
+    paths:
+      - .github/workflows/ghost-ai-windows-startup.yml
+      - scripts/ghost-ai-startup-diagnostics.ps1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reproduce:
+    name: Reproduce Ghost AI 0.1.1 startup on Windows
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download public Ghost AI v0.1.1 Portable archive
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.1.1 --repo ${{ github.repository }} --pattern 'Ghost-AI-v0.1.1-Portable.zip' --dir input
+          Expand-Archive -LiteralPath input/Ghost-AI-v0.1.1-Portable.zip -DestinationPath unpacked
+          if (-not (Test-Path 'unpacked/Ghost-AI.exe')) { throw 'Release archive has no Ghost AI executable' }
+      - name: Inspect launched process and Windows application log
+        id: startup
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          ./scripts/ghost-ai-startup-diagnostics.ps1 -Executable unpacked/Ghost-AI.exe -OutputDirectory diagnostics
+      - name: Preserve Ghost AI startup diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-v0.1.1-Startup-Diagnostics
+          path: diagnostics/
+          if-no-files-found: warn
+      - name: Require healthy startup
+        if: steps.startup.outcome != 'success'
+        shell: pwsh
+        run: throw 'Published Ghost AI v0.1.1 failed startup health check; inspect diagnostics artifact'
