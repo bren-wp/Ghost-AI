@@ -13,7 +13,7 @@ use rmcp::transport::streamable_http_client::{
 
 use super::call::read_resource_with_options;
 use super::call::{McpCallOptions, call_tool_with_options};
-use super::handler::Ghost AIClientHandler;
+use super::handler::GhostAIClientHandler;
 use super::listing::{
     list_all_resource_templates_bounded, list_all_resources_bounded, list_all_tools_bounded,
     supports_resources,
@@ -23,7 +23,7 @@ use super::result::render_call_tool_result;
 use super::types::{McpResourceInfo, McpResourceTemplateInfo, McpToolInfo, McpToolResult};
 
 /// A running MCP client session with Ghost AI's notification handler.
-pub type McpClientService = RunningService<RoleClient, Ghost AIClientHandler>;
+pub type McpClientService = RunningService<RoleClient, GhostAIClientHandler>;
 
 /// Configuration for connecting to an MCP server via HTTP.
 pub struct McpHttpConfig {
@@ -62,7 +62,7 @@ impl McpConnection {
     ) -> Result<Self> {
         tracing::info!("Connecting to MCP server via HTTP: {}", config.endpoint);
 
-        let mut handler = Ghost AIClientHandler::new(&config.endpoint, None);
+        let mut handler = GhostAIClientHandler::new(&config.endpoint, None);
         if let Some(prompter) = prompter {
             handler = handler.with_elicitation(prompter);
         }
@@ -194,7 +194,7 @@ impl McpConnection {
 /// clients, headers, auth, and client identity.
 pub async fn connect_http_service(
     config: &McpHttpConfig,
-    handler: Ghost AIClientHandler,
+    handler: GhostAIClientHandler,
 ) -> Result<McpClientService> {
     let http_client = if config.custom_headers.is_empty() {
         reqwest::Client::new()

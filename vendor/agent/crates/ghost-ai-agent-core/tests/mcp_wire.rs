@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use ghost_ai_agent_core::mcp::{
-    Ghost AIClientHandler, McpCallOptions, McpElicitationAnswer, McpElicitationPrompter,
+    GhostAIClientHandler, McpCallOptions, McpElicitationAnswer, McpElicitationPrompter,
     McpElicitationRequest, McpNotificationSink, call_tool_with_options, get_prompt_text,
     list_all_prompts_bounded, list_all_resource_templates_bounded, list_all_resources_bounded,
     list_all_tools_bounded, prepare_client_peer, read_resource_with_options,
@@ -271,17 +271,17 @@ async fn connect(
     loop_cursor: bool,
     sink: Option<Arc<dyn McpNotificationSink>>,
 ) -> (
-    rmcp::service::RunningService<rmcp::RoleClient, Ghost AIClientHandler>,
+    rmcp::service::RunningService<rmcp::RoleClient, GhostAIClientHandler>,
     Log,
 ) {
-    connect_with(loop_cursor, Ghost AIClientHandler::new("mock", sink)).await
+    connect_with(loop_cursor, GhostAIClientHandler::new("mock", sink)).await
 }
 
 async fn connect_with(
     loop_cursor: bool,
-    handler: Ghost AIClientHandler,
+    handler: GhostAIClientHandler,
 ) -> (
-    rmcp::service::RunningService<rmcp::RoleClient, Ghost AIClientHandler>,
+    rmcp::service::RunningService<rmcp::RoleClient, GhostAIClientHandler>,
     Log,
 ) {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
@@ -597,7 +597,7 @@ impl McpElicitationPrompter for AnswerAda {
 
 #[tokio::test]
 async fn elicitation_mid_call_reaches_the_prompter_and_returns_content() {
-    let handler = Ghost AIClientHandler::new("mock", None).with_elicitation(Arc::new(AnswerAda));
+    let handler = GhostAIClientHandler::new("mock", None).with_elicitation(Arc::new(AnswerAda));
     let (service, log) = connect_with(false, handler).await;
     let init = log
         .lock()
@@ -676,7 +676,7 @@ async fn roots_list_answers_the_current_workspace_without_hanging() {
         Arc::new(move || root.lock().unwrap().clone())
             as ghost_ai_agent_core::mcp::McpRootsProvider
     };
-    let handler = Ghost AIClientHandler::new("mock", None).with_roots(provider);
+    let handler = GhostAIClientHandler::new("mock", None).with_roots(provider);
     let (service, log) = connect_with(false, handler).await;
     let init = log
         .lock()

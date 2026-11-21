@@ -1,7 +1,7 @@
 [package]
 name = "ghost-ai-desktop"
 version = "0.1.0"
-description = "A Tauri App"
+description = "Ghost AI desktop assistant"
 authors = ["Brendigo"]
 edition = "2024"
 

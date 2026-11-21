@@ -62,11 +62,11 @@ pub enum McpProtocolMode {
 
 /// Start a session with `handler` over `transport` in `mode`.
 pub async fn serve_client<T, E, A>(
-    handler: Ghost AIClientHandler,
+    handler: GhostAIClientHandler,
     transport: T,
     mode: McpProtocolMode,
 ) -> Result<
-    rmcp::service::RunningService<RoleClient, Ghost AIClientHandler>,
+    rmcp::service::RunningService<RoleClient, GhostAIClientHandler>,
     rmcp::service::ClientInitializeError,
 >
 where
@@ -96,7 +96,7 @@ where
 /// handler callbacks, so each one is handled exactly once: here for modern
 /// sessions, in `on_tool_list_changed` for older ones.
 pub async fn start_subscriptions(
-    service: &rmcp::service::RunningService<RoleClient, Ghost AIClientHandler>,
+    service: &rmcp::service::RunningService<RoleClient, GhostAIClientHandler>,
 ) {
     let peer = service.peer().clone();
     let modern = peer
@@ -159,7 +159,7 @@ pub async fn prepare_client_peer(peer: &rmcp::service::Peer<RoleClient>) {
 }
 
 #[derive(Clone)]
-pub struct Ghost AIClientHandler {
+pub struct GhostAIClientHandler {
     info: ClientConfig,
     server: Arc<str>,
     progress: ProgressDispatcher,
@@ -187,7 +187,7 @@ pub fn roots_result(root: Option<&std::path::Path>) -> rmcp::model::ListRootsRes
     rmcp::model::ListRootsResult::new(roots)
 }
 
-impl Ghost AIClientHandler {
+impl GhostAIClientHandler {
     /// `server` labels log lines (the user-facing server name).
     pub fn new(server: &str, sink: Option<Arc<dyn McpNotificationSink>>) -> Self {
         Self {
@@ -337,7 +337,7 @@ fn log_server_message(server: &str, params: &LoggingMessageNotificationParam) {
     }
 }
 
-impl ClientHandler for Ghost AIClientHandler {
+impl ClientHandler for GhostAIClientHandler {
     fn get_info(&self) -> ClientConfig {
         self.info.clone()
     }
@@ -401,7 +401,7 @@ mod tests {
     #[tokio::test]
     async fn list_changed_storm_is_coalesced() {
         let counter = Arc::new(Counter(AtomicUsize::new(0)));
-        let handler = Ghost AIClientHandler::new("s", Some(counter.clone()));
+        let handler = GhostAIClientHandler::new("s", Some(counter.clone()));
         for _ in 0..50 {
             handler.schedule_list_changed();
         }
@@ -418,7 +418,7 @@ mod tests {
     fn client_info_identity() {
         let info = ghost_ai_client_info();
         assert_eq!(info.client_info.name, "ghost_ai");
-        let handler = Ghost AIClientHandler::new("s", None).with_client_version("9.9.9");
+        let handler = GhostAIClientHandler::new("s", None).with_client_version("9.9.9");
         assert_eq!(handler.get_info().client_info.version, "9.9.9");
         assert_eq!(handler.get_info().client_info.name, "ghost_ai");
     }

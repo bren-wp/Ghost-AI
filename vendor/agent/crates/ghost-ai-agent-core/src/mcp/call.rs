@@ -20,7 +20,7 @@ use rmcp::model::{
     ReadResourceRequestParams, ReadResourceResult, RequestId, ServerResult,
 };
 
-use super::handler::Ghost AIClientHandler;
+use super::handler::GhostAIClientHandler;
 use rmcp::service::{Peer, PeerRequestOptions, ServiceError};
 
 /// Default per-call deadline.
@@ -114,7 +114,7 @@ pub const MAX_INPUT_ROUNDS: usize = rmcp::model::DEFAULT_MRTR_MAX_ROUNDS;
 
 /// Call a tool with the given deadline settings. Progress notifications for
 /// this call reach `on_progress` when a `dispatcher` is supplied (the one
-/// owned by the connection's [`super::Ghost AIClientHandler`]). A
+/// owned by the connection's [`super::GhostAIClientHandler`]). A
 /// 2026-07-28 server may answer `input_required` (MRTR, FR-17): `input`
 /// (the connection's handler) fulfils those rounds; without it, or past
 /// [`MAX_INPUT_ROUNDS`], the call fails.
@@ -123,7 +123,7 @@ pub async fn call_tool_with_options(
     params: CallToolRequestParams,
     options: McpCallOptions,
     dispatcher: Option<&ProgressDispatcher>,
-    input: Option<&Ghost AIClientHandler>,
+    input: Option<&GhostAIClientHandler>,
     mut on_progress: impl FnMut(ProgressNotificationParam) + Send,
 ) -> Result<CallToolResult, ServiceError> {
     let mut params = params;
@@ -147,7 +147,7 @@ pub async fn read_resource_with_options(
     peer: &Peer<RoleClient>,
     uri: &str,
     options: McpCallOptions,
-    input: Option<&Ghost AIClientHandler>,
+    input: Option<&GhostAIClientHandler>,
 ) -> Result<ReadResourceResult, ServiceError> {
     let mut params = ReadResourceRequestParams::new(uri);
     let mut rounds = InputRounds::default();
@@ -170,7 +170,7 @@ pub async fn get_prompt_with_options(
     peer: &Peer<RoleClient>,
     mut params: rmcp::model::GetPromptRequestParams,
     options: McpCallOptions,
-    input: Option<&Ghost AIClientHandler>,
+    input: Option<&GhostAIClientHandler>,
 ) -> Result<rmcp::model::GetPromptResult, ServiceError> {
     let mut rounds = InputRounds::default();
     loop {
@@ -201,7 +201,7 @@ impl InputRounds {
     /// server state back off like the SDK (50 ms doubling, capped at 250 ms).
     pub(crate) async fn next(
         &mut self,
-        input: Option<&Ghost AIClientHandler>,
+        input: Option<&GhostAIClientHandler>,
         required: rmcp::model::InputRequiredResult,
     ) -> Result<(Option<InputResponses>, Option<String>), ServiceError> {
         self.taken += 1;

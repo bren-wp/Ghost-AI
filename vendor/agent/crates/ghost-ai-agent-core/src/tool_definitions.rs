@@ -3,7 +3,7 @@
 //! The `web_search` and `web_fetch` tool schemas were previously duplicated:
 //! - Desktop: `src-tauri/src/llm/tools/web_search.rs` / `web_fetch.rs`
 //!   (rig `ToolDefinition` with inline JSON schema)
-//! - iOS: `Sources/Ghost AICore/Services/Tools/ToolRegistry.swift`
+//! - iOS: `Sources/GhostAICore/Services/Tools/ToolRegistry.swift`
 //!   (`BuiltinTools.webSearch` / `webFetch` with hand-written JSON strings)
 //!
 //! This module is the single source of truth for the schemas sent to the LLM.

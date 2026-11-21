@@ -35,7 +35,7 @@ import { SkillEditDialog } from '@/components/skill-edit-dialog'
 import { useSkillActions } from '@/hooks/useSkills'
 import { useSkillStore } from '@/stores/skillStore'
 import { useLibrarySelectionStore } from '@/stores/librarySelectionStore'
-import { isGhost AISkill, isSkillAvailable, isSyncedSkill, type Skill } from '@/types'
+import { isGhostAISkill, isSkillAvailable, isSyncedSkill, type Skill } from '@/types'
 
 interface SkillDetailProps {
   skill: Skill
@@ -57,7 +57,7 @@ export function SkillDetail({ skill }: SkillDetailProps) {
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
 
   const available = isSkillAvailable(skill)
-  const ownSkill = isGhost AISkill(skill)
+  const ownSkill = isGhostAISkill(skill)
   const sourceLabel = t(`sourceLabels.${skill.source}` as never, { defaultValue: skill.source })
 
   // Reload SKILL.md when the files change underneath (edit, sync, rescan).

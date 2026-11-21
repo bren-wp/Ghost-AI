@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use ghost_ai_agent_core::mcp::{
-    Ghost AIClientHandler, MAX_INPUT_ROUNDS, McpCallOptions, McpElicitationAnswer,
+    GhostAIClientHandler, MAX_INPUT_ROUNDS, McpCallOptions, McpElicitationAnswer,
     McpElicitationPrompter, McpElicitationRequest, McpNotificationSink, McpProtocolMode,
     call_tool_with_options, prepare_client_peer, render_call_tool_result, serve_client,
     start_subscriptions,
@@ -192,9 +192,9 @@ impl McpElicitationPrompter for AnswerAda {
 async fn connect(
     era: Era,
     mode: McpProtocolMode,
-    handler: Ghost AIClientHandler,
+    handler: GhostAIClientHandler,
 ) -> (
-    rmcp::service::RunningService<rmcp::RoleClient, Ghost AIClientHandler>,
+    rmcp::service::RunningService<rmcp::RoleClient, GhostAIClientHandler>,
     Log,
 ) {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
@@ -224,7 +224,7 @@ async fn opted_in_server_negotiates_2026_via_discover() {
     let (service, log) = connect(
         Era::Modern,
         McpProtocolMode::PreferModern,
-        Ghost AIClientHandler::new("modern", None),
+        GhostAIClientHandler::new("modern", None),
     )
     .await;
     let info = service.peer().peer_info().unwrap();
@@ -239,7 +239,7 @@ async fn legacy_server_falls_back_to_initialize() {
     let (service, log) = connect(
         Era::Legacy,
         McpProtocolMode::PreferModern,
-        Ghost AIClientHandler::new("legacy", None),
+        GhostAIClientHandler::new("legacy", None),
     )
     .await;
     let info = service.peer().peer_info().unwrap();
@@ -253,7 +253,7 @@ async fn default_mode_never_probes_discover() {
     let (_service, log) = connect(
         Era::Legacy,
         McpProtocolMode::Legacy,
-        Ghost AIClientHandler::new("legacy", None),
+        GhostAIClientHandler::new("legacy", None),
     )
     .await;
     let seen = methods(&log).await;
@@ -262,7 +262,7 @@ async fn default_mode_never_probes_discover() {
 
 #[tokio::test]
 async fn input_required_round_is_answered_through_the_prompter() {
-    let handler = Ghost AIClientHandler::new("modern", None).with_elicitation(Arc::new(AnswerAda));
+    let handler = GhostAIClientHandler::new("modern", None).with_elicitation(Arc::new(AnswerAda));
     let (service, log) = connect(Era::Modern, McpProtocolMode::PreferModern, handler).await;
     let result = call_tool_with_options(
         service.peer(),
@@ -289,7 +289,7 @@ async fn input_rounds_are_bounded() {
     let (service, _log) = connect(
         Era::Modern,
         McpProtocolMode::PreferModern,
-        Ghost AIClientHandler::new("modern", None),
+        GhostAIClientHandler::new("modern", None),
     )
     .await;
     let err = call_tool_with_options(
@@ -313,7 +313,7 @@ async fn input_rounds_without_a_handler_fail_cleanly() {
     let (service, _log) = connect(
         Era::Modern,
         McpProtocolMode::PreferModern,
-        Ghost AIClientHandler::new("modern", None),
+        GhostAIClientHandler::new("modern", None),
     )
     .await;
     let err = call_tool_with_options(
@@ -335,7 +335,7 @@ async fn tool_list_changes_arrive_through_the_subscription() {
     let (service, log) = connect(
         Era::Modern,
         McpProtocolMode::PreferModern,
-        Ghost AIClientHandler::new("modern", Some(counter.clone())),
+        GhostAIClientHandler::new("modern", Some(counter.clone())),
     )
     .await;
     let listen = log
@@ -367,7 +367,7 @@ async fn legacy_sessions_do_not_subscribe() {
     let (_service, log) = connect(
         Era::Legacy,
         McpProtocolMode::PreferModern,
-        Ghost AIClientHandler::new("legacy", Some(counter)),
+        GhostAIClientHandler::new("legacy", Some(counter)),
     )
     .await;
     let seen = methods(&log).await;

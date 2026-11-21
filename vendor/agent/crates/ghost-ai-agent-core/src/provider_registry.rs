@@ -4,7 +4,7 @@
 //! Both clients previously maintained separate hardcoded lists:
 //! - Desktop: `src/components/provider-settings-dialog/constants.ts`
 //!   (`BUILTIN_PROVIDERS`, `FETCH_SUPPORTED_PROVIDERS`)
-//! - iOS: `Sources/Ghost AICore/Models/ProviderCatalog.swift`
+//! - iOS: `Sources/GhostAICore/Models/ProviderCatalog.swift`
 //!   (`ProviderCatalog.builtin`, `fetchSupportedBuiltins`)
 //!
 //! This module replaces both. New providers are added here once and appear

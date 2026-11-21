@@ -7,7 +7,7 @@
 //! ASWebAuthenticationSession).
 //!
 //! Shared pieces:
-//! - [`Ghost AIClientHandler`]: client identity + server notifications
+//! - [`GhostAIClientHandler`]: client identity + server notifications
 //!   (`tools/list_changed` debounced, progress routing, server logs).
 //! - [`list_all_tools_bounded`]: cursor-following listing with guards.
 //! - [`call_tool_with_options`]: deadline, progress, cancel-on-drop.
@@ -37,7 +37,7 @@ pub use elicitation::{
     scan_answer, validate_form_content,
 };
 pub use handler::{
-    Ghost AIClientHandler, LIST_CHANGED_DEBOUNCE, McpNotificationSink, McpProtocolMode,
+    GhostAIClientHandler, LIST_CHANGED_DEBOUNCE, McpNotificationSink, McpProtocolMode,
     McpRootsProvider, ghost_ai_client_info, prepare_client_peer, roots_result, serve_client,
     start_subscriptions,
 };

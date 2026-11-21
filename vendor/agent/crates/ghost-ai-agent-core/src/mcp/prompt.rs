@@ -151,7 +151,7 @@ pub async fn get_prompt_text(
     peer: &Peer<RoleClient>,
     name: &str,
     arguments: BTreeMap<String, String>,
-    input: Option<&super::handler::Ghost AIClientHandler>,
+    input: Option<&super::handler::GhostAIClientHandler>,
 ) -> Result<String> {
     scan_prompt_arguments(&arguments).map_err(|reason| anyhow::anyhow!("Blocked: {reason}"))?;
     let mut params = GetPromptRequestParams::new(name);

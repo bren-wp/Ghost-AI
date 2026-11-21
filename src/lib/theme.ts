@@ -31,7 +31,7 @@ function readPreference(): ThemePreference {
   } catch {
     // Storage unavailable: fall through to the default.
   }
-  return 'system'
+  return 'dark'
 }
 
 function systemPrefersDark(): boolean {

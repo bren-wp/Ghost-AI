@@ -3,7 +3,7 @@
 // (the CSP forbids inline scripts). Keep the storage key and resolution logic
 // in step with src/lib/theme.ts, which takes over once React mounts.
 ;(function () {
-  var preference = 'system'
+  var preference = 'dark'
   try {
     var saved = localStorage.getItem('ghost_ai_theme')
     if (saved === 'light' || saved === 'dark' || saved === 'system') preference = saved

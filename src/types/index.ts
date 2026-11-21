@@ -46,7 +46,7 @@ export type { Skill, CreateSkillRequest, SkillSource, SkillSourceInfo } from './
 export {
   isBuiltinSkill,
   isUserSkill,
-  isGhost AISkill,
+  isGhostAISkill,
   isSyncedSkill,
   isSkillAvailable,
   getSkillsBySource,

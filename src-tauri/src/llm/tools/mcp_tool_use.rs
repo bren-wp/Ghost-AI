@@ -73,7 +73,7 @@ pub struct McpClientEntry {
     pub call_options: McpCallOptions,
     pub progress: ProgressDispatcher,
     /// The connection's handler: answers MRTR input rounds (FR-17).
-    pub handler: ghost_ai_agent_core::mcp::Ghost AIClientHandler,
+    pub handler: ghost_ai_agent_core::mcp::GhostAIClientHandler,
 }
 
 /// Maps "server/tool" -> the owning server's client

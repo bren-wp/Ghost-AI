@@ -279,3 +279,34 @@
   animation: search-highlight-fade 2.5s ease-out forwards;
   border-radius: var(--radius-md);
 }
+
+
+/* Ghost AI visual identity: consistent dark surfaces across all screens. */
+.dark {
+  --background: #080f1a;
+  --foreground: #e5e7eb;
+  --card: #111827;
+  --card-foreground: #e5e7eb;
+  --popover: #111827;
+  --popover-foreground: #e5e7eb;
+  --primary: #00e5ff;
+  --primary-foreground: #080f1a;
+  --secondary: #1a263d;
+  --secondary-foreground: #e5e7eb;
+  --muted: #1f2937;
+  --muted-foreground: #a8b3c8;
+  --accent: #24264c;
+  --accent-foreground: #e5e7eb;
+  --border: #324057;
+  --input: #34435d;
+  --ring: #874cff;
+  --sidebar: #0b1425;
+  --sidebar-foreground: #e5e7eb;
+  --sidebar-primary: #00e5ff;
+  --sidebar-primary-foreground: #080f1a;
+  --sidebar-accent: #1d2540;
+  --sidebar-accent-foreground: #e5e7eb;
+  --sidebar-border: #263450;
+  --sidebar-ring: #874cff;
+}
+.dark :focus-visible { outline-color: #874cff; }

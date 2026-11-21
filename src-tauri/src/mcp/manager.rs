@@ -13,7 +13,7 @@ use std::sync::{Arc, Weak};
 use tokio::sync::RwLock;
 
 use ghost_ai_agent_core::mcp::{
-    self as core_mcp, Ghost AIClientHandler, McpCallOptions, McpNotificationSink,
+    self as core_mcp, GhostAIClientHandler, McpCallOptions, McpNotificationSink,
     connect_http_service, list_all_tools_bounded,
 };
 
@@ -180,7 +180,7 @@ impl Clone for McpServerConnection {
 
 impl McpServerConnection {
     /// The connection's handler: fulfils MRTR input rounds (FR-17).
-    pub fn handler(&self) -> Ghost AIClientHandler {
+    pub fn handler(&self) -> GhostAIClientHandler {
         self._running_service.service().clone()
     }
 
@@ -275,7 +275,7 @@ impl McpConnectionManager {
         *self.elicitation.write().unwrap_or_else(|e| e.into_inner()) = Some(prompter);
     }
 
-    fn handler_for(&self, tool: &Tool) -> Ghost AIClientHandler {
+    fn handler_for(&self, tool: &Tool) -> GhostAIClientHandler {
         let sink = ListChangedSink {
             connections: Arc::downgrade(&self.connections),
             server_id: tool.id.clone(),
@@ -288,7 +288,7 @@ impl McpConnectionManager {
         };
         let roots = Arc::clone(&self.roots);
         let server_id = tool.id.clone();
-        let handler = Ghost AIClientHandler::new(&tool.name, Some(Arc::new(sink)))
+        let handler = GhostAIClientHandler::new(&tool.name, Some(Arc::new(sink)))
             .with_client_version(env!("CARGO_PKG_VERSION"))
             .with_roots(Arc::new(move || {
                 roots
@@ -504,7 +504,7 @@ impl McpConnectionManager {
     #[cfg(test)]
     fn create_client_info() -> rmcp::model::ClientConfig {
         use rmcp::ClientHandler;
-        Ghost AIClientHandler::new("test", None)
+        GhostAIClientHandler::new("test", None)
             .with_client_version(env!("CARGO_PKG_VERSION"))
             .get_info()
     }
@@ -561,7 +561,7 @@ impl McpConnectionManager {
         endpoint: &str,
         auth_header: Option<String>,
         custom_headers: Option<&HashMap<String, String>>,
-        handler: Ghost AIClientHandler,
+        handler: GhostAIClientHandler,
         protocol: core_mcp::McpProtocolMode,
     ) -> Result<McpRunningService> {
         tracing::info!("🌐 Connecting via HTTP to: {}", endpoint);
@@ -579,7 +579,7 @@ impl McpConnectionManager {
     async fn connect_stdio(
         &self,
         config: &McpConfig,
-        handler: Ghost AIClientHandler,
+        handler: GhostAIClientHandler,
     ) -> Result<McpRunningService> {
         let command_str = config
             .command
@@ -959,7 +959,7 @@ impl McpConnectionManager {
                 endpoint,
                 None,
                 None,
-                Ghost AIClientHandler::new(endpoint, None)
+                GhostAIClientHandler::new(endpoint, None)
                     .with_client_version(env!("CARGO_PKG_VERSION")),
                 core_mcp::McpProtocolMode::Legacy,
             )
@@ -980,7 +980,7 @@ impl McpConnectionManager {
         let running_service = self
             .connect_stdio(
                 config,
-                Ghost AIClientHandler::new(&label, None)
+                GhostAIClientHandler::new(&label, None)
                     .with_client_version(env!("CARGO_PKG_VERSION")),
             )
             .await?;

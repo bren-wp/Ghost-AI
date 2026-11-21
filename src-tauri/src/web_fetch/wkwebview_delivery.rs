@@ -23,7 +23,7 @@ use super::webview_fetch::{HANDLER_NAME, deliver_message};
 
 define_class!(
     #[unsafe(super(NSObject))]
-    #[name = "Ghost AIWvfMessageSink"]
+    #[name = "GhostAIWvfMessageSink"]
     #[thread_kind = MainThreadOnly]
     pub struct WvfMessageSink;
 

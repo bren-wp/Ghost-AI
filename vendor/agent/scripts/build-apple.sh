@@ -6,8 +6,8 @@ IOS_DIR="${ROOT_DIR}/../ghost_ai-ios"
 BUILD_DIR="${ROOT_DIR}/build/apple"
 BINDINGS_DIR="${BUILD_DIR}/bindings"
 HEADERS_DIR="${BUILD_DIR}/headers"
-XCFRAMEWORK_PATH="${IOS_DIR}/Vendor/Ghost AIAgentFFI.xcframework"
-SWIFT_BINDINGS_DIR="${IOS_DIR}/Sources/Ghost AIAgentBridge/Generated"
+XCFRAMEWORK_PATH="${IOS_DIR}/Vendor/GhostAIAgentFFI.xcframework"
+SWIFT_BINDINGS_DIR="${IOS_DIR}/Sources/GhostAIAgentBridge/Generated"
 LIB_NAME="libghost_ai_agent_ffi.a"
 
 export IPHONEOS_DEPLOYMENT_TARGET=17.0

@@ -20,7 +20,7 @@ export function isUserSkill(skill: Skill): boolean {
 }
 
 /** Ghost AI's own skills: editable here, and synced across devices. */
-export function isGhost AISkill(skill: Skill): boolean {
+export function isGhostAISkill(skill: Skill): boolean {
   return skill.source === 'user'
 }
 
