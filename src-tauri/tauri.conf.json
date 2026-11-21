@@ -17,7 +17,9 @@
         "height": 790,
         "dragDropEnabled": false,
         "minWidth": 800,
-        "minHeight": 560
+        "minHeight": 560,
+        "fullscreen": false,
+        "maximized": false
       }
     ],
     "security": {
@@ -64,7 +66,10 @@
     "createUpdaterArtifacts": false,
     "resources": [
       "resources/models_dev.json",
-      "builtin-skills"
+      "builtin-skills",
+      "../legal/EULA-EN.txt",
+      "../legal/COMMERCIAL-LICENSE-HR.md",
+      "../legal/THIRD_PARTY_NOTICES.md"
     ],
     "icon": [
       "icons/32x32.png",
@@ -73,7 +78,19 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "macOS": {}
+    "macOS": {},
+    "publisher": "Brendigo",
+    "copyright": "Copyright © 2026 Brendigo",
+    "shortDescription": "Ghost AI — your intelligent desktop workspace",
+    "longDescription": "Ghost AI unifies AI conversations, file analysis, research, assistants and coding in one streamlined desktop workspace.",
+    "category": "Productivity",
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": false,
+        "license": "../legal/EULA-EN.txt",
+        "installMode": "currentUser"
+      }
+    }
   },
   "plugins": {}
 }
