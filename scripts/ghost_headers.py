@@ -26,22 +26,27 @@ def make_header(path: Path) -> str:
     return f"/* {HEADER} */" if symbol == "/*" else f"{symbol} {HEADER}"
 
 def apply(path: Path) -> bool:
-    if path.name == "ghost_headers.py":
-        return False
-    if path.name.endswith(".d.ts"):
+    if path.name == "ghost_headers.py" or path.name.endswith(".d.ts"):
         return False
     try:
         source = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return False
-    if not source or HEADER in source.splitlines()[:4]:
+    if not source:
         return False
     prefix = make_header(path)
-    if source.startswith("#!"):
-        first, separator, rest = source.partition("\n")
-        updated = first + separator + prefix + "\n" + rest
-    else:
-        updated = prefix + "\n" + source
+    rows = source.splitlines(keepends=True)
+    header_index = 1 if rows[0].startswith("#!") else 0
+    existing = 0
+    while header_index + existing < len(rows) and rows[header_index + existing].strip() == prefix:
+        existing += 1
+    if existing > 1:
+        del rows[header_index + 1:header_index + existing]
+    elif existing == 0:
+        rows.insert(header_index, prefix + "\n")
+    updated = "".join(rows)
+    if updated == source:
+        return False
     path.write_text(updated, encoding="utf-8")
     return True
 
