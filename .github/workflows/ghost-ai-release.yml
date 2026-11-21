@@ -91,7 +91,6 @@ jobs:
           $installer = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
           if (-not $installer) { throw 'No Ghost AI Setup executable was built' }
           Copy-Item $installer.FullName "release/Ghost-AI-$version-Setup.exe"
-          Copy-Item $installer.FullName "release/Ghost-AI-$version-Update.exe"
           $binary = 'src-tauri/target/release/ghost-ai-desktop.exe'
           if (-not (Test-Path $binary)) { throw 'Missing Ghost AI executable' }
           New-Item -ItemType Directory -Force 'release/Portable' | Out-Null
@@ -113,9 +112,15 @@ jobs:
           if (-not (Test-Path $makensisPath)) { throw 'NSIS is unavailable: cannot create a real Portable.exe' }
           $out = Join-Path (Get-Location).Path "release/Ghost-AI-$version-Portable.exe"
           $payload = Join-Path (Get-Location).Path 'release/Portable'
-          & $makensisPath /V2 "/DOUTPUT_FILE=$out" "/DPAYLOAD=$payload" "scripts/ghost-portable.nsi"
+          $icon = (Resolve-Path 'src-tauri/icons/icon.ico').Path
+          $number = $version.TrimStart('v')
+          & $makensisPath /V2 "/DOUTPUT_FILE=$out" "/DPAYLOAD=$payload" "/DICON_FILE=$icon" "/DPRODUCT_VERSION=$number" "scripts/ghost-portable.nsi"
           if ($LASTEXITCODE -ne 0) { throw 'Portable.exe creation failed' }
           if ((Get-Item $out).Length -lt 10000000) { throw 'Portable package appears incomplete' }
+          $updateOut = Join-Path (Get-Location).Path "release/Ghost-AI-$version-Update.exe"
+          & $makensisPath /V2 "/DOUTPUT_FILE=$updateOut" "/DSETUP_FILE=$($installer.FullName)" "/DICON_FILE=$icon" "/DPRODUCT_VERSION=$number" "scripts/ghost-update.nsi"
+          if ($LASTEXITCODE -ne 0) { throw 'Update.exe creation failed' }
+          if ((Get-Item $updateOut).Length -lt 10000000) { throw 'Update package appears incomplete' }
           $updaters = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*.nsis.zip*' -ErrorAction SilentlyContinue
           if ($env:VITE_GHOST_AI_UPDATES -eq 'true' -and !$updaters) { throw 'Configured signing but no signed NSIS updater was produced' }
           foreach ($asset in $updaters) { Copy-Item $asset.FullName "release/$($asset.Name)" }
@@ -163,8 +168,8 @@ jobs:
       - name: Package Linux
         run: |
           mkdir -p release
-          cp src-tauri/target/release/bundle/appimage/*.AppImage release/
-          cp src-tauri/target/release/bundle/deb/*.deb release/
+          cp src-tauri/target/release/bundle/appimage/*.AppImage "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Linux.AppImage"
+          cp src-tauri/target/release/bundle/deb/*.deb "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Linux.deb"
           find src-tauri/target/release/bundle -type f \( -name '*.AppImage.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
       - uses: actions/upload-artifact@v4
         with:
@@ -202,7 +207,7 @@ jobs:
       - name: Package macOS
         run: |
           mkdir -p release
-          cp src-tauri/target/release/bundle/dmg/*.dmg release/
+          cp src-tauri/target/release/bundle/dmg/*.dmg "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-macOS.dmg"
           find src-tauri/target/release/bundle -type f \( -name '*.app.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
       - uses: actions/upload-artifact@v4
         with:
