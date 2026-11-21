@@ -62,7 +62,7 @@ lazy_static = "1.4"
 async-trait = "0.1"
 dirs = "5"
 shell-words = "1"
-nanoid = "0.4"
+nanoid = "0.5"
 
 # LLM framework (0.42 facade: rig-core portable contracts + rig-agent runtime)
 rig = "0.42"
