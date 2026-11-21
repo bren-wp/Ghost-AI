@@ -3,6 +3,7 @@ mod attachment_gc;
 pub mod blob_sync;
 pub mod commands;
 mod crypto;
+mod ghost_ai_startup;
 pub mod db;
 mod keychain;
 mod language_detect;
@@ -39,6 +40,7 @@ use tokio::sync::RwLock;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    ghost_ai_startup::install_panic_reporter();
     // macOS GUI apps launched from Finder/Spotlight inherit a minimal PATH
     // (/usr/bin:/bin:/usr/sbin:/sbin) that doesn't include user-installed
     // tools like node/npx. Resolve the full PATH from the user's login shell.
@@ -52,8 +54,17 @@ pub fn run() {
         }
     }
 
-    tauri::Builder::default()
-        .register_uri_scheme_protocol(web_fetch::WEBVIEW_SCHEME, |_ctx, request| {
+    // Only register the updater when this binary was built with a trusted public key.
+    let builder = tauri::Builder::default();
+    let builder = if option_env!("GHOST_AI_UPDATER_PUBLIC_KEY")
+        .is_some_and(|key| !key.trim().is_empty())
+    {
+        builder.plugin(tauri_plugin_updater::Builder::new().build())
+    } else {
+        builder
+    };
+
+    builder.register_uri_scheme_protocol(web_fetch::WEBVIEW_SCHEME, |_ctx, request| {
             let uri = request.uri().to_string();
             let status = web_fetch::webview_deliver(&uri, request.body());
             tauri::http::Response::builder()
@@ -62,7 +73,6 @@ pub fn run() {
                 .body(status.as_bytes().to_vec().into())
                 .unwrap_or_else(|_| tauri::http::Response::new(Vec::new()))
         })
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -651,6 +661,7 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .unwrap_or_else(|e| {
+            ghost_ai_startup::record_startup_failure(&format!("Application initialization failed: {e}"));
             tracing::error!("FATAL: Error while building tauri application: {}", e);
             std::process::exit(1);
         })

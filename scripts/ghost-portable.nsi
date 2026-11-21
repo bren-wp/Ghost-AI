@@ -33,7 +33,16 @@ Section "Run Ghost AI"
   InitPluginsDir
   SetOutPath "$PLUGINSDIR\GhostAI"
   File /r "${PAYLOAD}\*.*"
+  ClearErrors
   ExecWait '"$PLUGINSDIR\GhostAI\Ghost-AI.exe"' $0
+  IfErrors startup_error
+  StrCmp $0 0 startup_ok startup_error
+startup_error:
+  MessageBox MB_OK|MB_ICONSTOP "Ghost AI could not start. Visit brendigo.com for the latest version and support."
+  SetErrorLevel 1
+  Goto startup_end
+startup_ok:
+  SetErrorLevel 0
+startup_end:
   SetOutPath "$TEMP"
-  SetErrorLevel $0
 SectionEnd

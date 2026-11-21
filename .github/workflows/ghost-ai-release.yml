@@ -128,6 +128,59 @@ jobs:
           Get-ChildItem 'release/Ghost-AI-*' -File | ForEach-Object {
             (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLower() + '  ' + $_.Name
           } | Set-Content -Encoding utf8 'release/SHA256SUMS.txt'
+      - name: Prove packaged Ghost AI launches on Windows
+        id: live_startup
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          ./scripts/ghost-ai-startup-diagnostics.ps1 -Executable 'release/Portable/Ghost-AI.exe' -OutputDirectory release-startup-diagnostics -ObserveSeconds 25
+      - name: Preserve Windows startup diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-Windows-Startup-Diagnostics
+          path: release-startup-diagnostics/
+          if-no-files-found: warn
+      - name: Reject non-starting Windows packages
+        if: steps.live_startup.outcome != 'success'
+        shell: pwsh
+        run: throw 'The packaged Ghost AI executable failed its startup health check'
+      - name: Prove Portable.exe starts its bundled Ghost AI window
+        id: portable_health
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $tag = "${{ needs.validate.outputs.release_tag }}"
+          ./scripts/ghost-ai-test-portable.ps1 -Launcher "release/Ghost-AI-$tag-Portable.exe" -OutputDirectory 'release-portable-diagnostics'
+      - name: Preserve portable launcher evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-Windows-Portable-Diagnostics
+          path: release-portable-diagnostics/
+          if-no-files-found: warn
+      - name: Reject broken Portable.exe launchers
+        if: steps.portable_health.outcome != 'success'
+        shell: pwsh
+        run: throw 'Ghost AI Portable.exe failed to start the bundled application'
+      - name: Verify Setup.exe installation and Update.exe maintenance
+        id: installer_health
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $tag = "${{ needs.validate.outputs.release_tag }}"
+          ./scripts/ghost-ai-test-installation.ps1 -Setup "release/Ghost-AI-$tag-Setup.exe" -Update "release/Ghost-AI-$tag-Update.exe" -OutputDirectory 'release-installer-diagnostics'
+      - name: Preserve installer and update diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-Windows-Setup-Update-Diagnostics
+          path: release-installer-diagnostics/
+          if-no-files-found: warn
+      - name: Reject non-working setup or update packages
+        if: steps.installer_health.outcome != 'success'
+        shell: pwsh
+        run: throw 'Ghost AI setup or update package failed its real Windows installation test'
       - name: Capture a real first-run Ghost AI screenshot
         shell: pwsh
         continue-on-error: true
