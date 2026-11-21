@@ -83,6 +83,7 @@ def configure():
     s=re.sub(r'(ghost-ai-agent-core\s*=\s*\{\s*path\s*=\s*")[^"]+',r'\g<1>../vendor/agent/crates/ghost-ai-agent-core',s)
     s=re.sub(r'(?m)^version = "0\.12\.0"$','version = "0.1.0"',s,count=1)
     s=s.replace('authors = ["you"]','authors = ["Brendigo"]')
+    s=s.replace('description = "A Tauri App"','description = "Ghost AI desktop assistant"')
     p.write_text(s)
     p=ROOT/"index.html"
     s=p.read_text()
