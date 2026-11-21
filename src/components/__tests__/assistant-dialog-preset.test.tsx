@@ -78,7 +78,7 @@ const assistant: Assistant = {
 let createAssistant: ReturnType<typeof vi.fn>
 let updateAssistant: ReturnType<typeof vi.fn>
 
-const openModelSection = () => fireEvent.click(screen.getByText('common:model'))
+const openModelSection = () => fireEvent.click(screen.getByRole('button', { name: 'common:model' }))
 const openPicker = () =>
   fireEvent.pointerDown(screen.getByTestId('preset-picker'), { button: 0, ctrlKey: false })
 
@@ -107,6 +107,14 @@ describe('AssistantDialog parameter preset', () => {
       ],
       ensureLoaded: vi.fn() as never,
     })
+  })
+
+  it('navigates between assistant sections on compact displays', () => {
+    render(<AssistantDialog open onOpenChange={vi.fn()} assistant={assistant} mode="edit" />)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Assistant options' }), {
+      target: { value: 'model' },
+    })
+    expect(screen.getByTestId('preset-picker')).toHaveTextContent('Balanced')
   })
 
   it("shows the assistant's preset and saves a new choice", async () => {
