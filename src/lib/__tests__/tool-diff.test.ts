@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect } from 'vitest'
 import { computeUnifiedDiff, diffStatCounts, DIFF_MAX_ROWS } from '@/lib/tool-diff'
 

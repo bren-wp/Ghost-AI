@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Reconcile skill directories on disk with the skill index.
 //!
 //! Three kinds of sources behave differently:

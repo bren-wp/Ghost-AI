@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! The visual-output system-prompt fragment for desktop: which formats the
 //! model may use, built by `ghost_ai_agent_core::visual_output` from what
 //! this client renders and what the user turned on.

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { LLMProvider } from './types'
 
 export const CUSTOM_PROVIDER: LLMProvider = {

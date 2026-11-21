@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Event-driven trigger layer over [`crate::sync::run_sync_pass`].
 //!
 //! A fixed timer alone left two cadence gaps on desktop:

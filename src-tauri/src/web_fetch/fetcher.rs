@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 use chrono::Utc;
 use futures::stream::{FuturesUnordered, StreamExt};
 use tokio::sync::mpsc;

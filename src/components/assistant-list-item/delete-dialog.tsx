@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useTranslation } from 'react-i18next'
 import {
   AlertDialog,

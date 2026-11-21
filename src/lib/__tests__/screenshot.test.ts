@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { toPng } from 'html-to-image'
 import { save } from '@tauri-apps/plugin-dialog'

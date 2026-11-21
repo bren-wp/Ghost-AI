@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { ResolvedContact } from '@/hooks/useContactProfile'
 import { AssistantProfile } from './assistant-profile'
 import { ModelProfile } from './model-profile'

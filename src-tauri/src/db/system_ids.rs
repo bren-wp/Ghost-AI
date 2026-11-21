@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Deterministic system-row ids (UUID v5).
 //!
 //! System-seeded rows (self user, parameter presets, system prompts,

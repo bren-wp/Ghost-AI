@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { OpenUiBlockProps } from './types'

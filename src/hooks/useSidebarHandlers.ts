@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useCallback } from 'react'
 import { useNewConversation } from '@/hooks/useNewConversation'
 import { invoke } from '@tauri-apps/api/core'

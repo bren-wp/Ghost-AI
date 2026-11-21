@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Web fetch tool for LLM agents
 //!
 //! Allows the AI to actively fetch and read web page content.

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { X } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Badge } from '@/components/ui/badge'

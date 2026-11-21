@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 use serde::Serialize;
 use std::io::Seek;
 use std::path::{Path, PathBuf};

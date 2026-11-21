@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Desktop content-key (CK) lifecycle and sync-enablement state (ADR 04 §3,
 //! §7).
 //!

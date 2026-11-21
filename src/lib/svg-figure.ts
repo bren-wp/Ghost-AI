@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 /**
  * Inline SVG figures: theme palette, cached preparation through the Rust
  * core (`prepare_svg_figure`), and the reduced-motion preference.

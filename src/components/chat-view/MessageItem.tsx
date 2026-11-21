@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { memo, useCallback } from 'react'
 import { SiblingNavigator } from '@/components/chat-view/SiblingNavigator'
 import { invoke } from '@tauri-apps/api/core'

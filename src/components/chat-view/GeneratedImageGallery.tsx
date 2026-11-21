@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useState, useEffect, useMemo } from 'react'
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 import { ImageLightbox, type ImageAttachmentData } from '@/components/attachment-preview'

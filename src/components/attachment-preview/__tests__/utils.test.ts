@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect } from 'vitest'
 import { getDomain, getFaviconUrl, formatFileSize, isMarkdownFile } from '../utils'
 import type { FetchResult } from '@/types'

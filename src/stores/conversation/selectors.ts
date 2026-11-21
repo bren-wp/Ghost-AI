@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { StoreGet, ConversationStoreSelectors } from './types'
 
 export const createSelectors = (_set: unknown, get: StoreGet): ConversationStoreSelectors => ({

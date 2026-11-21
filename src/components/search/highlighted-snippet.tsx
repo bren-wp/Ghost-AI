@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 export function HighlightedSnippet({ text }: { text: string }) {
   const parts = text.split(/(<mark>.*?<\/mark>)/g)
   return (

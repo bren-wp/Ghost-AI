@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Auto-review eval: run the auto-mode judge against live models on a
 //! fixed scenario set and report how each model's verdicts compare with
 //! the expected outcome of each scenario.

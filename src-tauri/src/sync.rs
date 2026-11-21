@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Desktop snapshot-sync glue (Phase 3a/3b + ADR 04 enablement).
 //!
 //! The engine itself lives in `ghost-ai-agent-core::sync`; this module adds

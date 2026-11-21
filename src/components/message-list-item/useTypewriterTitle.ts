@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useEffect, useRef, useState } from 'react'
 
 /**

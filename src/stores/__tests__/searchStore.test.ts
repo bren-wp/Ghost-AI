@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { invoke } from '@tauri-apps/api/core'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useSearchStore } from '../searchStore'

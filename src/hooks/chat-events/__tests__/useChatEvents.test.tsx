@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { listen } from '@tauri-apps/api/event'

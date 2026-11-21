@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CloudOff, FileText, Image, FileIcon as FileIconLucide, Loader2 } from 'lucide-react'

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { openUrl } from '@tauri-apps/plugin-opener'

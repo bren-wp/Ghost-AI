@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, expect, it } from 'vitest'
 import { getFileType, getMimeType } from '../types'
 import { isPdfFile } from '../pdf-text'

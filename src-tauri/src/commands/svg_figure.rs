@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Inline SVG figures: the Tauri surface over `ghost_ai_agent_core::svg_figure`.
 //!
 //! The frontend hands each ```svg fence body to [`prepare_svg_figure`] and

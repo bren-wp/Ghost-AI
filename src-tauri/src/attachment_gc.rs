@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Local attachment garbage collection.
 //!
 //! Deleting a message tombstones its `message_attachments` links, but the

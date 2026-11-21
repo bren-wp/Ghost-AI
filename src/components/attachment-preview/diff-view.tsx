@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { computeUnifiedDiff, DIFF_MAX_ROWS, type DiffRow } from '@/lib/tool-diff'

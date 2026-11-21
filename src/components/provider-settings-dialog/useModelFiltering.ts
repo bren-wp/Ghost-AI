@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import * as React from 'react'
 import i18n from '@/lib/i18n'
 import type { LLMProvider, ModelInfo } from './types'

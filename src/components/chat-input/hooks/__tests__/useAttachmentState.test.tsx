@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useAttachmentState } from '../useAttachmentState'

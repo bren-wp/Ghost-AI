@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 /**
  * OpenUI chart and KPI blocks (```openui-lang fences): on unless the user
  * turns them off (`"false"`). The library section adds about 600 prompt

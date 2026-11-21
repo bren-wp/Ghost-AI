@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { invoke } from '@tauri-apps/api/core'
 import type { Message, Conversation, SiblingGroup, UserAttachment } from '@/types'
 import type {

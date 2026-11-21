@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useCallback } from 'react'
 import { useMessageStore } from '@/stores/message'
 import { useConversationStore } from '@/stores/conversation'

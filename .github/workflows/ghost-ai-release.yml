@@ -6,6 +6,10 @@ on:
     branches: ['release/v*']
   workflow_dispatch:
 
+concurrency:
+  group: ghost-ai-release-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 

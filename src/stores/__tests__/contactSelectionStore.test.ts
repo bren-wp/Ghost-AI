@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useContactSelectionStore } from '../contactSelectionStore'
 

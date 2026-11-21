@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useConversationStore } from '@/stores/conversation'

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
@@ -8,7 +9,7 @@ import { toast } from 'sonner'
 import { ArrowUpRight } from 'lucide-react'
 import { logger } from '@/lib/logger'
 
-export const CHANGELOG_URL = 'https://github.com/bren-wp/Ghost-AI/changelog/'
+export const CHANGELOG_URL = 'https://brendigo.com'
 
 async function openExternal(url: string) {
   try {
@@ -72,7 +73,7 @@ interface ReleaseNotesProps {
 }
 
 /** What's new in an available update, with a link to the full changelog. */
-export function ReleaseNotes({ version, notes }: ReleaseNotesProps) {
+export function ReleaseNotes({ notes }: ReleaseNotesProps) {
   const { t } = useTranslation('settings')
 
   return (
@@ -88,7 +89,7 @@ export function ReleaseNotes({ version, notes }: ReleaseNotesProps) {
         </div>
       )}
       <span className="text-xs">
-        <ExternalLink href={`${CHANGELOG_URL}#v${version}`}>
+        <ExternalLink href={CHANGELOG_URL}>
           <span className="inline-flex items-center gap-0.5">
             {t('updateChangelogLink')}
             <ArrowUpRight className="h-3 w-3" />

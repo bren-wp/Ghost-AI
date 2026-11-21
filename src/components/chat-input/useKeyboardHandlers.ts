@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import React, { useEffect, useRef } from 'react'
 
 interface UseKeyboardHandlersOptions {

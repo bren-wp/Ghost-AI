@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { ImmerSet, StoreGet, MessageStoreStreamingActions } from './types'
 import {
   THROTTLE_MS,

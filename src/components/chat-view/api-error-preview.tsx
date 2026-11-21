@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, Copy, Check } from 'lucide-react'
