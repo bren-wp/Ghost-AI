@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! One-shot ciphertext repair after a master-key adoption.
 //!
 //! When the iCloud-synchronizable item replaces a different local master

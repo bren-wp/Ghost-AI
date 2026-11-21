@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 export { useChatHandlers } from './chat-handlers'
 export { useAttachmentHandlers } from './attachment-handlers'
 export { useSearchDecisionHandlers } from './search-decision-handlers'

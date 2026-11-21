@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Desktop host of the auto-mode judge (permission v3, Phase B).
 //!
 //! The engine, ruleset, verdict contract, counters, and capability probe

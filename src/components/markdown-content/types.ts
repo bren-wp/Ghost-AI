@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 export interface MarkdownContentProps {
   content: string
   className?: string

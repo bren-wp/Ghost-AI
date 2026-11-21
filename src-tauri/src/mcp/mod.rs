@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! MCP (Model Context Protocol) integration module
 //!
 //! This module provides functionality to connect to MCP servers and retrieve

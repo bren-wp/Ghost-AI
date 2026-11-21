@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { render, act } from '@testing-library/react'
 import { MessageList } from '../MessageList'

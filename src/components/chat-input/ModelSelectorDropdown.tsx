@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle } from 'lucide-react'

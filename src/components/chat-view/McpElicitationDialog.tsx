@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Dialog for MCP elicitation (FR-12): a server asks the user for input
 // during a call, as a form or a link to open. Fed by the elicitation store
 // (FIFO, oldest first); answers go back through `resolve_mcp_elicitation`.

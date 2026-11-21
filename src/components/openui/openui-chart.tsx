@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // The `Chart` component of Ghost AI's OpenUI library, drawn the way shadcn's
 // charts are: a Card around a Recharts chart in a ChartContainer, colored
 // from the app's --chart-1..6 palette. Colors and config keys never come

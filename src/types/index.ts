@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Provider types
 export type { Provider, CreateProviderRequest } from './provider'
 

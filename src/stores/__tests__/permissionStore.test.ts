@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { beforeEach, describe, expect, it } from 'vitest'
 import { usePermissionStore, type PermissionRequest } from '@/stores/permissionStore'
 

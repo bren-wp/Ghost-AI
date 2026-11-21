@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Debug-only UI automation endpoint.
 //!
 //! Tauri has no WebDriver on macOS (WKWebView), so UI tests drive the real

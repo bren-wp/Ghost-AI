@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useRef, useState, useEffect, useCallback, RefObject } from 'react'
 
 export interface UseInputResizeReturn {

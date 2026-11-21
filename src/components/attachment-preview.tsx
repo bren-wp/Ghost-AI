@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Re-export everything from the attachment-preview directory
 export {
   AttachmentPreview,

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Re-export everything from the markdown-content directory
 export {
   MarkdownContent,

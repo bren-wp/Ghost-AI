@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { UserAttachment, ContextEnrichment, ProcessStep } from '@/types'
 
 /** Image data for lightbox navigation - supports both storage paths and base64 data */

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Skill file manifests.
 //!
 //! A skill is a directory, not just its SKILL.md: scripts, references and

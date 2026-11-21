@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Skill tool for LLM agents.
 //!
 //! Loads the full instructions for a skill by name. The tool description contains

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Permission gate commands: the frontend's answer to an approval request.
 
 use super::AppState;

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useMessageStore, type MessageStore } from '@/stores/message'
 import type { StreamingToolCall } from '@/components/attachment-preview/tool-call-preview'
 

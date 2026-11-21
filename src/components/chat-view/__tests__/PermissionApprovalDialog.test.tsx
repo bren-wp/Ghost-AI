@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { PermissionApprovalDialog } from '../PermissionApprovalDialog'

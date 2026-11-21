@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 mod assistant;
 mod attachment;
 mod context;

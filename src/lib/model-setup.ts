@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { Model, Provider } from '@/types'
 
 /** Whether a conversation can actually send, derived from enabled providers

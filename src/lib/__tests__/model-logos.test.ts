@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import llamaAvatar from '@/assets/avatars/models/llama.png'
 import { describe, it, expect, vi } from 'vitest'
 import { getModelLogoById, getModelLogo, getModelAvatarData } from '../model-logos'

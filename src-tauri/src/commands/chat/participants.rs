@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Participant management for conversations
 //!
 //! Handles auto-adding participants (users, models, assistants) to conversations.

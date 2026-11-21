@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { MessageStore, ConversationState } from './types'

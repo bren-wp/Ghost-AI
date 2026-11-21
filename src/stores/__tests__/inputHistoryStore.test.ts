@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 const invokeMock = vi.fn()

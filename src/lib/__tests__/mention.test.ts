@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect } from 'vitest'
 import { activeMention, applyMention, rankMentionCandidates } from '../mention'
 

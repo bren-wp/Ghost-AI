@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 'use client'
 
 import * as CollapsiblePrimitive from '@radix-ui/react-collapsible'

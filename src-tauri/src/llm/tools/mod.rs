@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Native tools for LLM agents
 //!
 //! This module provides tool implementations that can be used by rig agents.

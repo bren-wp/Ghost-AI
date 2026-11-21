@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Shared layout for the permission cards in Settings > Built-in Tools:
 // icon and title on one row (optional action on the right), description
 // and body flush left underneath.

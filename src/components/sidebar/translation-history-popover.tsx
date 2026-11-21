@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { History, Search, Trash2, X } from 'lucide-react'

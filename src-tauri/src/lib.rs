@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 mod attachment_gc;
 pub mod blob_sync;
 pub mod commands;

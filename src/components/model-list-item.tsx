@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import * as React from 'react'
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemHeader } from '@/components/ui/item'
 import { ModelAvatar } from '@/components/model-avatar'

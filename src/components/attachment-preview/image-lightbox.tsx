@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'

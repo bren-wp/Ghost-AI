@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MorphSpinner } from '@/components/ui/morph-spinner'

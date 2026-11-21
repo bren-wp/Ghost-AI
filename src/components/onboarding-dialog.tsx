@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Bot, BotIcon, CheckCircle2, Loader2 } from 'lucide-react'

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Live end-to-end checks of the MCP client against real servers:
 //! `@modelcontextprotocol/server-everything` over STDIO (via npx) and the
 //! public example server over Streamable HTTP. Ignored by default (they need

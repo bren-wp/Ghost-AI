@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useCallback } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { toast } from 'sonner'

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { Layers } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'

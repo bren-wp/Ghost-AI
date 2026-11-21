@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Moonshot provider constants
 //!
 //! The actual client creation and streaming is handled by agent_builder.rs

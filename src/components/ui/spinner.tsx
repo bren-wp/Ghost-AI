@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useTranslation } from 'react-i18next'
 import { Loader2Icon } from 'lucide-react'
 

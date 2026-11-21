@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 use chrono::Utc;
 
 use ghost_ai_agent_core::web_fetch as core_fetch;

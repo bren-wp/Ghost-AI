@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 mod assistants;
 mod attachments;
 pub mod compactions;

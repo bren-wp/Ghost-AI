@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'

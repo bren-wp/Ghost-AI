@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useMemo } from 'react'
 import { useAssistantStore } from '@/stores/assistantStore'
 import { useModelStore } from '@/stores/modelStore'

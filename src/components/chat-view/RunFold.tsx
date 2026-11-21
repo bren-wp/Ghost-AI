@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Check, ChevronDown, ChevronRight, CircleSlash } from 'lucide-react'

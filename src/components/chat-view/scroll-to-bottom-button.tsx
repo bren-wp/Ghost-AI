@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { ArrowDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 

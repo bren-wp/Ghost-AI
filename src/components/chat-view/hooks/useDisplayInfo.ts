@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useCallback } from 'react'
 import { useModelStore } from '@/stores/modelStore'
 import { useAssistantStore } from '@/stores/assistantStore'
