@@ -8,7 +8,6 @@ import {
   Check,
   Cloud,
   ChevronDown,
-  Download,
   Eye,
   EyeOff,
   FileDown,
@@ -19,7 +18,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Share2,
   Sparkles,
   Settings,
   Stethoscope,
@@ -36,7 +34,6 @@ import {
 } from 'lucide-react'
 
 import { invoke } from '@tauri-apps/api/core'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { toast } from 'sonner'
 import {
   Breadcrumb,
@@ -70,7 +67,6 @@ import { useConversationStore } from '@/stores/conversation'
 import { useMcpStore } from '@/stores/mcpStore'
 import { useModelStore } from '@/stores/modelStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { useUpdaterStore } from '@/stores/updaterStore'
 import { useSkillStore } from '@/stores/skillStore'
 import type {
   Model,
@@ -94,12 +90,10 @@ import {
 import { LLMProviderSettings } from '@/components/settings-dialog/llm-provider-settings'
 import { ObscuraInstallHint } from '@/components/settings-dialog/obscura-install-hint'
 import { PermissionsSettings } from '@/components/settings-dialog/permissions-settings'
-import { ReleaseNotes } from '@/components/settings-dialog/release-notes'
 import { fetchModelCapabilities, invalidateCapabilitiesCache } from '@/hooks/useModelCapabilities'
 import { invalidateVisionFallbackStatus } from '@/hooks/useVisionFallbackStatus'
 import { AUTO_REVIEW_MODEL_KEY, invalidateAutoReviewStatus } from '@/lib/permission-mode'
 import { logger } from '@/lib/logger'
-import appIcon from '@/assets/app-icon.png'
 import { changeLanguage, supportedLanguages, getCurrentLanguage } from '@/lib/i18n'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -107,6 +101,7 @@ import { BuiltinToolIcon } from '@/components/builtin-tool-icon'
 import { SyncSettingsSection } from '@/components/sync/sync-settings-section'
 import { VisualsSettings } from '@/components/settings-dialog/visuals-settings'
 import { AppearanceSettings } from '@/components/settings-dialog/appearance-settings'
+import { GhostAboutSettings } from '@/components/settings-dialog/ghost-ai-about-settings'
 import { McpServerConfigModal } from '@/components/mcp-server-config-modal'
 
 // Translation key per fetch strategy. Record<> forces exhaustiveness: adding
@@ -118,10 +113,6 @@ const FETCH_METHOD_LABELS: Record<WebFetchLocalMethod, string> = {
   webview: 'alwaysUseWebview',
   headless: 'alwaysUseChrome',
 }
-
-// External destinations for the About section.
-const AUTHOR_WEBSITE_URL = 'https://brendigo.com'
-const SUPPORT_WEBSITE_URL = 'https://brendigo.com'
 
 const data = {
   nav: [
@@ -139,16 +130,6 @@ const data = {
     { name: 'language', icon: Globe },
     { name: 'advanced', icon: Settings },
     { name: 'about', icon: Heart },
-    // { name: 'Navigation', icon: Menu },
-    // { name: 'Home', icon: Home },
-    // { name: 'Messages & media', icon: MessageCircle },
-    // { name: 'Language & region', icon: Globe },
-    // { name: 'Accessibility', icon: Keyboard },
-    // { name: 'Mark as read', icon: Check },
-    // { name: 'Audio & video', icon: Video },
-    // { name: 'Connected accounts', icon: Link },
-    // { name: 'Privacy & visibility', icon: Lock },
-    // { name: 'Advanced', icon: Settings },
   ],
 }
 
@@ -241,21 +222,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [logMaxTotalMb, setLogMaxTotalMbState] = React.useState<number>(50)
   const [logDiagnosing, setLogDiagnosing] = React.useState(false)
 
-  // About section state (updater store also owns the app version)
-  const updaterStatus = useUpdaterStore((s) => s.status)
-  const updaterUpdate = useUpdaterStore((s) => s.update)
-  const updaterVersion = useUpdaterStore((s) => s.currentVersion)
-  const updaterError = useUpdaterStore((s) => s.error)
-  const updaterDownloadedBytes = useUpdaterStore((s) => s.downloadedBytes)
-  const updaterTotalBytes = useUpdaterStore((s) => s.totalBytes)
-  const autoCheckEnabled = useUpdaterStore((s) => s.autoCheckEnabled)
-  const checkForUpdates = useUpdaterStore((s) => s.checkForUpdates)
-  const downloadUpdate = useUpdaterStore((s) => s.downloadUpdate)
-  const installAndRestart = useUpdaterStore((s) => s.installAndRestart)
-  const setAutoCheck = useUpdaterStore((s) => s.setAutoCheck)
-  const skipCurrentVersion = useUpdaterStore((s) => s.skipCurrentVersion)
-  const loadUpdaterPreferences = useUpdaterStore((s) => s.loadPreferences)
-
   const loadLogStorageInfo = React.useCallback(async () => {
     try {
       setLogStorageInfo(await invoke<LogStorageInfo>('get_log_storage_info'))
@@ -286,25 +252,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       await invoke('open_logs_directory')
     } catch (error) {
       logger.error('Failed to open logs directory:', error)
-      toast.error(String(error))
-    }
-  }
-
-  const openExternal = async (url: string) => {
-    try {
-      await openUrl(url)
-    } catch (error) {
-      logger.error('Failed to open URL:', error)
-      toast.error(String(error))
-    }
-  }
-
-  const handleCopyRecommendation = async () => {
-    try {
-      await navigator.clipboard.writeText(t('aboutRecommendationText'))
-      toast.success(t('aboutRecommendCopied'))
-    } catch (error) {
-      logger.error('Failed to copy recommendation:', error)
       toast.error(String(error))
     }
   }
@@ -348,20 +295,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   React.useEffect(() => {
     loadCapabilitiesInfo()
   }, [loadCapabilitiesInfo])
-  React.useEffect(() => {
-    void loadUpdaterPreferences()
-  }, [loadUpdaterPreferences])
-
-  const handleManualUpdateCheck = async () => {
-    const found = await checkForUpdates({ silent: false })
-    if (found === null) {
-      if (useUpdaterStore.getState().error) toast.error(t('updateCheckFailed'))
-      else toast.success(t('updateUpToDate'))
-    } else {
-      toast.success(t('updateAvailableToast', { version: found.version }))
-    }
-  }
-
   const saveSetting = useSettingsStore((state) => state.saveSetting)
   const getSetting = useSettingsStore((state) => state.getSetting)
   const searchProviders = useSettingsStore((state) => state.searchProviders)
@@ -1589,149 +1522,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       )
     }
 
-    if (activeSection === 'about') {
-      return (
-        <div className="grid gap-6">
-          <div className="rounded-xl border border-border bg-card p-4"><p className="text-base font-semibold">Ghost AI</p><p className="text-sm text-muted-foreground">By Brendigo · https://brendigo.com</p></div>
-          <p className="text-sm text-muted-foreground max-w-md">{t('aboutNoTelemetry')}</p>
+    if (activeSection === 'about') return <GhostAboutSettings />
 
-          <div className="grid gap-2">
-            <Label>{t('aboutSupportTitle')}</Label>
-            <p className="text-xs text-muted-foreground max-w-md">{t('aboutSupportDescription')}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => openExternal(AUTHOR_WEBSITE_URL)}>
-                <Globe className="mr-2 h-4 w-4" />
-                Official website
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleCopyRecommendation}>
-                <Share2 className="mr-2 h-4 w-4" />
-                {t('aboutRecommendButton')}
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>{t('aboutIssuesTitle')}</Label>
-            <p className="text-xs text-muted-foreground max-w-md">{t('aboutIssuesDescription')}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => openExternal(SUPPORT_WEBSITE_URL)}>
-                <Heart className="mr-2 h-4 w-4" />
-                Contact Brendigo
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid gap-2">
-            <Label>{t('updateSectionTitle')}</Label>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleManualUpdateCheck}
-                disabled={
-                  updaterStatus === 'checking' ||
-                  updaterStatus === 'downloading' ||
-                  updaterStatus === 'installing'
-                }
-              >
-                {updaterStatus === 'checking' ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                {updaterStatus === 'checking' ? t('updateChecking') : t('updateCheckButton')}
-              </Button>
-              {updaterUpdate && updaterStatus === 'idle' && (
-                <>
-                  <Button size="sm" onClick={() => void downloadUpdate()}>
-                    <Download className="mr-2 h-4 w-4" />
-                    {t('updateDownloadButton')}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => void skipCurrentVersion()}>
-                    {t('updateSkipVersion')}
-                  </Button>
-                </>
-              )}
-              {(updaterStatus === 'ready' || updaterStatus === 'installing') && (
-                <Button
-                  size="sm"
-                  onClick={() => void installAndRestart()}
-                  disabled={updaterStatus === 'installing'}
-                >
-                  {updaterStatus === 'installing' ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Check className="mr-2 h-4 w-4" />
-                  )}
-                  {updaterStatus === 'installing' ? t('updateInstalling') : t('updateReadyButton')}
-                </Button>
-              )}
-            </div>
-
-            {updaterUpdate && updaterStatus === 'idle' && (
-              <div className="grid gap-2 max-w-md">
-                <p className="text-xs text-muted-foreground">
-                  {t('updateAvailableLine', {
-                    version: updaterUpdate.version,
-                    current: updaterUpdate.currentVersion,
-                  })}
-                </p>
-                <ReleaseNotes version={updaterUpdate.version} notes={updaterUpdate.body} />
-              </div>
-            )}
-
-            {updaterStatus === 'downloading' && (
-              <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {updaterTotalBytes > 0
-                  ? t('updateDownloadingProgress', {
-                      received: formatLogSize(updaterDownloadedBytes),
-                      total: formatLogSize(updaterTotalBytes),
-                    })
-                  : t('updateDownloading')}
-              </p>
-            )}
-
-            {updaterStatus === 'installing' && (
-              <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t('updateInstalling')}
-              </p>
-            )}
-
-            {updaterError && <p className="text-xs text-destructive max-w-md">{updaterError}</p>}
-
-            <div className="flex items-center justify-between gap-4 max-w-md pt-2">
-              <div className="grid gap-1">
-                <Label htmlFor="update-auto-check">{t('updateAutoCheckLabel')}</Label>
-                <p className="text-xs text-muted-foreground">{t('updateAutoCheckDescription')}</p>
-              </div>
-              <Switch
-                id="update-auto-check"
-                checked={autoCheckEnabled}
-                onCheckedChange={(checked) => void setAutoCheck(checked)}
-              />
-            </div>
-          </div>
-
-          {updaterVersion !== null && (
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <img src={appIcon} alt="Ghost AI" className="size-4 rounded-[4px]" />
-              {t('aboutVersion', { version: updaterVersion })}
-            </p>
-          )}
-        </div>
-      )
-    }
-
-    // Placeholder content for other sections
-    return (
-      <>
-        {Array.from({ length: 10 }).map((_, i) => (
-          <div key={i} className="bg-muted/50 aspect-video max-w-3xl rounded-xl" />
-        ))}
-      </>
-    )
+    return null
   }
 
   return (

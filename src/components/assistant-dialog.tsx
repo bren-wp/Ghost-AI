@@ -91,12 +91,21 @@ export function AssistantDialog({
   mode = 'create',
 }: AssistantDialogProps) {
   const { t } = useTranslation(['assistants', 'common'])
-  const { models, loadModels, getProviderById } = useModelStore()
-  const { assistants, createAssistant, updateAssistant, lastCreatedModelId } = useAssistantStore()
-  const { prompts, ensureLoaded: ensurePromptsLoaded } = usePromptStore()
-  const { selectedModel, selectedAssistant } = useConversationStore()
-  const { servers: allTools, loadServers: loadTools } = useMcpStore()
-  const { skills: allSkills, ensureLoaded: ensureSkillsLoaded } = useSkillStore()
+  const models = useModelStore((state) => state.models)
+  const loadModels = useModelStore((state) => state.loadModels)
+  const getProviderById = useModelStore((state) => state.getProviderById)
+  const assistants = useAssistantStore((state) => state.assistants)
+  const createAssistant = useAssistantStore((state) => state.createAssistant)
+  const updateAssistant = useAssistantStore((state) => state.updateAssistant)
+  const lastCreatedModelId = useAssistantStore((state) => state.lastCreatedModelId)
+  const prompts = usePromptStore((state) => state.prompts)
+  const ensurePromptsLoaded = usePromptStore((state) => state.ensureLoaded)
+  const selectedModel = useConversationStore((state) => state.selectedModel)
+  const selectedAssistant = useConversationStore((state) => state.selectedAssistant)
+  const allTools = useMcpStore((state) => state.servers)
+  const loadTools = useMcpStore((state) => state.loadServers)
+  const allSkills = useSkillStore((state) => state.skills)
+  const ensureSkillsLoaded = useSkillStore((state) => state.ensureLoaded)
 
   // Form state
   const [name, setName] = useState('')
@@ -463,7 +472,7 @@ export function AssistantDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="role">{t('role')}</Label>
               <Input
@@ -555,7 +564,7 @@ export function AssistantDialog({
           </div>
 
           {/* Avatar */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="avatar-text">{t('avatarEmoji')}</Label>
               <Input
@@ -1317,7 +1326,7 @@ export function AssistantDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="overflow-hidden p-0 gap-0 md:max-h-[600px] md:max-w-[700px] lg:max-w-[900px]">
+      <DialogContent className="max-h-[min(92dvh,760px)] w-[min(96vw,900px)] max-w-[96vw] overflow-hidden p-0 gap-0 md:max-w-[94vw] lg:max-w-[900px]">
         <DialogTitle className="sr-only">
           {mode === 'edit' ? t('editAssistant') : t('newAssistant')}
         </DialogTitle>
@@ -1348,9 +1357,13 @@ export function AssistantDialog({
             </SidebarContent>
           </Sidebar>
 
-          <main className="flex h-[600px] flex-1 flex-col overflow-hidden">
+          <main className="flex min-h-0 h-[min(86dvh,690px)] min-w-0 flex-1 flex-col overflow-hidden">
             <header className="flex h-16 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">
-              <div className="flex items-center gap-2 px-4">
+              <div className="flex min-w-0 items-center gap-2 px-4">
+                <label className="sr-only" htmlFor="ghost-ai-assistant-navigation">Assistant options</label>
+                <select id="ghost-ai-assistant-navigation" className="max-w-[calc(95vw-5rem)] min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground md:hidden" value={activeSection} onChange={(e) => setActiveSection(e.target.value)}>
+                  {navItems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
                 <Breadcrumb>
                   <BreadcrumbList>
                     <BreadcrumbItem className="hidden md:block">

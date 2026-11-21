@@ -3,6 +3,7 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import * as RechartsPrimitive from 'recharts'
 import type { TooltipValueType } from 'recharts'
+import { safeChartColor, safeChartIdentifier } from '@/lib/ghost-ai-chart-css'
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: '', dark: '.dark' } as const
@@ -53,7 +54,7 @@ function ChartContainer({
   }
 }) {
   const uniqueId = React.useId()
-  const chartId = `chart-${id ?? uniqueId.replace(/:/g, '')}`
+  const chartId = `chart-${safeChartIdentifier(id ?? uniqueId)}`
 
   return (
     <ChartContext.Provider value={{ config }}>
@@ -76,32 +77,27 @@ function ChartContainer({
 }
 
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
-  const colorConfig = Object.entries(config).filter(([, config]) => config.theme ?? config.color)
-
-  if (!colorConfig.length) {
-    return null
-  }
-
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ?? itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
-  })
-  .join('\n')}
-}
-`
-          )
-          .join('\n'),
-      }}
-    />
+  const colorConfig = Object.entries(config).filter(
+    ([key, options]) =>
+      key === safeChartIdentifier(key) &&
+      Object.keys(THEMES).some(
+        (theme) =>
+          safeChartColor(options.theme?.[theme as keyof typeof THEMES] ?? options.color) !== null
+      )
   )
+  if (!colorConfig.length) return null
+
+  const cssText = Object.entries(THEMES).map(([theme, prefix]) => {
+    const variables = colorConfig.flatMap(([key, options]) => {
+      const color = safeChartColor(
+        options.theme?.[theme as keyof typeof THEMES] ?? options.color
+      )
+      return color ? [`--color-${key}: ${color};`] : []
+    })
+    return `${prefix} [data-chart="${id}"] {\n${variables.join('\n')}\n}`
+  }).join('\n')
+
+  return <style>{cssText}</style>
 }
 
 const ChartTooltip = RechartsPrimitive.Tooltip

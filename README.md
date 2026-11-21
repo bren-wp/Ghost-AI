@@ -1,3 +1,4 @@
+<!-- Ghost AI by Brendigo -->
 <p align="center">
   <img src="brand/banner.svg" width="100%" alt="Ghost AI by Brendigo">
 </p>
@@ -7,7 +8,7 @@
 <p align="center">One beautifully focused place to chat, create, research, analyze and get things done.</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Ghost_AI-v0.1.0-874CFF" alt="Ghost AI version">
+  <img src="https://img.shields.io/badge/Ghost_AI-v0.1.1-874CFF" alt="Ghost AI version">
   <img src="https://img.shields.io/badge/Windows-Desktop-00E5FF" alt="Windows">
   <img src="https://img.shields.io/badge/Local_%26_Cloud_AI-Multiple_models-1F2937" alt="AI models">
 </p>
@@ -31,18 +32,34 @@ Ghost AI brings your favorite compatible AI services and local models into a pow
 - **Your look:** elegant dark surfaces, cyan highlights and violet accents.
 - **Your workflow:** tools, assistants and extensible integrations.
 
+## A workspace made for ideas
+
+<p align="center">
+  <img src="brand/screens/ghost-ai-home-concept.svg" width="49%" alt="Ghost AI home workspace design">
+  <img src="brand/screens/ghost-ai-conversations-concept.svg" width="49%" alt="Ghost AI conversation workspace design">
+</p>
+<p align="center">
+  <img src="brand/screens/ghost-ai-agents-concept.svg" width="49%" alt="Ghost AI agents workspace design">
+  <img src="brand/screens/ghost-ai-documents-concept.svg" width="49%" alt="Ghost AI documents workspace design">
+</p>
+<p align="center">
+  <img src="brand/screens/ghost-ai-providers-concept.svg" width="49%" alt="Ghost AI provider settings design">
+  <img src="brand/screens/ghost-ai-settings-concept.svg" width="49%" alt="Ghost AI personalized preferences design">
+</p>
+<p align="center"><small>Design previews show the Ghost AI visual direction, not screenshots of a running app.</small></p>
+
 ## Designed to feel right, everywhere
 
 <p align="center"><img src="brand/logo.svg" width="152" alt="Ghost AI app icon"></p>
 
 Ghost AI uses a responsive interface designed for laptop screens, external monitors and different display scales. Its window opens at a comfortable size without filling the whole screen.
 
-The visuals currently included in this repository are original brand designs. Screenshots of the real app are added only after the matching build and visual tests are complete.
+Every display should feel consistent. Real application screenshots are included only after capture and verification on a supported operating system.
 
 ## Available platforms
 
 **Windows:** setup, portable package and installer-based update package.  
-**macOS and Linux:** planned release builds subject to compatibility and distribution checks.
+**macOS and Linux:** platform packages are provided after successful build, compatibility and distribution checks.
 
 Download the latest verified packages from **[brendigo.com](https://brendigo.com)** when released. Public preview builds, when available, are also attached to releases in this repository.
 

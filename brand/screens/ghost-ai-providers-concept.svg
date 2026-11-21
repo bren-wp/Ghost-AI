@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-label="Ghost AI by Brendigo — Providers concept">
+<defs><linearGradient id="back" x2="1" y2="1"><stop stop-color="#080f1a"/><stop offset="1" stop-color="#1b183b"/></linearGradient><linearGradient id="brand"><stop stop-color="#00e5ff"/><stop offset="1" stop-color="#874cff"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="26"/></filter></defs>
+<rect width="1440" height="900" fill="url(#back)"/>
+<ellipse cx="1220" cy="160" rx="330" ry="270" fill="#874cff" opacity=".10" filter="url(#glow)"/>
+<rect x="70" y="42" width="1300" height="804" rx="20" fill="#111827" stroke="#34435f" stroke-width="2"/>
+<rect x="70" y="42" width="1300" height="53" rx="20" fill="#141f31"/>
+<rect x="70" y="75" width="1300" height="20" fill="#141f31"/>
+<rect x="70" y="95" width="255" height="751" fill="#0c1726"/>
+<path d="M325 95V846" stroke="#2e3c53"/>
+<circle cx="97" cy="69" r="6" fill="#fa657a"/><circle cx="117" cy="69" r="6" fill="#ffc86c"/><circle cx="137" cy="69" r="6" fill="#55d3a6"/>
+<rect x="96" y="117" width="48" height="48" rx="14" fill="url(#brand)"/>
+<path d="M110 148v-11a10 10 0 0 1 20 0v11l-6-4-4 4-4-4z" fill="#0c1726"/>
+<text x="155" y="135" font-size="20" font-family="Arial,sans-serif" font-weight="bold" fill="#f6f8ff">Ghost AI</text>
+<text x="155" y="153" font-size="12" font-family="Arial,sans-serif" fill="#97a9c4">by Brendigo</text>
+<rect x="91" y="208" width="212" height="45" rx="10" fill="none"/><text x="114" y="238" font-size="15" font-family="Arial,sans-serif" fill="#a6b6ce">Home</text><rect x="91" y="270" width="212" height="45" rx="10" fill="none"/><text x="114" y="300" font-size="15" font-family="Arial,sans-serif" fill="#a6b6ce">Conversations</text><rect x="91" y="332" width="212" height="45" rx="10" fill="none"/><text x="114" y="362" font-size="15" font-family="Arial,sans-serif" fill="#a6b6ce">Agents</text><rect x="91" y="394" width="212" height="45" rx="10" fill="none"/><text x="114" y="424" font-size="15" font-family="Arial,sans-serif" fill="#a6b6ce">Documents</text><rect x="91" y="456" width="212" height="45" rx="10" fill="#223855"/><text x="114" y="486" font-size="15" font-family="Arial,sans-serif" fill="#00e5ff">Providers</text><rect x="91" y="518" width="212" height="45" rx="10" fill="none"/><text x="114" y="548" font-size="15" font-family="Arial,sans-serif" fill="#a6b6ce">Settings</text>
+<text x="106" y="802" font-size="12" font-family="Arial,sans-serif" fill="#7e91ae">Ghost AI · brendigo.com</text>
+<text x="354" y="75" font-size="14" font-family="Arial,sans-serif" fill="#d1d9e8">Providers</text>
+<text x="1315" y="76" font-size="13" text-anchor="end" font-family="Arial,sans-serif" fill="#8fa5c5">Ghost AI</text>
+<text x="377" y="158" font-family="Arial,sans-serif" font-size="33" fill="#e7ecf8">Connect your AI</text><text x="377" y="200" font-family="Arial,sans-serif" font-size="16" fill="#9caecc">Manage supported cloud providers and local runtimes.</text><rect x="377" y="248" width="448" height="210" rx="16" fill="#172338" stroke="#30465f"/><text x="401" y="286" font-family="Arial,sans-serif" font-size="19" fill="#eff5ff" font-weight="bold">Cloud providers</text><text x="401" y="317" font-family="Arial,sans-serif" font-size="14" fill="#95acc7">Credentials stored with care</text><rect x="847" y="248" width="460" height="210" rx="16" fill="#172338" stroke="#30465f"/><text x="871" y="286" font-family="Arial,sans-serif" font-size="19" fill="#eff5ff" font-weight="bold">Local models</text><text x="871" y="317" font-family="Arial,sans-serif" font-size="14" fill="#95acc7">Run compatible models on your computer</text><rect x="377" y="482" width="930" height="195" rx="16" fill="#172338" stroke="#30465f"/><text x="401" y="520" font-family="Arial,sans-serif" font-size="19" fill="#eff5ff" font-weight="bold">Connection settings</text><text x="401" y="551" font-family="Arial,sans-serif" font-size="14" fill="#95acc7">Endpoints, models and permission controls</text>
+</svg>
