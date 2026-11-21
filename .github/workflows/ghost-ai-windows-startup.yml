@@ -7,6 +7,9 @@ on:
     paths:
       - .github/workflows/ghost-ai-windows-startup.yml
       - scripts/ghost-ai-startup-diagnostics.ps1
+      - src-tauri/src/lib.rs
+      - src-tauri/tauri.conf.json
+      - src-tauri/Cargo.toml
   workflow_dispatch:
 permissions:
   contents: read
@@ -38,7 +41,58 @@ jobs:
           name: Ghost-AI-v0.1.1-Startup-Diagnostics
           path: diagnostics/
           if-no-files-found: warn
-      - name: Require healthy startup
+      - name: Show baseline failure without hiding it
         if: steps.startup.outcome != 'success'
+        run: echo "Public v0.1.1 launch failure reproduced; see diagnostics artifact."
+
+  patched:
+    name: Build and actually launch patched Ghost AI
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      VITE_GHOST_AI_UPDATES: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Install exact application dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build patched Windows executable
+        run: pnpm tauri build --no-bundle
+      - name: Stage the exact Portable layout
         shell: pwsh
-        run: throw 'Published Ghost AI v0.1.1 failed startup health check; inspect diagnostics artifact'
+        run: |
+          New-Item -ItemType Directory -Force patched/Portable | Out-Null
+          Copy-Item src-tauri/target/release/ghost-ai-desktop.exe patched/Portable/Ghost-AI.exe
+          foreach ($part in @('resources','builtin-skills')) {
+            Copy-Item "src-tauri/$part" "patched/Portable/$part" -Recurse -Force
+          }
+          Copy-Item legal patched/Portable/legal -Recurse -Force
+          if (-not (Test-Path patched/Portable/resources/models_dev.json)) { throw 'Missing bundled model data' }
+      - name: Confirm Ghost AI really starts
+        id: smoke
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          ./scripts/ghost-ai-startup-diagnostics.ps1 -Executable patched/Portable/Ghost-AI.exe -OutputDirectory patched-diagnostics -ObserveSeconds 25
+      - name: Preserve executable startup evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-Patched-Windows-Startup
+          path: patched-diagnostics/
+          if-no-files-found: warn
+      - name: Reject Windows build that exits before startup
+        if: steps.smoke.outcome != 'success'
+        shell: pwsh
+        run: throw 'Ghost AI Windows startup validation failed; see patched-diagnostics'
