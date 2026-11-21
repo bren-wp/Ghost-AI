@@ -128,6 +128,23 @@ jobs:
           Get-ChildItem 'release/Ghost-AI-*' -File | ForEach-Object {
             (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLower() + '  ' + $_.Name
           } | Set-Content -Encoding utf8 'release/SHA256SUMS.txt'
+      - name: Prove packaged Ghost AI launches on Windows
+        id: live_startup
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          ./scripts/ghost-ai-startup-diagnostics.ps1 -Executable 'release/Portable/Ghost-AI.exe' -OutputDirectory release-startup-diagnostics -ObserveSeconds 25
+      - name: Preserve Windows startup diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-Windows-Startup-Diagnostics
+          path: release-startup-diagnostics/
+          if-no-files-found: warn
+      - name: Reject non-starting Windows packages
+        if: steps.live_startup.outcome != 'success'
+        shell: pwsh
+        run: throw 'The packaged Ghost AI executable failed its startup health check'
       - name: Capture a real first-run Ghost AI screenshot
         shell: pwsh
         continue-on-error: true
