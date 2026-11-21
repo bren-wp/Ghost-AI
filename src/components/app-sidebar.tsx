@@ -1,0 +1,569 @@
+'use client'
+
+import * as React from 'react'
+import { Plus, Search, SquarePen, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { filterGroups, filterItems, normalizeQuery } from '@/lib/sidebar-filter'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  useSidebar,
+} from '@/components/ui/sidebar'
+import { ProviderSettingsDialog } from '@/components/provider-settings-dialog'
+import { SettingsDialog } from '@/components/settings-dialog'
+import { AssistantDialog } from '@/components/assistant-dialog'
+import { PromptDialog } from '@/components/prompt-dialog'
+import { ConversationList } from '@/components/sidebar/conversation-list'
+import { ContactsContent } from '@/components/sidebar/contacts-content'
+import { LibraryContent } from '@/components/sidebar/library-content'
+import { ArtifactsContent } from '@/components/sidebar/artifacts-content'
+import {
+  IS_APPLE_PLATFORM,
+  NEW_CONVERSATION_SHORTCUT,
+  SidebarNavigation,
+} from '@/components/sidebar/sidebar-navigation'
+import { useConversationParticipants } from '@/hooks/useConversationParticipants'
+import { useSidebarHandlers } from '@/hooks/useSidebarHandlers'
+import { useVendorsList } from '@/hooks/useVendorsList'
+import { useAssistantGroups } from '@/hooks/useAssistantGroups'
+import { useSearchStore } from '@/stores/searchStore'
+import { useContactSelectionStore } from '@/stores/contactSelectionStore'
+import { useLibrarySelectionStore } from '@/stores/librarySelectionStore'
+import { usePromptGroups } from '@/hooks/usePromptGroups'
+import { usePresetActions } from '@/hooks/usePresets'
+import { usePresetStore } from '@/stores/presetStore'
+import { PresetDialog } from '@/components/preset-dialog'
+import { SkillEditDialog } from '@/components/skill-edit-dialog'
+import { useSkillActions } from '@/hooks/useSkills'
+import { useSkillStore } from '@/stores/skillStore'
+import { useAssistantStore } from '@/stores/assistantStore'
+import { useTranslation } from 'react-i18next'
+import { hasBlockingDialog } from '@/lib/blocking-dialog'
+import { usePromptStore } from '@/stores/promptStore'
+import { useProviderSettingsStore } from '@/stores/providerSettingsStore'
+import { SIDEBAR_DATA, getNavItems } from '@/lib/sidebar-data'
+import type { Prompt as PromptListItem } from '@/components/prompt-list'
+import type { Model as ModelListItem } from '@/components/model-list'
+import type { Assistant as AssistantListItem } from '@/components/assistant-list'
+import type { Assistant as AssistantDB } from '@/types/assistant'
+import type { Prompt as PromptDB } from '@/types/prompt'
+import type { ModelParameterPreset } from '@/types'
+
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  activeSection: string
+  onSectionChange: (section: string) => void
+  /** Switches to the conversations section and opens a draft */
+  onNewConversation: () => void
+}
+
+export function AppSidebar({
+  activeSection,
+  onSectionChange,
+  onNewConversation,
+  ...props
+}: AppSidebarProps) {
+  const { t } = useTranslation()
+  const navItems = React.useMemo(() => getNavItems(t), [t])
+  const activeItem = navItems.find((item) => item.id === activeSection) || navItems[0]
+  const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false)
+  const [assistantDialogOpen, setAssistantDialogOpen] = React.useState(false)
+  const [promptDialogOpen, setPromptDialogOpen] = React.useState(false)
+  const [editingAssistant, setEditingAssistant] = React.useState<AssistantDB | null>(null)
+  const [editingPrompt, setEditingPrompt] = React.useState<PromptDB | null>(null)
+  const [promptDialogMode, setPromptDialogMode] = React.useState<'create' | 'edit'>('create')
+  const activeContactsTab = useContactSelectionStore((state) => state.activeTab)
+  const setActiveContactsTab = useContactSelectionStore((state) => state.setActiveTab)
+  const { setOpen, setOpenMobile } = useSidebar()
+  const providerDialogOpen = useProviderSettingsStore((state) => state.open)
+  const providerDialogInitialId = useProviderSettingsStore((state) => state.initialProviderId)
+  const openProviderSettings = useProviderSettingsStore((state) => state.openProviderSettings)
+  const closeProviderSettings = useProviderSettingsStore((state) => state.closeProviderSettings)
+
+  const { conversationParticipantsMap } = useConversationParticipants()
+  const vendorsList = useVendorsList()
+  const assistantGroups = useAssistantGroups()
+
+  const assistants = useAssistantStore((state) => state.assistants)
+  const prompts = usePromptStore((state) => state.prompts)
+  const ensurePromptsLoaded = usePromptStore((state) => state.ensureLoaded)
+  const togglePromptStar = usePromptStore((state) => state.togglePromptStar)
+  const selectedContact = useContactSelectionStore((state) => state.selected)
+  const selectContact = useContactSelectionStore((state) => state.selectContact)
+  const selectedPromptId = useLibrarySelectionStore((state) => state.selectedPromptId)
+  const selectPrompt = useLibrarySelectionStore((state) => state.selectPrompt)
+  const activeLibraryTab = useLibrarySelectionStore((state) => state.activeTab)
+  const setActiveLibraryTab = useLibrarySelectionStore((state) => state.setActiveTab)
+  const selectedPresetId = useLibrarySelectionStore((state) => state.selectedPresetId)
+  const selectPreset = useLibrarySelectionStore((state) => state.selectPreset)
+  const presets = usePresetStore((state) => state.presets)
+  const presetActions = usePresetActions()
+  const [presetDialogOpen, setPresetDialogOpen] = React.useState(false)
+  const [editingPreset, setEditingPreset] = React.useState<ModelParameterPreset | null>(null)
+  const skills = useSkillStore((state) => state.skills)
+  const ensureSkillsLoaded = useSkillStore((state) => state.ensureLoaded)
+  const selectedSkillId = useLibrarySelectionStore((state) => state.selectedSkillId)
+  const selectSkill = useLibrarySelectionStore((state) => state.selectSkill)
+  const skillActions = useSkillActions()
+  const [skillDialogOpen, setSkillDialogOpen] = React.useState(false)
+
+  // Ensure prompts are loaded (handles HMR store reset)
+  React.useEffect(() => {
+    ensurePromptsLoaded()
+  }, [ensurePromptsLoaded])
+
+  // Skills are scanned lazily the first time the Library needs them
+  React.useEffect(() => {
+    if (activeSection === 'library') ensureSkillsLoaded()
+  }, [activeSection, ensureSkillsLoaded])
+
+  const promptGroups = usePromptGroups()
+
+  // Header filter for the Library and Contacts lists. Short lists (presets,
+  // people) have none; every other section keeps chat-history search.
+  const [filterOpen, setFilterOpen] = React.useState(false)
+  const [filterQuery, setFilterQuery] = React.useState('')
+  const usesListFilter = activeSection === 'library' || activeSection === 'contacts'
+  const filterTarget: 'prompts' | 'skills' | 'models' | 'assistants' | null =
+    activeSection === 'library'
+      ? activeLibraryTab === 'presets'
+        ? null
+        : activeLibraryTab
+      : activeSection === 'contacts'
+        ? activeContactsTab === 'people'
+          ? null
+          : activeContactsTab
+        : null
+  // A filter belongs to one list: switching section or tab clears it.
+  React.useEffect(() => {
+    setFilterOpen(false)
+    setFilterQuery('')
+  }, [activeSection, activeLibraryTab, activeContactsTab])
+  const closeFilter = () => {
+    setFilterOpen(false)
+    setFilterQuery('')
+  }
+  const query = filterOpen && filterTarget ? normalizeQuery(filterQuery) : null
+  const filterActive = query !== null
+
+  const visibleVendors = React.useMemo(
+    () =>
+      filterGroups(
+        vendorsList,
+        query,
+        (vendor) => vendor.models,
+        (vendor, models) => ({ ...vendor, models }),
+        (model) => [model.name, model.modelId, model.providerName]
+      ),
+    [vendorsList, query]
+  )
+  const visibleAssistantGroups = React.useMemo(
+    () =>
+      filterGroups(
+        assistantGroups,
+        query,
+        (group) => group.assistants,
+        (group, assistants) => ({ ...group, assistants }),
+        (assistant) => [
+          assistant.name,
+          assistant.persona,
+          assistant.description,
+          assistant.modelName,
+        ]
+      ),
+    [assistantGroups, query]
+  )
+  const visiblePromptGroups = React.useMemo(
+    () =>
+      filterGroups(
+        promptGroups,
+        query,
+        (group) => group.prompts,
+        (group, prompts) => ({ ...group, prompts }),
+        (prompt) => [prompt.name, prompt.content]
+      ),
+    [promptGroups, query]
+  )
+  const visibleSkills = React.useMemo(
+    () => filterItems(skills, query, (skill) => [skill.name, skill.description, skill.path]),
+    [skills, query]
+  )
+
+  const handlers = useSidebarHandlers()
+
+  const renderContent = () => {
+    switch (activeItem.id) {
+      case 'conversations':
+        return (
+          <ConversationList
+            conversationParticipantsMap={conversationParticipantsMap}
+            onConversationClick={handlers.handleConversationClick}
+            onGenerateTitle={handlers.handleGenerateTitle}
+            onEditTitle={handlers.handleEditTitle}
+            onDelete={handlers.handleDeleteConversation}
+          />
+        )
+      case 'contacts':
+        return (
+          <ContactsContent
+            activeTab={activeContactsTab}
+            onTabChange={setActiveContactsTab}
+            vendorsList={visibleVendors}
+            assistantGroups={visibleAssistantGroups}
+            filterActive={filterActive}
+            selectedModelId={selectedContact?.kind === 'model' ? selectedContact.id : undefined}
+            selectedAssistantId={
+              selectedContact?.kind === 'assistant' ? selectedContact.id : undefined
+            }
+            onModelClick={(model: ModelListItem) => selectContact({ kind: 'model', id: model.id })}
+            onModelActivate={(model: ModelListItem) => {
+              void handlers.handleModelClick(model)
+              onSectionChange('conversations')
+            }}
+            onModelSettings={(model: ModelListItem) => openProviderSettings(model.providerId)}
+            onModelDelete={(model: ModelListItem) => handlers.handleModelDelete(model)}
+            onModelStarToggle={(model: ModelListItem) => handlers.handleModelStarToggle(model)}
+            onVendorSettings={(vendor) => openProviderSettings(vendor.id)}
+            onAssistantClick={(assistant: AssistantListItem) =>
+              selectContact({ kind: 'assistant', id: assistant.id })
+            }
+            onAssistantActivate={(assistant: AssistantListItem) => {
+              void handlers.handleAssistantClick(assistant)
+              onSectionChange('conversations')
+            }}
+            onAssistantSettings={(assistant: AssistantListItem) => {
+              const fullAssistant = assistants.find((a) => a.id === assistant.id)
+              if (fullAssistant) {
+                setEditingAssistant(fullAssistant)
+                setAssistantDialogOpen(true)
+              }
+            }}
+            onAssistantStarToggle={(assistant: AssistantListItem) =>
+              handlers.handleAssistantStarToggle(assistant)
+            }
+            onAssistantDelete={(assistant: AssistantListItem) =>
+              handlers.handleAssistantDelete(assistant)
+            }
+            onGroupRename={(group, newName) => {
+              void handlers.handleAssistantGroupRename(group, newName)
+            }}
+          />
+        )
+      case 'library':
+        return (
+          <LibraryContent
+            activeTab={activeLibraryTab}
+            onTabChange={setActiveLibraryTab}
+            promptGroups={visiblePromptGroups}
+            filterActive={filterActive}
+            selectedPromptId={selectedPromptId || undefined}
+            onPromptClick={(prompt: PromptListItem) => selectPrompt(prompt.id)}
+            onPromptActivate={(prompt: PromptListItem) => {
+              void handlers.handlePromptUse(prompt)
+              onSectionChange('conversations')
+            }}
+            onPromptSettings={(prompt: PromptListItem) => {
+              const fullPrompt = prompts.find((p) => p.id === prompt.id)
+              if (fullPrompt) {
+                setEditingPrompt(fullPrompt)
+                setPromptDialogMode('edit')
+                setPromptDialogOpen(true)
+              }
+            }}
+            onPromptStarToggle={(prompt: PromptListItem) => {
+              togglePromptStar(prompt.id)
+            }}
+            onPromptDelete={(prompt: PromptListItem) => handlers.handlePromptDelete(prompt)}
+            onPromptGroupRename={(group, newName) => {
+              void handlers.handlePromptCategoryRename(group, newName)
+            }}
+            presets={presets}
+            selectedPresetId={selectedPresetId ?? undefined}
+            onPresetClick={(preset) => selectPreset(preset.id)}
+            onPresetActivate={(preset) => {
+              void presetActions.startChatWithPreset(preset)
+              onSectionChange('conversations')
+            }}
+            onPresetSetDefault={(preset) => void presetActions.setDefaultPreset(preset)}
+            onPresetEdit={(preset) => {
+              setEditingPreset(preset)
+              setPresetDialogOpen(true)
+            }}
+            skills={visibleSkills}
+            selectedSkillId={selectedSkillId ?? undefined}
+            onSkillClick={(skill) => selectSkill(skill.id)}
+            onSkillToggle={(skill) => void skillActions.toggleSkill(skill)}
+          />
+        )
+      case 'artifacts':
+        return <ArtifactsContent />
+      case 'settings':
+        return (
+          <div className="p-4">
+            <p className="text-sm text-muted-foreground">{t('settingsComingSoon')}</p>
+          </div>
+        )
+      default:
+        return null
+    }
+  }
+
+  const renderFooter = () => {
+    switch (activeItem.id) {
+      case 'conversations':
+        return (
+          <div className="px-3 pt-2 pb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-center gap-2 h-9"
+              onClick={onNewConversation}
+              title={`${t('sidebar:newConversation')} (${NEW_CONVERSATION_SHORTCUT})`}
+            >
+              <SquarePen data-icon="inline-start" />
+              <span>{t('sidebar:newConversation')}</span>
+              <kbd className="font-sans text-xs text-muted-foreground">
+                {NEW_CONVERSATION_SHORTCUT}
+              </kbd>
+            </Button>
+          </div>
+        )
+      case 'contacts':
+        switch (activeContactsTab) {
+          case 'models':
+            return (
+              <div className="px-3 pt-2 pb-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center gap-2 h-9"
+                  onClick={() => openProviderSettings()}
+                >
+                  <Plus className="size-4" />
+                  {t('sidebar:addModels')}
+                </Button>
+              </div>
+            )
+          case 'assistants':
+            return (
+              <div className="px-3 pt-2 pb-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center gap-2 h-9"
+                  onClick={() => {
+                    setEditingAssistant(null)
+                    setAssistantDialogOpen(true)
+                  }}
+                >
+                  <Plus className="size-4" />
+                  {t('sidebar:addAssistant')}
+                </Button>
+              </div>
+            )
+          case 'people':
+            return <></>
+        }
+        break
+      case 'library':
+        return (
+          <div className="px-3 pt-2 pb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-center gap-2 h-9"
+              onClick={() => {
+                if (activeLibraryTab === 'presets') {
+                  setEditingPreset(null)
+                  setPresetDialogOpen(true)
+                  return
+                }
+                if (activeLibraryTab === 'skills') {
+                  setSkillDialogOpen(true)
+                  return
+                }
+                setEditingPrompt(null)
+                setPromptDialogMode('create')
+                setPromptDialogOpen(true)
+              }}
+            >
+              <Plus className="size-4" />
+              {activeLibraryTab === 'presets'
+                ? t('sidebar:addPreset')
+                : activeLibraryTab === 'skills'
+                  ? t('skills:newSkill')
+                  : t('sidebar:addPrompt')}
+            </Button>
+          </div>
+        )
+      case 'settings':
+        return null
+      default:
+        return null
+    }
+    return null
+  }
+
+  const footer = renderFooter()
+
+  // Global shortcut: Cmd+N (macOS) / Ctrl+N (elsewhere) to start a new
+  // conversation. Ctrl+N is left alone on macOS, where it moves the caret
+  // down a line in text fields.
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const modifier = IS_APPLE_PLATFORM ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey
+      if (!modifier || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'n') return
+      e.preventDefault()
+      // Do not switch conversations underneath an open dialog
+      if (hasBlockingDialog()) return
+      onNewConversation()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onNewConversation])
+
+  return (
+    <Sidebar
+      collapsible="icon"
+      className="overflow-hidden *:data-[sidebar=sidebar]:flex-row"
+      style={
+        activeSection === 'translation'
+          ? ({ '--sidebar-width': 'var(--sidebar-width-icon)' } as React.CSSProperties)
+          : undefined
+      }
+      {...props}
+    >
+      <SidebarNavigation
+        navItems={navItems}
+        activeItem={activeItem}
+        onItemClick={(item) => {
+          onSectionChange(item.id)
+          setOpen(item.id !== 'translation')
+          setOpenMobile(false)
+        }}
+        onSettingsClick={() => setSettingsDialogOpen(true)}
+        user={SIDEBAR_DATA.user}
+      />
+
+      {activeSection !== 'translation' && (
+        <Sidebar collapsible="none" className="hidden flex-1 md:flex">
+          <SidebarHeader className="gap-3.5 border-b p-4">
+            <div className="flex w-full items-center justify-between h-7">
+              <div className="text-foreground text-base font-medium">{activeItem?.title}</div>
+              {!usesListFilter ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0"
+                  onClick={() => useSearchStore.getState().setOpen(true)}
+                  aria-label={t('sidebar:searchChatHistory')}
+                  title={t('sidebar:searchChatHistory')}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              ) : (
+                filterTarget && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={() => (filterOpen ? closeFilter() : setFilterOpen(true))}
+                    aria-label={t('sidebar:filterList')}
+                    aria-pressed={filterOpen}
+                    title={t('sidebar:filterList')}
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                )
+              )}
+            </div>
+            {filterOpen && filterTarget && (
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  value={filterQuery}
+                  onChange={(e) => setFilterQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.preventDefault()
+                      closeFilter()
+                    }
+                  }}
+                  placeholder={t(`sidebar:filterPlaceholders.${filterTarget}`)}
+                  aria-label={t('sidebar:filterList')}
+                  className="h-8 pl-8 pr-8 text-sm"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0.5 top-1/2 size-7 -translate-y-1/2"
+                  onClick={closeFilter}
+                  aria-label={t('sidebar:closeFilter')}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </div>
+            )}
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarGroup className="px-0">
+              <SidebarGroupContent>{renderContent()}</SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+          {footer && <SidebarFooter className="border-t">{footer}</SidebarFooter>}
+        </Sidebar>
+      )}
+
+      <ProviderSettingsDialog
+        open={providerDialogOpen}
+        initialProviderId={providerDialogInitialId}
+        onOpenChange={(open) => {
+          if (open) openProviderSettings(providerDialogInitialId)
+          else closeProviderSettings()
+        }}
+      />
+
+      <SettingsDialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen} />
+
+      <AssistantDialog
+        open={assistantDialogOpen}
+        onOpenChange={setAssistantDialogOpen}
+        assistant={editingAssistant}
+        mode={editingAssistant ? 'edit' : 'create'}
+      />
+
+      <PresetDialog
+        open={presetDialogOpen}
+        onOpenChange={(open) => {
+          setPresetDialogOpen(open)
+          if (!open) setEditingPreset(null)
+        }}
+        preset={editingPreset}
+        onSaved={(preset) => selectPreset(preset.id)}
+      />
+      <SkillEditDialog
+        open={skillDialogOpen}
+        onOpenChange={setSkillDialogOpen}
+        onCreated={(skill) => selectSkill(skill.id)}
+      />
+
+      <PromptDialog
+        open={promptDialogOpen}
+        onOpenChange={(open) => {
+          setPromptDialogOpen(open)
+          if (!open) {
+            setEditingPrompt(null)
+            setPromptDialogMode('create')
+          }
+        }}
+        prompt={editingPrompt}
+        mode={promptDialogMode}
+      />
+    </Sidebar>
+  )
+}

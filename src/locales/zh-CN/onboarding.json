@@ -1,0 +1,12 @@
+{
+  "welcome": "欢迎使用 Ghost AI",
+  "settingUp": "正在设置 Ghost AI...",
+  "checkingForModels": "正在检查可用模型",
+  "setupProvider": "连接模型",
+  "configureProvider": "连接一个 AI 模型即可开始",
+  "configureProviderDesc": "Ghost AI 使用你选择的 AI 服务。粘贴 OpenAI、Anthropic 或 OpenRouter 的 API 密钥，或使用通过 Ollama 在本机免费运行的模型。",
+  "ollamaReady": "Ollama 已就绪",
+  "ollamaFoundModels": "发现本机正在运行的 {{count}} 个模型，已为你添加。它们私密且可离线使用。你可以随时连接其他服务。",
+  "addMoreProviders": "连接其他服务",
+  "continue": "继续"
+}

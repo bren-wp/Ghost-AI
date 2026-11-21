@@ -1,0 +1,76 @@
+[package]
+name = "ghost-ai-agent-core"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = ["tls-native"]
+tls-native = ["reqwest/native-tls", "rig/native-tls"]
+rustls = ["reqwest/rustls", "rig/rustls"]
+
+[dependencies]
+dirs = "5"
+# CJK segmentation for the shared local-FTS tokenizer; pinned to the same
+# 0.7 line desktop's tokenizer has always used so both platforms segment
+# identically (dictionary drift across major versions changes results).
+jieba-rs = "0.7"
+grep-regex = "0.1"
+grep-searcher = "0.1"
+ignore = "0.4"
+pdf-extract = "0.7"
+# Repair fallback for PDFs whose xref/trailer is malformed enough that
+# pdf-extract's pinned lopdf rejects them (newer lopdf recovers by scanning).
+lopdf = { version = "0.45", default-features = false }
+# Office formats: OOXML is ZIP + XML. calamine reads spreadsheets;
+# quick-xml parses docx/pptx text without a full OOXML model.
+calamine = "0.36"
+quick-xml = { version = "0.42", default-features = false }
+zip = { version = "9", default-features = false, features = ["deflate"] }
+tree-sitter = "0.25"
+tree-sitter-bash = "0.25"
+async-stream.workspace = true
+encoding_rs.workspace = true
+aes-gcm.workspace = true
+argon2.workspace = true
+hkdf.workspace = true
+sha2.workspace = true
+anyhow.workspace = true
+futures.workspace = true
+nanoid.workspace = true
+rand.workspace = true
+regex.workspace = true
+ab_glyph.workspace = true
+png.workspace = true
+image.workspace = true
+base64.workspace = true
+reqwest.workspace = true
+htmd.workspace = true
+rmcp.workspace = true
+readability.workspace = true
+rig.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+scraper.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+url.workspace = true
+urlencoding.workspace = true
+tracing.workspace = true
+unicode-normalization.workspace = true
+rusqlite.workspace = true
+uuid.workspace = true
+zstd.workspace = true
+blake3 = "1"
+
+# Reading the bash process's own working directory (proc_pidinfo on macOS).
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+# In-memory duplex transport for the MCP wire tests (tests/mcp_wire.rs).
+rmcp = { workspace = true, features = ["transport-async-rw"] }
+eventsource-stream = "0.2"
+bytes = "1"
+flate2 = "1"

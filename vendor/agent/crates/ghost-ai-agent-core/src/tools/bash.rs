@@ -1,0 +1,1255 @@
+//! Bash tool for LLM agents
+//!
+//! Provides a persistent bash session where environment variables, working directory,
+//! and other state persist between calls. The session is lazily created on first use
+//! and automatically recreated if it dies or times out.
+
+use rig::agent::tool::Tool;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::fmt;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tokio::sync::Mutex as TokioMutex;
+
+use crate::bash_security::{self, SecurityVerdict};
+use crate::process_api::{ShellProcess, ShellSpawner, SpawnSpec, TokioSpawner};
+use crate::sandbox::{self, SandboxPolicy};
+use crate::shell_env;
+use crate::tool_fs::{Fs, StdFs};
+use crate::tools::bash_output::{Captured, OutputCapture, SpillTarget, spill_notice};
+use crate::tools::bash_sandbox::{
+    BashSandbox, EscalationDecision, EscalationKind, EscalationRequest, ExecutionDelta,
+    NOTE_NETWORK_ALLOWED, NOTE_RETRIED_UNSANDBOXED, NOTE_RUN_ANYWAY_UNSANDBOXED,
+    NOTE_SANDBOX_UNAVAILABLE, detect_denial, host_refusal, note_delta, note_denied,
+    note_host_refused, note_reported,
+};
+use std::sync::atomic::Ordering;
+
+const DEFAULT_TIMEOUT_SECS: u64 = 120;
+
+// ---------------------------------------------------------------------------
+// BashSession – persistent child process
+// ---------------------------------------------------------------------------
+
+struct CommandOutput {
+    captured: Captured,
+    exit_code: i32,
+    /// True when the command exceeded its timeout: `captured` is the
+    /// partial capture and `exit_code` is meaningless. The session was
+    /// killed and will be recreated on the next call.
+    timed_out: bool,
+}
+
+/// Directory spelling for comparisons (symlinks resolved when possible).
+fn canonical_dir(path: &std::path::Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+pub struct BashSession<P: ShellProcess> {
+    proc: P,
+    /// How this session was launched; a different desired launch (sandbox
+    /// toggled, network granted, env changed) respawns the session.
+    launch: SpawnSpec,
+    /// The shell's working directory after its last command.
+    dir: ShellDir,
+}
+
+/// Where the persistent shell is between commands.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ShellDir {
+    /// No command has run: a fresh shell is in its launch directory.
+    Fresh,
+    /// After the last command: read from the OS where the process is the
+    /// shell itself (unforgeable), else the directory the shell reported.
+    Known(PathBuf),
+    /// The shell reported no directory (`PWD` unset or emptied) and the OS
+    /// could not be asked: anywhere.
+    Unknown,
+}
+
+/// Shared session handle for a spawner `S`, used by `BashTool`,
+/// `KillShellTool`, and the session manager.
+pub type SharedSession<S> = Arc<TokioMutex<Option<BashSession<<S as ShellSpawner>::Shell>>>>;
+
+/// Concrete shared handle over the default tokio process backend.
+pub type SharedBashSession = SharedSession<TokioSpawner>;
+
+/// Shared list of temp file paths created during output truncation.
+pub type TempFileList = Arc<Mutex<Vec<PathBuf>>>;
+
+impl<P: ShellProcess> fmt::Debug for BashSession<P> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BashSession")
+            .field("pid", &self.proc.pid())
+            .finish()
+    }
+}
+
+impl<P: ShellProcess> BashSession<P> {
+    async fn new<S: ShellSpawner<Shell = P>>(
+        spawner: &S,
+        launch: SpawnSpec,
+    ) -> Result<Self, BashError> {
+        let mut session = Self {
+            proc: spawner
+                .spawn(&launch)
+                .await
+                .map_err(|e| BashError(format!("Failed to spawn bash: {}", e)))?,
+            launch,
+            dir: ShellDir::Fresh,
+        };
+        session.initialize().await?;
+        Ok(session)
+    }
+
+    /// Merge stderr into stdout, disable prompts, wait for ready marker.
+    async fn initialize(&mut self) -> Result<(), BashError> {
+        match self.handshake().await {
+            Ok(()) => Ok(()),
+            // Say why: a sandbox launcher that cannot set up its jail
+            // reports the reason on stderr and exits.
+            Err(BashError(message)) => Err(BashError(match self.proc.exit_report().await {
+                Some(report) => format!("{message} ({report})"),
+                None => message,
+            })),
+        }
+    }
+
+    async fn handshake(&mut self) -> Result<(), BashError> {
+        let marker = Self::make_marker("READY");
+        let init = format!(
+            "exec 2>&1\nexport PS1=''\nexport PS2=''\nexport PROMPT_COMMAND=''\necho {marker}\n"
+        );
+
+        self.proc
+            .write_stdin(init.as_bytes())
+            .await
+            .map_err(|e| BashError(format!("Init write failed: {}", e)))?;
+        self.proc
+            .flush_stdin()
+            .await
+            .map_err(|e| BashError(format!("Init flush failed: {}", e)))?;
+
+        // Discard any bashrc / profile output until we see the marker
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let mut buf = Vec::new();
+            loop {
+                buf.clear();
+                let n = self
+                    .proc
+                    .read_line(&mut buf)
+                    .await
+                    .map_err(|e| BashError(format!("Init read failed: {}", e)))?;
+                if n == 0 {
+                    return Err(BashError("Session ended during init".into()));
+                }
+                if String::from_utf8_lossy(&buf).trim() == marker {
+                    return Ok(());
+                }
+            }
+        })
+        .await
+        .map_err(|_| BashError("Session init timed out".into()))?
+    }
+
+    /// Execute a command, returning merged stdout+stderr and the exit code.
+    async fn execute(
+        &mut self,
+        command: &str,
+        timeout: Duration,
+        spill: Option<SpillTarget>,
+    ) -> Result<CommandOutput, BashError> {
+        let marker = Self::make_marker("DONE");
+
+        // The marker echo must be a separate command so $? captures the
+        // exit code of the user's command, not something internal. It also
+        // reports the shell's directory (newlines replaced, so a hostile
+        // directory name cannot break the line protocol): the gate trusts
+        // relative write targets only while the shell is where it started.
+        let script = format!("{command}\necho \"{marker}$?|${{PWD//$'\\n'/?}}\"\n");
+
+        self.proc
+            .write_stdin(script.as_bytes())
+            .await
+            .map_err(|e| BashError(format!("Write failed: {}", e)))?;
+        self.proc
+            .flush_stdin()
+            .await
+            .map_err(|e| BashError(format!("Flush failed: {}", e)))?;
+
+        // The capture stays owned by this frame; the timeout future only
+        // borrows it, so a timeout keeps the partial capture.
+        let mut capture = OutputCapture::new(spill);
+
+        let result: Result<Result<(i32, Option<PathBuf>), BashError>, _> =
+            tokio::time::timeout(timeout, async {
+                let mut buf = Vec::new();
+                loop {
+                    buf.clear();
+                    let n = self
+                        .proc
+                        .read_line(&mut buf)
+                        .await
+                        .map_err(|e| BashError(format!("Read failed: {}", e)))?;
+                    if n == 0 {
+                        return Err(BashError("Session ended unexpectedly".into()));
+                    }
+
+                    let line = String::from_utf8_lossy(&buf);
+
+                    // Output without a trailing newline (`head -c`, raw JSON)
+                    // puts the marker at the end of its last line, not at the
+                    // start of one: split there. The marker is unique per
+                    // command, so it cannot match real output.
+                    if let Some(index) = line.find(marker.as_str()) {
+                        let (output, rest) = line.split_at(index);
+                        if !output.is_empty() {
+                            capture.push(output);
+                        }
+                        let report = rest[marker.len()..].trim_end_matches(['\n', '\r']);
+                        let (code, pwd) = report.split_once('|').unwrap_or((report, ""));
+                        let pwd = (!pwd.is_empty()).then(|| PathBuf::from(pwd));
+                        return Ok((code.trim().parse::<i32>().unwrap_or(-1), pwd));
+                    }
+
+                    capture.push(&line);
+                }
+            })
+            .await;
+
+        match result {
+            Ok(Ok((exit_code, pwd))) => {
+                // The OS answer wins: the shell controls `$PWD` (and even
+                // `echo`), so its own report is only the fallback.
+                self.dir = match (self.proc.cwd(), pwd) {
+                    (Some(os), _) => ShellDir::Known(os),
+                    (None, Some(reported)) => ShellDir::Known(reported),
+                    (None, None) => ShellDir::Unknown,
+                };
+                Ok(CommandOutput {
+                    captured: capture.finish(),
+                    exit_code,
+                    timed_out: false,
+                })
+            }
+            Ok(Err(e)) => {
+                // Close (and drop) any partial spill file.
+                if let Some(spill) = capture.finish().spill
+                    && spill.temporary
+                {
+                    let _ = std::fs::remove_file(&spill.path);
+                }
+                Err(e)
+            }
+            Err(_) => {
+                // Kill the process to free resources; session will be recreated.
+                // The partial capture survives and is returned to the caller:
+                // a timeout is a labeled partial, not a hard failure.
+                self.proc.kill().await;
+                Ok(CommandOutput {
+                    captured: capture.finish(),
+                    exit_code: -1,
+                    timed_out: true,
+                })
+            }
+        }
+    }
+
+    fn is_alive(&mut self) -> bool {
+        self.proc.is_alive()
+    }
+
+    /// Whether the shell may have left the directory it was launched in. A
+    /// fresh shell has not; an unknown directory may have.
+    fn drifted(&self) -> bool {
+        match &self.dir {
+            ShellDir::Fresh => false,
+            ShellDir::Known(dir) => canonical_dir(dir) != canonical_dir(&self.launch.cwd),
+            ShellDir::Unknown => true,
+        }
+    }
+
+    pub async fn kill(&mut self) {
+        self.proc.kill().await;
+    }
+
+    /// Synchronous kill for use in app shutdown hooks where async is unavailable.
+    pub fn kill_sync(&mut self) {
+        if self.is_alive() {
+            self.proc.start_kill();
+        }
+    }
+
+    fn make_marker(label: &str) -> String {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+        let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+
+        format!(
+            "__GHOST_AI_{}_{:x}_{}_{}__",
+            label,
+            nanos,
+            std::process::id(),
+            seq
+        )
+    }
+}
+
+impl<P: ShellProcess> Drop for BashSession<P> {
+    fn drop(&mut self) {
+        if self.is_alive() {
+            self.proc.start_kill();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BashTool
+// ---------------------------------------------------------------------------
+
+/// Arguments for the bash tool
+#[derive(Debug, Clone, Deserialize)]
+pub struct BashArgs {
+    #[serde(default)]
+    pub command: Option<String>,
+    #[serde(default)]
+    pub timeout: Option<u64>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub workdir: Option<String>,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Bash error: {0}")]
+pub struct BashError(String);
+
+/// Persistent-session bash tool.
+///
+/// Environment variables and working directory survive across calls.
+/// The session is created lazily and recreated automatically on failure.
+fn default_fs() -> std::sync::Arc<dyn Fs> {
+    std::sync::Arc::new(StdFs)
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct BashTool<S: ShellSpawner = TokioSpawner> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_cwd: Option<String>,
+    #[serde(skip)]
+    spawner: S,
+    #[serde(skip)]
+    session: SharedSession<S>,
+    #[serde(skip)]
+    temp_files: TempFileList,
+    #[serde(skip)]
+    abort_notify: Option<Arc<tokio::sync::Notify>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project_root: Option<PathBuf>,
+    #[serde(skip, default = "default_fs")]
+    fs: std::sync::Arc<dyn Fs>,
+    /// `Some`: bash gets only the allowlist plus these app variables.
+    /// `None`: bash inherits the host environment.
+    #[serde(skip)]
+    env_passthrough: Option<Vec<String>>,
+    /// OS sandbox for the session; `None` runs unconfined.
+    #[serde(skip)]
+    sandbox: Option<BashSandbox>,
+    /// Where output past the inline cap streams to.
+    #[serde(skip, default = "SpillTarget::temp")]
+    spill: SpillTarget,
+}
+
+impl<S: ShellSpawner> fmt::Debug for BashTool<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BashTool")
+            .field("default_cwd", &self.default_cwd)
+            .finish()
+    }
+}
+
+impl<S: ShellSpawner + Default> Default for BashTool<S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<S: ShellSpawner + Default> BashTool<S> {
+    pub fn new() -> Self {
+        Self {
+            default_cwd: None,
+            spawner: S::default(),
+            session: Arc::new(TokioMutex::new(None)),
+            temp_files: Arc::new(Mutex::new(Vec::new())),
+            abort_notify: None,
+            project_root: None,
+            fs: std::sync::Arc::new(StdFs),
+            env_passthrough: None,
+            sandbox: None,
+            spill: SpillTarget::temp(),
+        }
+    }
+
+    pub fn with_working_directory(cwd: String) -> Self {
+        Self {
+            default_cwd: Some(cwd),
+            ..Self::new()
+        }
+    }
+
+    pub fn with_session(session: SharedSession<S>, cwd: Option<String>) -> Self {
+        Self {
+            default_cwd: cwd,
+            session,
+            ..Self::new()
+        }
+    }
+
+    /// Route temp-file spill and cleanup through a custom [`Fs`].
+    pub fn with_fs(mut self, fs: std::sync::Arc<dyn Fs>) -> Self {
+        self.fs = fs;
+        self
+    }
+
+    /// Minimize the session environment: the allowlist plus `passthrough`.
+    pub fn with_env_passthrough(mut self, passthrough: Vec<String>) -> Self {
+        self.env_passthrough = Some(passthrough);
+        self
+    }
+
+    /// Stream output past the inline cap to `target` (default: the temp
+    /// directory, cleaned up at the end of the generation).
+    pub fn with_spill_target(mut self, target: SpillTarget) -> Self {
+        self.spill = target;
+        self
+    }
+
+    /// Run the session inside the OS sandbox.
+    pub fn with_sandbox(mut self, sandbox: BashSandbox) -> Self {
+        self.sandbox = Some(sandbox);
+        self
+    }
+
+    pub fn with_project_root(mut self, root: PathBuf) -> Self {
+        self.project_root = Some(root);
+        self
+    }
+
+    /// Set a shared temp file tracker (call before the tool is consumed by the agent builder).
+    pub fn with_temp_file_tracker(mut self, tracker: TempFileList) -> Self {
+        self.temp_files = tracker;
+        self
+    }
+
+    /// Set the abort notification handle for cooperative cancellation.
+    pub fn with_abort_notify(mut self, notify: Arc<tokio::sync::Notify>) -> Self {
+        self.abort_notify = Some(notify);
+        self
+    }
+
+    pub fn session_handle(&self) -> SharedSession<S> {
+        self.session.clone()
+    }
+
+    #[allow(dead_code)]
+    pub fn temp_files_handle(&self) -> TempFileList {
+        self.temp_files.clone()
+    }
+
+    /// The session's launch directory: the host's working directory (the
+    /// desktop passes the workspace, else the conversation scratch), else
+    /// the sandbox scratch. Home is a last resort for hosts that give
+    /// neither; it is never a writable root.
+    pub(crate) fn resolve_cwd(&self) -> String {
+        self.default_cwd
+            .clone()
+            .or_else(|| {
+                self.sandbox
+                    .as_ref()
+                    .map(|sandbox| sandbox.scratch_dir.to_string_lossy().to_string())
+            })
+            .or_else(|| dirs::home_dir().map(|p| p.to_string_lossy().to_string()))
+            .unwrap_or_else(|| ".".to_string())
+    }
+
+    /// The directory a call ran in, for placing relative paths in its
+    /// output: an absolute `workdir`, else `workdir` joined onto the shell's
+    /// directory before the call (the launch directory for a fresh or
+    /// unknown one).
+    fn command_dir(&self, workdir: Option<&str>, shell_dir: &ShellDir) -> PathBuf {
+        let base = match shell_dir {
+            ShellDir::Known(dir) => dir.clone(),
+            ShellDir::Fresh | ShellDir::Unknown => PathBuf::from(self.resolve_cwd()),
+        };
+        match workdir {
+            Some(w) => base.join(w),
+            None => base,
+        }
+    }
+
+    /// Directories a relative write target of this call may resolve
+    /// against (ADR 09 FA-5): the call's cwd from the launch directory and
+    /// from the shell's current directory (`$HOME` standing in when that is
+    /// unknown), and `$HOME` when the command itself changes directory.
+    fn write_check_dirs(
+        &self,
+        command: &str,
+        workdir: Option<&str>,
+        shell_dir: &ShellDir,
+    ) -> Vec<PathBuf> {
+        let launch = PathBuf::from(self.resolve_cwd());
+        let mut bases = vec![launch];
+        match shell_dir {
+            ShellDir::Fresh => {}
+            ShellDir::Known(dir) => bases.push(dir.clone()),
+            ShellDir::Unknown => bases.extend(dirs::home_dir()),
+        }
+        let mut dirs: Vec<PathBuf> = Vec::new();
+        for base in bases {
+            let dir = match workdir {
+                Some(w) if std::path::Path::new(w).is_absolute() => PathBuf::from(w),
+                Some(w) => base.join(w),
+                None => base,
+            };
+            if !dirs.contains(&dir) {
+                dirs.push(dir);
+            }
+        }
+        if bash_security::changes_directory(command)
+            && let Some(home) = dirs::home_dir()
+            && !dirs.contains(&home)
+        {
+            dirs.push(home);
+        }
+        dirs
+    }
+
+    /// The classifier warning to prefix the output with: in a jail, the
+    /// contained redirects the gate absorbed carry none (ADR 09 §1, the
+    /// same predicate the gate evaluates).
+    fn output_warning(
+        &self,
+        command: &str,
+        classification: &bash_security::CommandClassification,
+        workdir: Option<&str>,
+        drifted: bool,
+    ) -> Option<String> {
+        let SecurityVerdict::Warn(message) = &classification.verdict else {
+            return None;
+        };
+        let Some(sandbox) = self.sandbox.as_ref().filter(|s| s.backend.is_some()) else {
+            return Some(message.clone());
+        };
+        let launch = PathBuf::from(self.resolve_cwd());
+        let scope = bash_security::AbsorbScope {
+            sandboxed: true,
+            roots: vec![launch.clone(), sandbox.scratch_dir.clone()],
+            cwd: bash_security::BashCwd::new(workdir, Some(&launch), drifted),
+        };
+        bash_security::effective_warning(command, classification, &scope)
+    }
+
+    /// Ensure `*guard` contains a live session, creating one if needed.
+    async fn ensure_session(
+        &self,
+        slot: &mut Option<BashSession<S::Shell>>,
+        launch: &SpawnSpec,
+    ) -> Result<(), BashError> {
+        if let Some(ref mut s) = *slot {
+            if s.is_alive() && s.launch == *launch {
+                return Ok(());
+            }
+            if s.is_alive() {
+                tracing::info!("🖥️ [bash] Launch settings changed, restarting session");
+                s.kill().await;
+            } else {
+                tracing::warn!("🖥️ [bash] Session died, creating a new one");
+            }
+            *slot = None;
+        }
+
+        tracing::info!(
+            "🖥️ [bash] Starting persistent session in: {} (program {})",
+            launch.cwd.display(),
+            launch.program
+        );
+        *slot = Some(BashSession::new(&self.spawner, launch.clone()).await?);
+        // A fresh shell starts in its launch directory.
+        self.publish_drift(slot.as_ref());
+        Ok(())
+    }
+
+    /// Share the session's drift state with the permission gate (ADR 09:
+    /// relative write targets are placed only while the shell is in its
+    /// launch directory). No session means a fresh one will start there.
+    fn publish_drift(&self, session: Option<&BashSession<S::Shell>>) {
+        if let Some(sandbox) = &self.sandbox {
+            sandbox
+                .cwd_drifted
+                .store(session.is_some_and(BashSession::drifted), Ordering::SeqCst);
+        }
+    }
+
+    #[cfg(test)]
+    fn check_dangerous(command: &str) -> Option<&'static str> {
+        bash_security::check_dangerous(command)
+    }
+
+    /// Delete all temp files tracked by the given handle.
+    pub fn cleanup_temp_files(handle: &TempFileList) {
+        if let Ok(mut files) = handle.lock() {
+            for path in files.drain(..) {
+                if let Err(e) = StdFs.remove_file(&path) {
+                    tracing::debug!(
+                        "🧹 [bash] Failed to clean temp file {}: {}",
+                        path.display(),
+                        e
+                    );
+                }
+            }
+        }
+    }
+}
+
+impl<S: ShellSpawner + Default> Tool for BashTool<S> {
+    const NAME: &'static str = "bash";
+
+    type Error = BashError;
+    type Args = BashArgs;
+    type Output = String;
+
+    fn description(&self) -> String {
+        let cwd_note = if let Some(ref dir) = self.default_cwd {
+            format!(" The session starts in: {}.", dir)
+        } else {
+            String::new()
+        };
+        format!(
+            "Execute a bash command in a persistent session. \
+                 Environment variables and working directory persist between calls. \
+                 Use `cd` to change directories. \
+                 Returns combined stdout and stderr. \
+                 Always prefer non-interactive commands (avoid commands that require user input).{cwd_note}"
+        )
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The bash command to execute"
+                },
+                "timeout": {
+                    "type": "number",
+                    "description": "Timeout in seconds (default: 120, max: 600)"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "A concise (5-10 word) human-readable description of what the command does"
+                },
+                "workdir": {
+                    "type": "string",
+                    "description": "Working directory to run this command in. The command runs in a sub-shell so the session's cwd is not changed."
+                }
+            },
+            "required": ["command"]
+        })
+    }
+
+    async fn call(
+        &self,
+        _context: &mut rig::agent::tool::ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
+        tracing::info!(
+            "🔧 [tool-call] bash: command={:?} timeout={:?} description={:?} workdir={:?}",
+            args.command,
+            args.timeout,
+            args.description,
+            args.workdir
+        );
+
+        let mut guard = self.session.lock().await;
+
+        let command = args
+            .command
+            .as_deref()
+            .filter(|c| !c.is_empty())
+            .ok_or_else(|| BashError("No command provided".into()))?;
+
+        // --- security checks (dangerous patterns + compound analysis + injection) ---
+        // Memoized: the approval gate classified this exact command a moment
+        // ago, so the pipeline does not run twice per call.
+        let classification = bash_security::classify_command(command);
+        if let SecurityVerdict::Block(msg) = &classification.verdict {
+            tracing::warn!("🛡️ [bash] Command blocked: {}", command);
+            return Err(BashError(msg.clone()));
+        }
+        let shell_dir = guard.as_ref().map_or(ShellDir::Fresh, |s| s.dir.clone());
+        let drifted = guard.as_ref().is_some_and(|s| s.drifted());
+        let security_warning =
+            self.output_warning(command, &classification, args.workdir.as_deref(), drifted);
+        if let Some(msg) = &security_warning {
+            tracing::warn!("🛡️ [bash] Security warning: {} — {}", msg, command);
+        }
+
+        // --- write-target blocklist (redirect targets + write commands),
+        // against every directory the command may run in ---
+        let check_dirs = self.write_check_dirs(command, args.workdir.as_deref(), &shell_dir);
+        if let Err(msg) = bash_security::check_write_targets(command, &check_dirs) {
+            tracing::warn!("🛡️ [bash] Write target blocked: {} — {}", msg, command);
+            return Err(BashError(msg));
+        }
+
+        // Wrap in a sub-shell if workdir is specified so the session's cwd is unaffected
+        let effective_command = if let Some(ref dir) = args.workdir {
+            format!("(cd '{}' && {})", dir.replace('\'', "'\\''"), command)
+        } else {
+            command.to_string()
+        };
+
+        let timeout_secs = args.timeout.unwrap_or(DEFAULT_TIMEOUT_SECS).clamp(1, 600);
+        let timeout = Duration::from_secs(timeout_secs);
+        let warn_prefix = security_warning
+            .as_ref()
+            .map(|w| format!("{}\n", w))
+            .unwrap_or_default();
+
+        // --- per-execution delta authorized by the gate (auto mode) ---
+        let delta = self
+            .sandbox
+            .as_ref()
+            .and_then(|sandbox| sandbox.deltas.take(command, args.workdir.as_deref()));
+        if delta.as_ref().is_some_and(|delta| delta.unsandboxed) {
+            // Run-anyway on a sandbox denial: once, outside the sandbox,
+            // in a throwaway session (the persistent one stays jailed).
+            let spec = self.launch_spec(None, None)?.spec;
+            let mut once: Option<BashSession<S::Shell>> =
+                Some(BashSession::new(&self.spawner, spec).await?);
+            let rerun = self.run_in(&mut once, &effective_command, timeout).await;
+            if let Some(mut session) = once.take() {
+                session.kill().await;
+            }
+            let notes = vec![NOTE_RUN_ANYWAY_UNSANDBOXED.to_string()];
+            return Ok(self.render(rerun?, timeout_secs, &warn_prefix, &notes));
+        }
+        let delta = delta.filter(|_| {
+            self.sandbox
+                .as_ref()
+                .is_some_and(|sandbox| sandbox.backend.is_some())
+        });
+
+        // --- ensure session (respawned when the launch config changed) ---
+        let launch = self.launch_spec(self.sandbox.as_ref(), delta.as_ref())?;
+        self.ensure_session(&mut guard, &launch.spec).await?;
+        let mut notes: Vec<String> = launch.note.into_iter().collect();
+        if let Some(delta) = &delta {
+            notes.push(note_delta(delta));
+        }
+
+        let result = self.run_in(&mut guard, &effective_command, timeout).await;
+        self.publish_drift(guard.as_ref());
+        // A delta covers this one execution: respawn the session with its
+        // normal profile right away, so nothing started under the delta
+        // (background jobs included) keeps the wider access.
+        if delta.is_some() {
+            let restored = match self.launch() {
+                Ok(normal) => self.ensure_session(&mut guard, &normal.spec).await.is_ok(),
+                Err(_) => false,
+            };
+            if !restored {
+                if let Some(mut session) = guard.take() {
+                    session.kill().await;
+                }
+                tracing::warn!("🛡️ [bash] Could not restore the sandbox profile; session dropped");
+            }
+        }
+        let mut cmd = match result {
+            Ok(cmd) => cmd,
+            Err(e) => {
+                // Mark the session dead so it gets recreated next time.
+                if let Some(ref mut s) = *guard
+                    && !s.is_alive()
+                {
+                    tracing::warn!("🖥️ [bash] Session dead after error, will recreate");
+                    *guard = None;
+                }
+                return Err(e);
+            }
+        };
+
+        // --- sandbox escalation ---
+        if launch.sandboxed
+            && !cmd.timed_out
+            && cmd.exit_code != 0
+            && let Some(sandbox) = &self.sandbox
+            && let Some((kind, detail)) = detect_denial(
+                &cmd.captured.scan_text,
+                sandbox.network_allowed.load(Ordering::SeqCst)
+                    || delta.as_ref().is_some_and(|delta| delta.network),
+            )
+        {
+            // macOS privacy controls (and SIP) refuse the whole app with the
+            // same EPERM a Seatbelt denial produces: when the host is refused
+            // too, it was not the sandbox, and running outside it would fail
+            // the same way. No card, no jail-denied marker; say so instead.
+            let refused = (kind == EscalationKind::Filesystem)
+                .then(|| {
+                    let base = self.command_dir(args.workdir.as_deref(), &shell_dir);
+                    host_refusal(&cmd.captured.scan_text, &base)
+                })
+                .flatten();
+            if let Some(path) = refused {
+                tracing::info!(
+                    "🛡️ [bash] Not a sandbox denial: the host is refused {} too",
+                    path.display()
+                );
+                notes.push(note_host_refused(&path));
+            } else {
+                tracing::info!("🛡️ [bash] Sandbox denial ({kind:?}): {detail}");
+                let decision = match &sandbox.escalator {
+                    Some(escalator) => Some(
+                        escalator
+                            .escalate(EscalationRequest {
+                                command: command.to_string(),
+                                kind,
+                                detail,
+                            })
+                            .await,
+                    ),
+                    None => None,
+                };
+                match decision {
+                    Some(EscalationDecision::RetryUnsandboxed) => {
+                        let spec = self.launch_spec(None, None)?.spec;
+                        let mut once: Option<BashSession<S::Shell>> =
+                            Some(BashSession::new(&self.spawner, spec).await?);
+                        let rerun = self.run_in(&mut once, &effective_command, timeout).await;
+                        if let Some(mut session) = once.take() {
+                            session.kill().await;
+                        }
+                        cmd = rerun?;
+                        notes.push(NOTE_RETRIED_UNSANDBOXED.to_string());
+                    }
+                    Some(EscalationDecision::AllowNetworkSession) => {
+                        sandbox.network_allowed.store(true, Ordering::SeqCst);
+                        let relaunch = self.launch()?;
+                        self.ensure_session(&mut guard, &relaunch.spec).await?;
+                        let rerun = self.run_in(&mut guard, &effective_command, timeout).await;
+                        self.publish_drift(guard.as_ref());
+                        match rerun {
+                            Ok(rerun) => cmd = rerun,
+                            Err(e) => {
+                                *guard = None;
+                                return Err(e);
+                            }
+                        }
+                        notes.push(NOTE_NETWORK_ALLOWED.to_string());
+                    }
+                    Some(EscalationDecision::Deny) => notes.push(note_denied(kind, true)),
+                    Some(EscalationDecision::Reported) => notes.push(note_reported(kind)),
+                    None => notes.push(note_denied(kind, false)),
+                }
+            }
+        }
+
+        // --- withheld-variable hint (env minimization) ---
+        if !cmd.timed_out
+            && cmd.exit_code != 0
+            && let Some(passthrough) = &self.env_passthrough
+            && let Some(hint) =
+                shell_env::missing_variable_hint(&cmd.captured.scan_text, passthrough, |name| {
+                    std::env::var(name).ok()
+                })
+        {
+            notes.push(hint);
+        }
+
+        Ok(self.render(cmd, timeout_secs, &warn_prefix, &notes))
+    }
+}
+
+/// How the tool will launch its session, and what to tell the model
+/// about it.
+struct Launch {
+    spec: SpawnSpec,
+    sandboxed: bool,
+    note: Option<String>,
+}
+
+impl<S: ShellSpawner + Default> BashTool<S> {
+    /// Launch spec for the session under the current settings.
+    fn launch(&self) -> Result<Launch, BashError> {
+        self.launch_spec(self.sandbox.as_ref(), None)
+    }
+
+    /// Launch spec with `sandbox` applied (`None`: unconfined, still with
+    /// the minimized environment), widened by a per-execution `delta`.
+    fn launch_spec(
+        &self,
+        sandbox: Option<&BashSandbox>,
+        delta: Option<&ExecutionDelta>,
+    ) -> Result<Launch, BashError> {
+        let cwd = self.resolve_cwd();
+        let mut spec = SpawnSpec::new("bash", &cwd);
+        if let Some(passthrough) = &self.env_passthrough {
+            spec.env = Some(shell_env::minimized_env(passthrough, |name| {
+                std::env::var(name).ok()
+            }));
+        }
+        let Some(sandbox) = sandbox else {
+            return Ok(Launch {
+                spec,
+                sandboxed: false,
+                note: None,
+            });
+        };
+        let Some(backend) = &sandbox.backend else {
+            return Ok(Launch {
+                spec,
+                sandboxed: false,
+                note: Some(NOTE_SANDBOX_UNAVAILABLE.to_string()),
+            });
+        };
+        std::fs::create_dir_all(&sandbox.scratch_dir).map_err(|e| {
+            BashError(format!(
+                "Sandbox could not start: cannot create scratch directory {}: {e}",
+                sandbox.scratch_dir.display()
+            ))
+        })?;
+        if let Some(env) = spec.env.as_mut() {
+            env.retain(|(name, _)| name != "TMPDIR");
+            env.push((
+                "TMPDIR".to_string(),
+                sandbox.scratch_dir.display().to_string(),
+            ));
+        }
+        let mut policy = SandboxPolicy::for_bash(
+            self.default_cwd.as_deref().map(std::path::Path::new),
+            &sandbox.scratch_dir,
+            sandbox.network_allowed.load(Ordering::SeqCst),
+        );
+        if let Some(delta) = delta {
+            policy.allow_network |= delta.network;
+            policy
+                .writable_roots
+                .extend(delta.writable_roots.iter().cloned());
+        }
+        let spec = sandbox::wrap(backend, &policy, spec)
+            .map_err(|e| BashError(format!("Sandbox could not start: {e}")))?;
+        Ok(Launch {
+            spec,
+            sandboxed: true,
+            note: None,
+        })
+    }
+
+    /// Run one command in `slot`'s session, honoring the abort signal
+    /// (abort kills the session and empties the slot).
+    async fn run_in(
+        &self,
+        slot: &mut Option<BashSession<S::Shell>>,
+        command: &str,
+        timeout: Duration,
+    ) -> Result<CommandOutput, BashError> {
+        let session = slot
+            .as_mut()
+            .ok_or_else(|| BashError("Session not started".into()))?;
+        let spill = Some(self.spill.clone());
+        let Some(abort) = &self.abort_notify else {
+            return session.execute(command, timeout, spill).await;
+        };
+        let aborted = tokio::select! {
+            biased;
+            _ = abort.notified() => true,
+            r = session.execute(command, timeout, spill) => return r,
+        };
+        debug_assert!(aborted);
+        tracing::info!("🛑 [bash] Command aborted: generation was stopped");
+        if let Some(mut s) = slot.take() {
+            s.kill().await;
+        }
+        Err(BashError("Command aborted: generation was stopped.".into()))
+    }
+
+    /// Format a command result for the model.
+    fn render(
+        &self,
+        cmd: CommandOutput,
+        timeout_secs: u64,
+        warn_prefix: &str,
+        notes: &[String],
+    ) -> String {
+        tracing::info!(
+            "🔧 [tool-result] bash: exit_code={} output_bytes={}",
+            cmd.exit_code,
+            cmd.captured.total_bytes
+        );
+
+        if let Some(spill) = &cmd.captured.spill
+            && spill.temporary
+            && let Ok(mut files) = self.temp_files.lock()
+        {
+            files.push(spill.path.clone());
+        }
+        let file_notice = spill_notice(&cmd.captured);
+        let text = cmd.captured.inline.as_str();
+        let notes_prefix: String = notes.iter().map(|note| format!("{note}\n")).collect();
+        let warn_prefix = format!("{warn_prefix}{notes_prefix}");
+
+        if cmd.timed_out {
+            let timeout_note = format!(
+                "[command timed out after {}s — session was reset; \
+                 partial output below (the command may still have been running)]\n",
+                timeout_secs
+            );
+            return format!("{warn_prefix}{timeout_note}{text}{file_notice}");
+        }
+
+        if cmd.exit_code == 0 {
+            if text.is_empty() {
+                format!("{warn_prefix}(no output)")
+            } else {
+                format!("{warn_prefix}{text}{file_notice}")
+            }
+        } else if text.is_empty() {
+            format!("{warn_prefix}[exit code: {}]{file_notice}", cmd.exit_code)
+        } else {
+            format!(
+                "{warn_prefix}[exit code: {}]\n{text}{file_notice}",
+                cmd.exit_code
+            )
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn failing_launcher(script: &str) -> SpawnSpec {
+        SpawnSpec {
+            program: "/bin/sh".into(),
+            args: vec!["-c".into(), script.into()],
+            cwd: std::env::temp_dir(),
+            env: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn launcher_failure_reports_status_and_stderr() {
+        let err = BashSession::new(
+            &TokioSpawner,
+            failing_launcher("echo 'bwrap: Creating new namespace failed' >&2; exit 3"),
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(
+            err.contains("exit status 3: bwrap: Creating new namespace failed"),
+            "{err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn chatty_launcher_does_not_block_and_keeps_the_tail() {
+        let err = BashSession::new(
+            &TokioSpawner,
+            failing_launcher(
+                "i=0; while [ $i -lt 4000 ]; do echo noise-line-$i >&2; i=$((i+1)); done; \
+                 echo final-reason >&2; exit 1",
+            ),
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("final-reason"), "{err}");
+        assert!(!err.contains("noise-line-0 "), "{err}");
+        assert!(err.len() < 1200, "report not bounded: {} bytes", err.len());
+    }
+
+    #[tokio::test]
+    async fn launcher_report_strips_terminal_escapes() {
+        let err = BashSession::new(
+            &TokioSpawner,
+            failing_launcher("printf 'bad\\033[2Jthing\\n' >&2; exit 2"),
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(!err.contains('\u{1b}'), "{err:?}");
+        assert!(err.contains("exit status 2: bad [2Jthing"), "{err:?}");
+    }
+
+    #[test]
+    fn test_bash_tool_creation() {
+        let tool: BashTool = BashTool::new();
+        assert_eq!(<BashTool as Tool>::NAME, "bash");
+        let _ = tool;
+    }
+
+    #[test]
+    fn test_bash_args_command_only() {
+        let args: BashArgs = serde_json::from_str(r#"{"command": "echo hello"}"#).unwrap();
+        assert_eq!(args.command, Some("echo hello".to_string()));
+        assert_eq!(args.timeout, None);
+    }
+
+    #[test]
+    fn test_bash_args_with_timeout() {
+        let args: BashArgs =
+            serde_json::from_str(r#"{"command": "sleep 5", "timeout": 10}"#).unwrap();
+        assert_eq!(args.command, Some("sleep 5".to_string()));
+        assert_eq!(args.timeout, Some(10));
+    }
+
+    #[test]
+    fn test_bash_args_with_description() {
+        let args: BashArgs = serde_json::from_str(
+            r#"{"command": "ls -la", "description": "List directory contents"}"#,
+        )
+        .unwrap();
+        assert_eq!(args.command, Some("ls -la".to_string()));
+        assert_eq!(
+            args.description,
+            Some("List directory contents".to_string())
+        );
+    }
+
+    #[test]
+    fn test_dangerous_command_detection() {
+        // Root-targeting commands
+        assert!(BashTool::<TokioSpawner>::check_dangerous("rm -rf /").is_some());
+        assert!(BashTool::<TokioSpawner>::check_dangerous("rm -rf /*").is_some());
+        assert!(BashTool::<TokioSpawner>::check_dangerous("rm -fr /").is_some());
+        assert!(BashTool::<TokioSpawner>::check_dangerous("rm -rf / && echo done").is_some());
+        assert!(BashTool::<TokioSpawner>::check_dangerous("chmod -R 777 /*").is_some());
+
+        // Other dangerous patterns
+        assert!(BashTool::<TokioSpawner>::check_dangerous("sudo mkfs.ext4 /dev/sda1").is_some());
+        assert!(BashTool::<TokioSpawner>::check_dangerous(":(){:|:&};:").is_some());
+
+        // Safe commands (specific paths, not root)
+        assert!(BashTool::<TokioSpawner>::check_dangerous("echo hello").is_none());
+        assert!(BashTool::<TokioSpawner>::check_dangerous("ls -la").is_none());
+        assert!(BashTool::<TokioSpawner>::check_dangerous("rm -rf /tmp/mydir").is_none());
+        assert!(BashTool::<TokioSpawner>::check_dangerous("rm -rf /var/log/old").is_none());
+        assert!(BashTool::<TokioSpawner>::check_dangerous("rm file.txt").is_none());
+        assert!(BashTool::<TokioSpawner>::check_dangerous("chmod -R 777 /tmp").is_none());
+    }
+
+    #[tokio::test]
+    async fn timeout_returns_partial_output() {
+        let mut session = BashSession::new(&TokioSpawner, SpawnSpec::new("bash", "/tmp"))
+            .await
+            .unwrap();
+
+        let out = session
+            .execute(
+                "echo partial-before-timeout; sleep 30",
+                Duration::from_secs(1),
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert!(out.timed_out, "flagged as timed out");
+        assert_eq!(out.exit_code, -1);
+        assert!(
+            out.captured.inline.contains("partial-before-timeout"),
+            "partial capture survives: {:?}",
+            out.captured.inline
+        );
+        assert!(!session.is_alive(), "session killed on timeout");
+    }
+
+    #[tokio::test]
+    async fn fast_command_still_reports_exit_code() {
+        let mut session = BashSession::new(&TokioSpawner, SpawnSpec::new("bash", "/tmp"))
+            .await
+            .unwrap();
+        let out = session
+            .execute("echo ok; (exit 3)", Duration::from_secs(10), None)
+            .await
+            .unwrap();
+
+        assert!(!out.timed_out);
+        assert_eq!(out.exit_code, 3);
+        assert_eq!(out.captured.inline, "ok");
+    }
+
+    #[tokio::test]
+    async fn large_output_streams_past_the_old_capture_ceiling() {
+        use rig::agent::tool::Tool as _;
+        let dir = tempfile::tempdir().unwrap();
+        let tool: BashTool = BashTool::with_working_directory(dir.path().display().to_string())
+            .with_spill_target(SpillTarget {
+                dir: dir.path().join("spill"),
+                reference_scheme: Some("tool-output".to_string()),
+            });
+        let mut ctx = rig::agent::tool::ToolContext::default();
+        let args: BashArgs = serde_json::from_value(json!({ "command": "seq 1 200000" })).unwrap();
+
+        let out = tool.call(&mut ctx, args).await.unwrap();
+
+        assert!(out.contains("tool-output://bash-"), "{out}");
+        assert!(out.contains("full output"), "{out}");
+        assert!(out.starts_with("1\n2\n"), "head inline: {}", &out[..40]);
+        assert!(out.contains("200000"), "tail inline");
+        let files: Vec<_> = std::fs::read_dir(dir.path().join("spill"))
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .collect();
+        assert_eq!(files.len(), 1);
+        let content = std::fs::read_to_string(&files[0]).unwrap();
+        // ~1.3 MB, all of it: the old capture stopped at 100 KB.
+        assert_eq!(content.lines().count(), 200_000);
+        assert!(content.ends_with("200000\n"));
+        // Durable spills are not registered for per-generation cleanup.
+        assert!(tool.temp_files_handle().lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn output_without_a_trailing_newline_completes_at_once() {
+        use rig::agent::tool::Tool as _;
+        let dir = tempfile::tempdir().unwrap();
+        let tool: BashTool = BashTool::with_working_directory(dir.path().display().to_string());
+        let started = std::time::Instant::now();
+        for (command, expected, code) in [
+            ("printf 'abc'", "abc", 0),
+            (
+                "printf '{\"t\":1}'; exit_code_probe() { return 3; }; exit_code_probe",
+                "{\"t\":1}",
+                3,
+            ),
+            ("printf 'x\ny'", "x\ny", 0),
+        ] {
+            let args: BashArgs = serde_json::from_value(json!({
+                "command": command,
+                "timeout": 5
+            }))
+            .unwrap();
+            let out = tool
+                .call(&mut rig::agent::tool::ToolContext::default(), args)
+                .await
+                .unwrap();
+            assert!(out.contains(expected), "{command}: {out}");
+            assert!(!out.contains("__GHOST_AI_"), "marker leaked: {out}");
+            assert!(!out.contains("timed out"), "{command}: {out}");
+            if code != 0 {
+                assert!(out.contains(&format!("{code}")), "{command}: {out}");
+            }
+        }
+        // The session survived: no respawn, and all three were quick.
+        assert!(started.elapsed() < std::time::Duration::from_secs(4));
+    }
+}

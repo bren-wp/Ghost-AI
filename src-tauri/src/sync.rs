@@ -1,0 +1,875 @@
+//! Desktop snapshot-sync glue (Phase 3a/3b + ADR 04 enablement).
+//!
+//! The engine itself lives in `ghost-ai-agent-core::sync`; this module adds
+//! macOS iCloud container detection, the background sync scheduler with the
+//! graded content-key ladder, and re-exports the engine for the app state.
+
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use crate::blob_sync;
+use crate::sync_crypto_state::{self, CkResolution};
+use tauri::Manager as _;
+
+pub use ghost_ai_agent_core::sync::{SyncEngine, SyncOutcome};
+use ghost_ai_agent_core::sync_crypto::SyncCrypto;
+
+/// Interval between background sync passes (pull + throttled flush).
+/// Idle passes are near-free: the engine's dirty detection skips the
+/// snapshot publish unless the app pool wrote since the last one.
+pub const SYNC_TICK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+
+/// Shared engine slot (absent while sync is disabled or the content key is
+/// not yet available).
+pub type SyncEngineHandle = Arc<std::sync::Mutex<Option<SyncEngine>>>;
+
+/// Everything the sync wiring needs to (re)construct engines.
+#[derive(Clone)]
+pub struct SyncWiring {
+    pub app_data_dir: PathBuf,
+    pub db_path: PathBuf,
+    /// App-private staging directory for decrypted snapshots (never the
+    /// OS temp dir — ADR 04 §1).
+    pub cache_dir: PathBuf,
+}
+
+/// Resolve the current sync target: the iCloud container when provisioned.
+/// Debug builds fall back to a local staging dir so publish/sync_now stay
+/// exercisable; release builds are structurally off without the container
+/// (ADR 04 §7 — the de-facto always-on staging fallback is corrected here).
+pub fn resolve_sync_target(app_data_dir: &std::path::Path) -> Option<(PathBuf, &'static str)> {
+    if let Some(dir) = detect_icloud_container() {
+        return Some((dir, "iCloud container"));
+    }
+    #[cfg(debug_assertions)]
+    {
+        let staging = app_data_dir.join("sync-staging");
+        std::fs::create_dir_all(&staging).ok()?;
+        #[allow(unreachable_code)]
+        return Some((staging, "local staging dir (debug)"));
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        None
+    }
+}
+
+impl SyncWiring {
+    /// Install an encrypting engine built from `crypto` into the shared
+    /// slot, replacing any stale engine.
+    pub fn install_engine(
+        &self,
+        slot: &SyncEngineHandle,
+        cloud_dir: PathBuf,
+        crypto: SyncCrypto,
+    ) -> anyhow::Result<()> {
+        let engine = SyncEngine::new(
+            &self.db_path,
+            cloud_dir.clone(),
+            self.cache_dir.clone(),
+            Some(crypto),
+        )?;
+        let mut guard = slot
+            .lock()
+            .map_err(|_| anyhow::anyhow!("sync engine poisoned"))?;
+        *guard = Some(engine);
+        Ok(())
+    }
+
+    /// Drop the engine without touching device state (used when the key
+    /// material is missing: the ladder owns the recovery).
+    pub fn drop_engine(&self, slot: &SyncEngineHandle) {
+        if let Ok(mut guard) = slot.lock() {
+            *guard = None;
+        }
+    }
+
+    /// Try to (re)construct the engine when enabled but absent, running the
+    /// graded content-key ladder (ADR 04 §3 rule 2). Emits `sync-locked`
+    /// when the passphrase rung is reached; silent otherwise — Keychain
+    /// propagation delay is normal, and the tick's cadence is the backoff.
+    pub fn ensure_engine(&self, app: &tauri::AppHandle, slot: &SyncEngineHandle) {
+        let settings = sync_crypto_state::load_settings(&self.app_data_dir);
+        if !settings.enabled {
+            return;
+        }
+        let Some((cloud_dir, reason)) = resolve_sync_target(&self.app_data_dir) else {
+            tracing::info!("Snapshot sync waiting for the iCloud container");
+            return;
+        };
+        if let Ok(guard) = slot.lock()
+            && guard.is_some()
+        {
+            return;
+        }
+        match sync_crypto_state::resolve_content_key(&self.app_data_dir, &cloud_dir, &settings) {
+            CkResolution::Ready(crypto) => match self.install_engine(slot, cloud_dir, crypto) {
+                Ok(()) => tracing::info!("Snapshot sync enabled ({reason})"),
+                Err(err) => tracing::warn!("Snapshot sync disabled: {err}"),
+            },
+            CkResolution::NeedBootstrap => {
+                // Onboarding owns this; nothing to do silently here.
+            }
+            CkResolution::NeedPassphrase => {
+                use tauri::Emitter;
+                if let Err(err) = app.emit("sync-locked", ()) {
+                    tracing::warn!("Failed to emit sync-locked: {err}");
+                }
+            }
+        }
+    }
+}
+
+/// Run [`SyncWiring::ensure_engine`] on the blocking pool and log a
+/// failed (panicking) run instead of dropping the error. The ladder does
+/// blocking I/O — Keychain reads plus the iCloud artifact header, whose
+/// first read can trigger a dataless-file download — so it must never
+/// block the main thread or an async worker.
+pub async fn ensure_engine_off_worker(
+    wiring: &SyncWiring,
+    app: &tauri::AppHandle,
+    slot: &SyncEngineHandle,
+) {
+    let wiring = wiring.clone();
+    let app = app.clone();
+    let slot = Arc::clone(slot);
+    if let Err(err) =
+        tauri::async_runtime::spawn_blocking(move || wiring.ensure_engine(&app, &slot)).await
+    {
+        tracing::warn!("Sync engine ladder failed: {err}");
+    }
+}
+
+/// Run one sync pass against the cloud snapshot: pull/merge, then flush
+/// pending local writes (throttled inside the engine; `manual` bypasses
+/// the throttle so user-triggered passes ship same-session writes
+/// immediately — real-device finding 2026-08-28 #6). When the merge pulled
+/// rows, incrementally reconcile the FTS index (merged rows bypass the
+/// sqlx insert path that normally maintains it) and emit `sync-merged` so
+/// the frontend can reload its stores without an app restart.
+///
+/// Returns the engine outcome (`None` = sync disabled on this machine) so
+/// the manual `sync_now` command can run the exact same path as the
+/// scheduler. Blob upload runs first either way: blobs-before-snapshots is
+/// what keeps peers from ever seeing a dangling hash. A key-material
+/// failure (sync group reset elsewhere, a key we never learned) drops
+/// the engine and re-enters the acquisition ladder at the passphrase rung —
+/// never an error loop (ADR 04 §3 rule 2).
+pub async fn run_sync_pass(
+    engine: SyncEngineHandle,
+    db: crate::db::Database,
+    app: tauri::AppHandle,
+    manual: bool,
+) -> anyhow::Result<Option<SyncOutcome>> {
+    use tauri::Emitter;
+
+    upload_blobs_before_publish(&engine, &db, &app).await;
+
+    let engine_for_task = engine.clone();
+    let sync_result =
+        tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<Option<SyncOutcome>> {
+            let mut guard = engine_for_task
+                .lock()
+                .map_err(|_| anyhow::anyhow!("sync engine poisoned"))?;
+            match guard.as_mut() {
+                Some(engine) => {
+                    let outcome = if manual {
+                        engine.sync_now_manual()?
+                    } else {
+                        engine.sync_now()?
+                    };
+                    Ok(Some(outcome))
+                }
+                None => Ok(None),
+            }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("sync task join failed: {e}"))?;
+
+    let outcome = match sync_result {
+        Ok(outcome) => outcome,
+        Err(err) => {
+            // Key-material failures re-enter the ladder at the passphrase
+            // rung (latching needs_unlock so the ladder cannot loop on the
+            // stale rungs) and read as "locked", not errored; everything
+            // else is recorded/emitted so Settings offers the escape
+            // hatches while the next tick retries.
+            let err = handle_pass_error(err, &engine, &app).await;
+            if sync_crypto_state::is_key_material_error(&err) {
+                return Ok(None);
+            }
+            return Err(err);
+        }
+    };
+
+    let outcome = match outcome {
+        Some(outcome) => outcome,
+        // Sync disabled on this machine; not an error.
+        None => return Ok(None),
+    };
+
+    // Persist the (possibly slot-refreshed, proven-by-use) chain after a
+    // successful pass so the next launch resolves from the cache.
+    if let (Ok(app_data_dir), Ok(guard)) = (app.path().app_data_dir(), engine.lock())
+        && let Some(engine) = guard.as_ref()
+        && let Some(crypto) = engine.crypto()
+    {
+        let _ = sync_crypto_state::persist_chain(&app_data_dir, crypto);
+    }
+
+    // A completed pass clears the surfaced failure latch (Settings drops
+    // the error row; the escape hatches stay available anyway).
+    if let Ok(app_data_dir) = app.path().app_data_dir() {
+        sync_crypto_state::clear_pass_error(&app_data_dir);
+    }
+
+    if outcome.rows_merged > 0 {
+        tracing::info!("Sync pulled {} rows", outcome.rows_merged);
+        if let Err(err) = db.sync_fts_incremental().await {
+            tracing::warn!("Incremental FTS sync failed: {err}");
+        }
+        if let Err(err) = app.emit("sync-merged", outcome.rows_merged) {
+            tracing::warn!("Failed to emit sync-merged event: {err}");
+        }
+    } else if outcome.action == "flushed" {
+        tracing::info!("Sync flushed pending local writes");
+    }
+
+    if outcome.rows_merged > 0 || SKILLS_PENDING_FETCH.load(std::sync::atomic::Ordering::Relaxed) {
+        reconcile_skills_after_pass(&app).await;
+    }
+
+    // Opportunistic blob GC, at most once a day per process. Only after a
+    // pass that shipped something - an idle up-to-date tick has no new
+    // information about orphans anyway.
+    let cloud_dir = engine
+        .lock()
+        .ok()
+        .and_then(|guard| guard.as_ref().map(|e| e.cloud_dir().to_path_buf()));
+    if (outcome.republished || outcome.rows_merged > 0)
+        && let Some(dir) = cloud_dir.clone()
+    {
+        let last = LAST_BLOB_GC.load(std::sync::atomic::Ordering::Relaxed);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let elapsed = now.saturating_sub(last);
+        if elapsed > 24 * 60 * 60
+            && LAST_BLOB_GC
+                .compare_exchange(
+                    last,
+                    now,
+                    std::sync::atomic::Ordering::Relaxed,
+                    std::sync::atomic::Ordering::Relaxed,
+                )
+                .is_ok()
+            && let Err(err) = blob_sync::gc_orphan_blobs(&db, &dir, blob_sync::GC_GRACE_SECS).await
+        {
+            tracing::warn!("Blob GC failed: {err:#}");
+        }
+    }
+
+    Ok(Some(outcome))
+}
+
+/// Unix seconds of the last opportunistic blob GC (process-local throttle).
+static LAST_BLOB_GC: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+/// Default iCloud container directory for this app
+/// (`iCloud.app.ghost_ai` per the entitlements inventory), if it exists.
+/// Desktop never creates it: the iOS side provisions the container.
+pub fn detect_icloud_container() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    let path = std::path::PathBuf::from(home)
+        .join("Library")
+        .join("Mobile Documents")
+        .join("iCloud~app~ghost_ai");
+    path.is_dir().then_some(path)
+}
+
+/// Ship new attachment bytes before any publish: blobs-before-snapshots is
+/// what keeps peers from ever seeing a dangling hash (ADR 02). Warn-only —
+/// the pass itself decides whether to proceed.
+async fn upload_blobs_before_publish(
+    engine: &SyncEngineHandle,
+    db: &crate::db::Database,
+    app: &tauri::AppHandle,
+) {
+    let (cloud_dir, keys) = match engine.lock() {
+        Ok(guard) => match guard.as_ref() {
+            Some(engine) => (
+                Some(engine.cloud_dir().to_path_buf()),
+                engine.crypto().map(|c| *c.current_key()),
+            ),
+            None => (None, None),
+        },
+        Err(_) => {
+            tracing::warn!("sync engine poisoned; skipping blob upload");
+            (None, None)
+        }
+    };
+    let attach_dir = crate::storage::get_attachments_dir(app).ok();
+    if let Some(dir) = cloud_dir.as_ref() {
+        // Failed uploads can leave temps behind when their cleanup fails
+        // with the same error; sweep them so a congested container cannot
+        // accumulate garbage across passes.
+        let removed = blob_sync::sweep_stale_blob_temps(dir);
+        if removed > 0 {
+            tracing::info!("Swept {removed} stale blob temp file(s) from the container");
+        }
+    }
+    if let (Some(dir), Some(attach), Some(keys)) =
+        (cloud_dir.as_ref(), attach_dir.as_ref(), keys.as_ref())
+        && let Err(err) = blob_sync::ensure_referenced_blobs_uploaded(db, dir, attach, keys).await
+    {
+        tracing::warn!("Blob upload before sync failed: {err:#}");
+    }
+    if let (Some(dir), Some(keys)) = (cloud_dir.as_ref(), keys.as_ref()) {
+        match crate::skills::SkillRoots::from_app(app) {
+            Ok(roots) => {
+                if let Err(err) =
+                    blob_sync::ensure_skill_blobs_uploaded(db, dir, &roots, keys).await
+                {
+                    tracing::warn!("Skill blob upload before sync failed: {err:#}");
+                }
+            }
+            Err(err) => tracing::warn!("Skill roots unavailable: {err}"),
+        }
+    }
+}
+
+/// Container dir and content key of the installed engine, when sync is on
+/// and decryptable (what blob fetches need).
+pub fn blob_access(
+    engine: &SyncEngineHandle,
+) -> Option<(PathBuf, [u8; ghost_ai_agent_core::sync_crypto::CK_LEN])> {
+    let guard = engine.lock().ok()?;
+    let engine = guard.as_ref()?;
+    Some((
+        engine.cloud_dir().to_path_buf(),
+        *engine.crypto()?.current_key(),
+    ))
+}
+
+/// Set while some synced skill could not be materialized yet (its blobs had
+/// not landed in the container): later passes retry even without new rows.
+static SKILLS_PENDING_FETCH: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// After a pass: reconcile Ghost AI's own skills with what peers synced
+/// (fetch new or edited skills, trash ones deleted elsewhere).
+async fn reconcile_skills_after_pass(app: &tauri::AppHandle) {
+    use tauri::Emitter;
+    let Some(state) = app.try_state::<crate::commands::AppState>() else {
+        return;
+    };
+    match crate::commands::run_skill_reconcile(&state, app).await {
+        Ok(report) => {
+            SKILLS_PENDING_FETCH.store(
+                report.pending_fetch > 0,
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            if report.pending_fetch > 0 {
+                tracing::info!(
+                    "{} synced skill(s) waiting for their files",
+                    report.pending_fetch
+                );
+            }
+            if report.changed
+                && let Err(err) = app.emit("skills-changed", ())
+            {
+                tracing::warn!("Failed to emit skills-changed: {err}");
+            }
+        }
+        Err(err) => tracing::warn!("Skill reconcile after sync failed: {err}"),
+    }
+}
+
+/// Manual escape hatch behind the `force_sync_publish` command: publish
+/// unconditionally WITH a version bump (see the engine's `force_publish`).
+/// Shares the pass error latch and events so Settings reflects the outcome.
+pub async fn run_forced_publish(
+    engine: SyncEngineHandle,
+    db: crate::db::Database,
+    app: tauri::AppHandle,
+) -> anyhow::Result<()> {
+    upload_blobs_before_publish(&engine, &db, &app).await;
+
+    let engine_for_task = engine.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<()> {
+        let mut guard = engine_for_task
+            .lock()
+            .map_err(|_| anyhow::anyhow!("sync engine poisoned"))?;
+        match guard.as_mut() {
+            Some(engine) => engine.force_publish(),
+            None => Ok(()),
+        }
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("sync task join failed: {e}"))?;
+
+    match result {
+        Ok(()) => {
+            if let (Ok(app_data_dir), Ok(guard)) = (app.path().app_data_dir(), engine.lock())
+                && let Some(engine) = guard.as_ref()
+                && let Some(crypto) = engine.crypto()
+            {
+                let _ = sync_crypto_state::persist_chain(&app_data_dir, crypto);
+            }
+            tracing::info!("Sync force-published the local state");
+            Ok(())
+        }
+        Err(err) => Err(handle_pass_error(err, &engine, &app).await),
+    }
+}
+
+/// Shared failure tail of the pass paths: key-material failures drop the
+/// engine and latch the passphrase rung; everything else is recorded as
+/// the surfaced `last_pass_error` and emitted as `sync-error` so the
+/// Settings surface can offer the escape hatches. Returns the error for
+/// propagation.
+async fn handle_pass_error(
+    err: anyhow::Error,
+    engine: &SyncEngineHandle,
+    app: &tauri::AppHandle,
+) -> anyhow::Error {
+    use tauri::Emitter;
+
+    if sync_crypto_state::is_key_material_error(&err) {
+        tracing::warn!("Sync content key rejected by the cloud artifact: {err:#}");
+        if let Ok(app_data_dir) = app.path().app_data_dir() {
+            engine.lock().ok().and_then(|mut guard| guard.take());
+            sync_crypto_state::enter_needs_unlock(&app_data_dir);
+            if let Err(emit_err) = app.emit("sync-locked", ()) {
+                tracing::warn!("Failed to emit sync-locked: {emit_err}");
+            }
+        }
+        return err;
+    }
+    tracing::error!("Sync pass failed: {err:#}");
+    if let Ok(app_data_dir) = app.path().app_data_dir() {
+        sync_crypto_state::record_pass_error(&app_data_dir, &format!("{err:#}"));
+    }
+    if let Err(emit_err) = app.emit("sync-error", format!("{err:#}")) {
+        tracing::warn!("Failed to emit sync-error: {emit_err}");
+    }
+    err
+}
+
+/// Terminal flush for the join/unlock paths: publish this device's state
+/// without the pass flow, on a blocking thread — `VACUUM INTO` plus file
+/// IO must not run on an async worker (audit 2026-08-28, low).
+pub async fn terminal_publish(engine: SyncEngineHandle) {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let Ok(mut guard) = engine.lock() else {
+            return Ok(());
+        };
+        match guard.as_mut() {
+            Some(engine) => engine.publish(),
+            None => Ok(()),
+        }
+    })
+    .await;
+    match result {
+        Ok(Ok(())) => {}
+        Ok(Err(err)) => tracing::warn!("Terminal sync publish failed: {err:#}"),
+        Err(err) => tracing::warn!("Terminal sync publish task failed: {err}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ghost_ai_agent_core::sync::{
+        META_SYNC_VERSION, SNAPSHOT_FILE, compressed_snapshot_name, encrypted_snapshot_name,
+        get_meta,
+    };
+    use ghost_ai_agent_core::sync_crypto::ArgonParams;
+    use std::path::{Path, PathBuf};
+
+    /// Build a production-schema database (through the app's own schema code)
+    /// at `path`, with a conversation row.
+    async fn make_db(path: &Path, _tag: &str, title: &str) -> crate::db::Database {
+        let db = crate::db::Database::new(path.to_str().unwrap())
+            .await
+            .expect("db init");
+        db.create_conversation(crate::models::CreateConversationRequest {
+            id: None,
+            title: title.to_string(),
+        })
+        .await
+        .expect("conversation");
+        db
+    }
+
+    fn unique_tag() -> u128 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    }
+
+    fn cloud_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "ghost_ai-sync-test-{}-{}-{}",
+            tag,
+            std::process::id(),
+            unique_tag()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// Remove a database file plus any WAL side files left by a pool that
+    /// never closed cleanly (stale -wal resurrects old meta rows).
+    fn remove_db(path: &Path) {
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(path.with_extension("db-wal"));
+        let _ = std::fs::remove_file(path.with_extension("db-shm"));
+        let _ = std::fs::remove_file(format!("{}-wal", path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", path.display()));
+    }
+
+    #[tokio::test]
+    async fn two_devices_converge_through_cloud_snapshot() {
+        let tag = unique_tag();
+        let base = std::env::temp_dir().join(format!("sync-a-{}", tag));
+        let b_path = std::env::temp_dir().join(format!("sync-b-{}", tag));
+        remove_db(&base);
+        remove_db(&b_path);
+        let a_db = make_db(&base, "a", "from A").await;
+
+        let cloud = cloud_dir("converge");
+        let staging_a = std::env::temp_dir().join(format!("sync-stage-a-{tag}"));
+        let mut a = SyncEngine::new(&base, cloud.clone(), staging_a, None).unwrap();
+
+        // Device A publishes its initial state.
+        let out = a.sync_now().unwrap();
+        assert_eq!(out.action, "published-initial");
+
+        // Device B (second database file) pulls A's rows and republishes.
+        let b_db = make_db(&b_path, "c2", "from B").await;
+        let staging_b = std::env::temp_dir().join(format!("sync-stage-b-{tag}"));
+        let mut b = SyncEngine::new(&b_path, cloud.clone(), staging_b, None).unwrap();
+        let out_b = b.sync_now().unwrap();
+        assert!(out_b.rows_merged > 0, "B must pull A's rows: {out_b:?}");
+        assert!(out_b.republished, "B republishes the merged state");
+
+        // A pulls B's rows and republishes under a fresh version id.
+        let out_a2 = a.sync_now().unwrap();
+        assert!(out_a2.rows_merged > 0, "A must pull B's rows: {out_a2:?}");
+
+        // B's next pass finds nothing new: content already equals A's
+        // snapshot, so B adopts A's version id (converged, no republish).
+        let out_b2 = b.sync_now().unwrap();
+        assert_eq!(out_b2.action, "converged", "{out_b2:?}");
+        assert!(!out_b2.republished, "{out_b2:?}");
+
+        // Version ids converged; further passes are no-ops on both sides.
+        let a_version = get_meta(a.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+        let b_version = get_meta(b.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+        assert_eq!(a_version, b_version, "version ids must converge");
+        assert_eq!(a.sync_now().unwrap().action, "up-to-date");
+        assert_eq!(b.sync_now().unwrap().action, "up-to-date");
+
+        // Both databases hold both conversations.
+        for db in [&a_db, &b_db] {
+            let convs = db.list_conversations().await.unwrap();
+            let titles: Vec<&str> = convs.iter().map(|c| c.title.as_str()).collect();
+            assert!(titles.contains(&"from A"), "{titles:?}");
+            assert!(titles.contains(&"from B"), "{titles:?}");
+        }
+
+        drop(a);
+        drop(b);
+        drop(a_db);
+        drop(b_db);
+        remove_db(&base);
+        remove_db(&b_path);
+        let _ = std::fs::remove_dir_all(&cloud);
+    }
+
+    #[tokio::test]
+    async fn publish_without_changes_keeps_version_id() {
+        let path = std::env::temp_dir().join(format!("sync-p-{}", unique_tag()));
+        remove_db(&path);
+        let _db = make_db(&path, "c1", "t").await;
+        let cloud = cloud_dir("publish");
+        let staging = std::env::temp_dir().join(format!("sync-stage-p-{}", unique_tag()));
+        let mut engine = SyncEngine::new(&path, cloud.clone(), staging, None).unwrap();
+        engine.publish().unwrap();
+        let v1 = get_meta(engine.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+        engine.publish().unwrap();
+        let v2 = get_meta(engine.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+        assert_eq!(v1, v2, "republish without writes keeps the id");
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir_all(&cloud);
+    }
+
+    #[tokio::test]
+    async fn dirty_detection_sees_pool_writes() {
+        let path = std::env::temp_dir().join(format!("sync-d-{}", unique_tag()));
+        remove_db(&path);
+        let db = make_db(&path, "c1", "t").await;
+        let cloud = cloud_dir("dirty");
+        let staging = std::env::temp_dir().join(format!("sync-stage-d-{}", unique_tag()));
+        let mut engine = SyncEngine::new(&path, cloud.clone(), staging, None).unwrap();
+        engine.publish().unwrap();
+        let v1 = get_meta(engine.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+
+        // Write through the sqlx pool (another connection) -> dirty.
+        db.create_conversation(crate::models::CreateConversationRequest {
+            id: None,
+            title: "second".to_string(),
+        })
+        .await
+        .unwrap();
+
+        engine.publish().unwrap();
+        let v2 = get_meta(engine.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+        assert_ne!(v1, v2, "pool writes must bump the version id");
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir_all(&cloud);
+    }
+
+    #[test]
+    fn container_detection_absent() {
+        // Not asserting presence (machine-dependent): the detector must
+        // simply not panic and return None when missing.
+        let result = detect_icloud_container();
+        assert!(result.is_none() || result.unwrap().is_dir());
+    }
+
+    #[test]
+    fn resolve_sync_target_uses_container_or_debug_staging() {
+        let tmp = tempfile::tempdir().unwrap();
+        let target = resolve_sync_target(tmp.path());
+        if let Some(container) = detect_icloud_container() {
+            assert_eq!(target, Some((container, "iCloud container")));
+        } else if cfg!(debug_assertions) {
+            let (dir, label) = target.expect("debug builds resolve the local staging fallback");
+            assert_eq!(dir, tmp.path().join("sync-staging"));
+            assert_eq!(label, "local staging dir (debug)");
+            assert!(dir.is_dir(), "the staging dir must be created eagerly");
+        } else {
+            assert_eq!(
+                target, None,
+                "release builds stay off without the container"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn install_engine_populates_and_replaces_the_slot() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db_path = tmp.path().join("data.db");
+        let _db = make_db(&db_path, "c1", "t").await;
+        let cloud = tmp.path().join("cloud-a");
+        let cloud_b = tmp.path().join("cloud-b");
+        std::fs::create_dir_all(&cloud).unwrap();
+        std::fs::create_dir_all(&cloud_b).unwrap();
+        let wiring = SyncWiring {
+            app_data_dir: tmp.path().to_path_buf(),
+            db_path: db_path.clone(),
+            cache_dir: tmp.path().join("cache"),
+        };
+        let slot: SyncEngineHandle = Arc::new(std::sync::Mutex::new(None));
+        assert!(slot.lock().unwrap().is_none());
+
+        let crypto =
+            SyncCrypto::bootstrap_with_params("unit-test-passphrase", ArgonParams::test()).unwrap();
+        wiring.install_engine(&slot, cloud.clone(), crypto).unwrap();
+        {
+            let guard = slot.lock().unwrap();
+            let engine = guard.as_ref().expect("engine installed");
+            assert_eq!(engine.cloud_dir(), cloud);
+            assert_eq!(engine.cache_dir(), tmp.path().join("cache"));
+            assert!(engine.crypto().is_some(), "engine keeps the crypto state");
+        }
+
+        // Installing again replaces the stale engine instead of stacking.
+        let crypto =
+            SyncCrypto::bootstrap_with_params("unit-test-passphrase", ArgonParams::test()).unwrap();
+        wiring
+            .install_engine(&slot, cloud_b.clone(), crypto)
+            .unwrap();
+        assert_eq!(slot.lock().unwrap().as_ref().unwrap().cloud_dir(), cloud_b);
+
+        wiring.drop_engine(&slot);
+        assert!(slot.lock().unwrap().is_none());
+        // Dropping an empty slot must not panic either.
+        wiring.drop_engine(&slot);
+    }
+
+    #[tokio::test]
+    async fn terminal_publish_is_a_noop_without_an_engine() {
+        let slot: SyncEngineHandle = Arc::new(std::sync::Mutex::new(None));
+        terminal_publish(Arc::clone(&slot)).await;
+        assert!(slot.lock().unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn terminal_publish_ships_the_installed_engine_state() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db_path = tmp.path().join("data.db");
+        let _db = make_db(&db_path, "c1", "t").await;
+        let cloud = tmp.path().join("cloud");
+        std::fs::create_dir_all(&cloud).unwrap();
+        let wiring = SyncWiring {
+            app_data_dir: tmp.path().to_path_buf(),
+            db_path,
+            cache_dir: tmp.path().join("cache"),
+        };
+        let slot: SyncEngineHandle = Arc::new(std::sync::Mutex::new(None));
+        let crypto =
+            SyncCrypto::bootstrap_with_params("unit-test-passphrase", ArgonParams::test()).unwrap();
+        wiring.install_engine(&slot, cloud.clone(), crypto).unwrap();
+
+        terminal_publish(Arc::clone(&slot)).await;
+
+        let snapshot_root = cloud.join(SNAPSHOT_FILE);
+        assert!(
+            encrypted_snapshot_name(&snapshot_root).exists(),
+            "terminal publish must ship the encrypted artifact"
+        );
+        assert!(
+            !compressed_snapshot_name(&snapshot_root).exists(),
+            "an engine with crypto must not leave plaintext artifacts"
+        );
+        assert!(
+            slot.lock().unwrap().as_ref().is_some(),
+            "terminal publish must not drop the engine"
+        );
+    }
+
+    #[tokio::test]
+    async fn force_publish_bumps_the_version_even_without_writes() {
+        let path = std::env::temp_dir().join(format!("sync-f-{}", unique_tag()));
+        remove_db(&path);
+        let _db = make_db(&path, "c1", "t").await;
+        let cloud = cloud_dir("force");
+        let staging = std::env::temp_dir().join(format!("sync-stage-f-{}", unique_tag()));
+        let mut engine = SyncEngine::new(&path, cloud.clone(), staging.clone(), None).unwrap();
+        engine.publish().unwrap();
+        let v1 = get_meta(engine.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+
+        engine.force_publish().unwrap();
+        let v2 = get_meta(engine.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+        assert_ne!(v1, v2, "a forced publish bumps the version id");
+
+        engine.force_publish().unwrap();
+        let v3 = get_meta(engine.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+        assert_ne!(v2, v3, "each forced publish bumps again");
+
+        drop(engine);
+        drop(_db);
+        remove_db(&path);
+        let _ = std::fs::remove_dir_all(&cloud);
+        let _ = std::fs::remove_dir_all(&staging);
+    }
+
+    #[tokio::test]
+    async fn manual_pass_ships_same_session_pool_writes() {
+        let path = std::env::temp_dir().join(format!("sync-m-{}", unique_tag()));
+        remove_db(&path);
+        let db = make_db(&path, "c1", "first").await;
+        let cloud = cloud_dir("manual");
+        let staging = std::env::temp_dir().join(format!("sync-stage-m-{}", unique_tag()));
+        let mut engine = SyncEngine::new(&path, cloud.clone(), staging.clone(), None).unwrap();
+        engine.publish().unwrap();
+        let v1 = get_meta(engine.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+
+        // Same-session write through the app pool (a second connection).
+        db.create_conversation(crate::models::CreateConversationRequest {
+            id: None,
+            title: "second".to_string(),
+        })
+        .await
+        .unwrap();
+
+        // A manual pass bypasses the flush throttle: the write ships now.
+        let out = engine.sync_now_manual().unwrap();
+        assert_eq!(out.action, "flushed", "{out:?}");
+        assert_eq!(out.rows_merged, 0);
+        assert!(out.republished, "{out:?}");
+        let v2 = get_meta(engine.connection(), META_SYNC_VERSION)
+            .unwrap()
+            .unwrap();
+        assert_ne!(v1, v2, "shipping the write bumps the version id");
+
+        drop(engine);
+        drop(db);
+        remove_db(&path);
+        let _ = std::fs::remove_dir_all(&cloud);
+        let _ = std::fs::remove_dir_all(&staging);
+    }
+}
+
+#[cfg(test)]
+mod live_tests {
+    use super::*;
+
+    /// Live round-trip against the REAL desktop database and the REAL iCloud
+    /// container path. Opt-in only (touches user data + creates the Mac-side
+    /// container folder): `cargo test --lib sync::live_tests -- --ignored`.
+    #[test]
+    #[ignore = "touches the real database and container path"]
+    fn live_container_roundtrip() {
+        let db_path = std::env::var_os("HOME")
+            .map(|h| {
+                std::path::PathBuf::from(h)
+                    .join("Library/Application Support/app.ghost_ai.desktop/data.db")
+            })
+            .expect("HOME");
+        if !db_path.exists() {
+            panic!("real desktop database not found at {}", db_path.display());
+        }
+        let container = std::env::var_os("HOME")
+            .map(|h| {
+                std::path::PathBuf::from(h).join("Library/Mobile Documents/iCloud~app~ghost_ai")
+            })
+            .unwrap();
+        // Validation run: the Mac-side folder may legitimately not exist yet
+        // (iOS provisions it). For this live test we create it - iCloud's
+        // bird daemon reconciles it into the container once an entitled app
+        // has run on any device.
+        std::fs::create_dir_all(&container).expect("create container dir");
+
+        let mut engine = SyncEngine::new(&db_path, container.clone(), std::env::temp_dir(), None)
+            .expect("engine");
+        engine.publish().expect("publish real data");
+        let snapshot = container.join(ghost_ai_agent_core::sync::SNAPSHOT_FILE);
+        assert!(snapshot.exists(), "snapshot published");
+        let size = std::fs::metadata(&snapshot).unwrap().len();
+        println!("published snapshot: {} bytes", size);
+        assert!(size > 0, "snapshot must be non-empty (real database)");
+
+        // A second pass must be a no-op (idempotent against our own output).
+        let out = engine.sync_now().expect("sync_now");
+        assert_eq!(out.action, "up-to-date", "{out:?}");
+        println!("second pass: {:?}", out);
+    }
+}

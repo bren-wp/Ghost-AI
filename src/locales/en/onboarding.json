@@ -1,0 +1,12 @@
+{
+  "welcome": "Welcome to Ghost AI",
+  "settingUp": "Setting up Ghost AI...",
+  "checkingForModels": "Checking for available models",
+  "setupProvider": "Connect a model",
+  "configureProvider": "Connect an AI model to get started",
+  "configureProviderDesc": "Ghost AI works with the AI service you choose. Paste an API key from OpenAI, Anthropic, or OpenRouter, or use a free model running on your own computer with Ollama.",
+  "ollamaReady": "Ollama is ready",
+  "ollamaFoundModels": "Found {{count}} model(s) running on this computer and added them for you. They are private and work offline. You can connect other services anytime.",
+  "addMoreProviders": "Connect another service",
+  "continue": "Continue"
+}

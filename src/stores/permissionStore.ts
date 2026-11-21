@@ -1,0 +1,104 @@
+// Pending tool-approval state fed by `permission-requested` /
+// `permission-resolved` backend events. Held in RAM only: grants never
+// persist and never sync (a grant made on one device must not take
+// effect on another).
+
+import { create } from 'zustand'
+
+export type PermissionTier = 'read' | 'write' | 'exec'
+
+/** What an approval covers; mirrors the backend GrantScope. Sent as the
+ * `grant` (allow for this session) and `remember` (remember on this
+ * device) fields of permission-requested. Bash `bases` are segment keys:
+ * the base command, plus its first subcommand for tools like git/npm. */
+export type PermissionGrant =
+  | { kind: 'bash'; bases: string[] }
+  | { kind: 'tool'; tool: string }
+  | { kind: 'server_tool'; server: string; tool: string }
+  | { kind: 'directory'; tool: string; dir: string }
+
+/** Why a prompt was forced past session grants; mirrors the backend
+ * ForcedPromptKind. Forced prompts never carry a grant. */
+export type PermissionWarningKind =
+  | 'security'
+  | 'unparsed'
+  | 'network'
+  | 'private_network'
+  | 'sensitive_read'
+  | 'sensitive_write'
+  | 'outside_deletion'
+  | 'mcp_destructive'
+  | 'sandbox'
+  | 'sandbox_network'
+  | 'sandbox_credentials'
+
+export interface PermissionWarning {
+  kind: PermissionWarningKind
+  detail: string
+}
+
+export interface PermissionRequest {
+  requestId: string
+  conversationId: string
+  toolName: string
+  subject: string
+  tier: PermissionTier
+  grant: PermissionGrant | null
+  warning?: PermissionWarning | null
+  /** Scope persisted by "remember on this device"; null when the prompt
+   * cannot be remembered (forced prompts, relative paths). */
+  remember?: PermissionGrant | null
+  /** Set when the OS sandbox blocked an already-approved command and the
+   * card asks whether to escape it. */
+  escalation?: PermissionEscalation | null
+  /** Jailed bash only: what approving widens for this one execution. */
+  escape?: PermissionEscape | null
+}
+
+/** The write widening an approval carries (ADR 08 SA-3): directories the
+ * approved run may also write, and targets no bounded widening can open
+ * (the sandbox still blocks them; a second card follows if it does). */
+export interface PermissionEscape {
+  writable_roots: string[]
+  unbounded: string[]
+  /** Detected egress the approval opens the network for, this run only. */
+  network?: string | null
+}
+
+/** Options of a sandbox escalation card. */
+export interface PermissionEscalation {
+  /** Offer "allow network this session" (network denials only). */
+  network_option: boolean
+  /** Offer "run once outside the sandbox"; absent means offered (it is
+   * withheld only on the pre-execution network card). */
+  retry_option?: boolean
+}
+
+interface PermissionState {
+  /** FIFO queue across conversations: each stream has at most one pending
+   * approval, but several conversations can stream at once. The dialog
+   * always shows queue[0]. */
+  pending: PermissionRequest[]
+  show: (request: PermissionRequest) => void
+  /** Remove one request by id (stale resolves cannot close a newer prompt). */
+  remove: (requestId: string) => void
+  /** Remove every request of one conversation (its generation stopped);
+   * other conversations' pending requests stay visible and answerable. */
+  clearConversation: (conversationId: string) => void
+  /** Drop the whole queue. */
+  reset: () => void
+}
+
+export const usePermissionStore = create<PermissionState>()((set) => ({
+  pending: [],
+  show: (request) => set((state) => ({ pending: [...state.pending, request] })),
+  remove: (requestId) =>
+    set((state) => ({
+      pending: state.pending.filter((request) => request.requestId !== requestId),
+    })),
+  clearConversation: (conversationId) =>
+    set((state) => ({
+      pending: state.pending.filter((request) => request.conversationId !== conversationId),
+    })),
+  reset: () => set({ pending: [] }),
+}))

@@ -1,0 +1,1090 @@
+//! Chat commands module
+//!
+//! This module handles sending messages, streaming LLM responses, and related functionality.
+
+mod attachment_processing;
+pub(crate) mod aux_models;
+mod compaction;
+mod message_builder;
+mod participants;
+mod search_processing;
+#[cfg(test)]
+mod snapcompact_eval;
+mod streaming;
+pub mod title;
+mod types;
+mod url_processing;
+pub mod web_search;
+
+use super::AppState;
+use crate::db::tools::{
+    BUILTIN_BASH_ID, BUILTIN_READ_ID, BUILTIN_WEB_FETCH_ID, BUILTIN_WEB_SEARCH_ID,
+};
+use crate::models::{CreateMessageRequest, Message};
+use crate::web_fetch;
+use tauri::{Emitter, State};
+use tokio_util::sync::CancellationToken;
+
+// Re-export types
+pub use types::{FileAttachmentInput, ImageAttachmentInput, ParameterOverrides};
+
+/// Send a message and start LLM generation
+///
+/// This command returns immediately after saving the user message.
+/// LLM processing happens in a background task.
+#[tauri::command]
+pub async fn send_message(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+    conversation_id: String,
+    content: String,
+    provider: String,
+    model: String,
+    api_key: Option<String>,
+    base_url: Option<String>,
+    api_style: Option<String>,
+    include_history: Option<bool>,
+    system_prompt: Option<String>,
+    user_prompt: Option<String>,
+    model_db_id: Option<String>,
+    assistant_db_id: Option<String>,
+    urls_to_fetch: Option<Vec<String>>,
+    images: Option<Vec<ImageAttachmentInput>>,
+    files: Option<Vec<FileAttachmentInput>>,
+    search_enabled: Option<bool>,
+    parameter_overrides: Option<types::ParameterOverrides>,
+    context_message_count: Option<i64>,
+    use_provider_defaults: Option<bool>,
+    disable_tools: Option<bool>,
+    reuse_fetch_result_ids: Option<Vec<String>>,
+    // Non-destructive resend: create the new user message as a SIBLING
+    // VARIANT of this message (same parent), instead of appending under
+    // the active leaf.
+    sibling_of_message_id: Option<String>,
+    // Resend: stored attachments of the original message, re-linked to the
+    // new message and projected from storage (original bytes, no IPC copy).
+    reuse_attachment_ids: Option<Vec<String>>,
+    // Id for the new user message, chosen by the composer so it can render
+    // the message before this command returns. Generated here when absent.
+    message_id: Option<String>,
+) -> Result<Message, String> {
+    super::ensure_no_generation(&state, &conversation_id).await?;
+    check_attachment_payload(images.as_deref(), files.as_deref())?;
+    let message_id = resolve_message_id(message_id)?;
+
+    log_send_message_params(
+        &conversation_id,
+        &content,
+        &provider,
+        &model,
+        &base_url,
+        &system_prompt,
+        &user_prompt,
+        &model_db_id,
+        &assistant_db_id,
+        &urls_to_fetch,
+        &images,
+        &files,
+        &search_enabled,
+        &parameter_overrides,
+        &context_message_count,
+        &use_provider_defaults,
+        &reuse_fetch_result_ids,
+    );
+
+    // Save user message to database. A sibling_of_message_id creates a
+    // sibling variant (non-destructive resend); None appends under the
+    // active leaf.
+    let user_message = save_user_message(
+        &state,
+        &conversation_id,
+        message_id,
+        &content,
+        sibling_of_message_id,
+    )
+    .await?;
+
+    // Auto-add participants
+    participants::ensure_participants(&state, &conversation_id, &model_db_id, &assistant_db_id)
+        .await;
+
+    // Create and register cancellation token
+    let cancel_token = CancellationToken::new();
+    {
+        let mut tasks = state.generation_tasks.write().await;
+        tasks.insert(conversation_id.clone(), cancel_token.clone());
+    }
+
+    // Spawn background task
+    spawn_background_task(
+        state.inner().clone(),
+        app,
+        conversation_id,
+        content,
+        provider,
+        model,
+        api_key,
+        base_url,
+        api_style,
+        include_history,
+        system_prompt,
+        user_prompt,
+        model_db_id,
+        assistant_db_id,
+        urls_to_fetch,
+        images,
+        files,
+        search_enabled.unwrap_or(false),
+        user_message.id.clone(),
+        cancel_token,
+        parameter_overrides,
+        context_message_count,
+        use_provider_defaults.unwrap_or(false),
+        disable_tools.unwrap_or(false),
+        reuse_fetch_result_ids,
+        false,
+        reuse_attachment_ids.unwrap_or_default(),
+    );
+    Ok(user_message)
+}
+
+/// Hard ceiling on the attachment payload of one `send_message` call, in
+/// base64/text characters. The composer refuses oversized files per file
+/// before reading them; this is the backend floor for anything else.
+const MAX_ATTACHMENT_PAYLOAD_CHARS: usize = 200 * 1024 * 1024;
+
+fn check_attachment_payload(
+    images: Option<&[ImageAttachmentInput]>,
+    files: Option<&[FileAttachmentInput]>,
+) -> Result<(), String> {
+    let images: usize = images
+        .unwrap_or_default()
+        .iter()
+        .map(|image| image.base64.len())
+        .sum();
+    let files: usize = files
+        .unwrap_or_default()
+        .iter()
+        .map(|file| file.content.len() + file.base64.as_ref().map_or(0, String::len))
+        .sum();
+    let total = images + files;
+    if total > MAX_ATTACHMENT_PAYLOAD_CHARS {
+        return Err(format!(
+            "Attachments are too large to send ({} MB, limit {} MB). Remove some \
+             attachments, or put large files in the working directory and ask \
+             the assistant to read them with its tools.",
+            total / (1024 * 1024),
+            MAX_ATTACHMENT_PAYLOAD_CHARS / (1024 * 1024)
+        ));
+    }
+    Ok(())
+}
+
+/// Regenerate an assistant/model reply as a SIBLING VARIANT: rewind the
+/// active leaf to the reply's parent user message and re-run generation
+/// against the same history. The previous reply stays on its own branch,
+/// reachable via the sibling navigator. Attachments and fetched resources
+/// of the user message are reused from storage — nothing is re-fetched.
+///
+/// A user message target is answered in place: this is the retry path for a
+/// turn whose generation failed or was stopped before any reply was saved.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn regenerate_message(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+    conversation_id: String,
+    message_id: String,
+    provider: String,
+    model: String,
+    api_key: Option<String>,
+    base_url: Option<String>,
+    api_style: Option<String>,
+    system_prompt: Option<String>,
+    user_prompt: Option<String>,
+    model_db_id: Option<String>,
+    assistant_db_id: Option<String>,
+    parameter_overrides: Option<types::ParameterOverrides>,
+    context_message_count: Option<i64>,
+    use_provider_defaults: Option<bool>,
+    disable_tools: Option<bool>,
+) -> Result<(), String> {
+    super::ensure_no_generation(&state, &conversation_id).await?;
+
+    let parent = regenerate_parent(&state, &conversation_id, &message_id).await?;
+    let parent_id = parent.id.clone();
+
+    // Rewind the leaf to the user message; the new assistant reply is
+    // created under the same parent and becomes the active variant.
+    state
+        .db
+        .rewind_active_to(&conversation_id, &parent_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Auto-add participants (mirrors send_message; cheap when present).
+    participants::ensure_participants(&state, &conversation_id, &model_db_id, &assistant_db_id)
+        .await;
+
+    let cancel_token = CancellationToken::new();
+    {
+        let mut tasks = state.generation_tasks.write().await;
+        tasks.insert(conversation_id.clone(), cancel_token.clone());
+    }
+
+    spawn_background_task(
+        state.inner().clone(),
+        app,
+        conversation_id,
+        parent.content,
+        provider,
+        model,
+        api_key,
+        base_url,
+        api_style,
+        None,
+        system_prompt,
+        user_prompt,
+        model_db_id,
+        assistant_db_id,
+        None,
+        None,
+        None,
+        false,
+        parent_id,
+        cancel_token,
+        parameter_overrides,
+        context_message_count,
+        use_provider_defaults.unwrap_or(false),
+        disable_tools.unwrap_or(false),
+        None,
+        true,
+        Vec::new(),
+    );
+    Ok(())
+}
+
+/// The user message a regenerate answers. A user target is answered in
+/// place (retry of a turn that never got a reply); an assistant target
+/// re-answers its parent.
+async fn regenerate_parent(
+    state: &AppState,
+    conversation_id: &str,
+    message_id: &str,
+) -> Result<Message, String> {
+    let target = state
+        .db
+        .get_message(message_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Message not found: {message_id}"))?;
+    if target.conversation_id.as_deref() != Some(conversation_id) {
+        return Err(format!(
+            "Message {message_id} does not belong to conversation {conversation_id}"
+        ));
+    }
+    if target.sender_type == "user" {
+        return Ok(target);
+    }
+    let parent_id = target
+        .parent_id
+        .clone()
+        .ok_or_else(|| "Message has no parent turn to regenerate from".to_string())?;
+    state
+        .db
+        .get_message(&parent_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Parent message not found".to_string())
+}
+
+/// A composer-chosen message id must be a UUID; none means generate one.
+fn resolve_message_id(message_id: Option<String>) -> Result<String, String> {
+    match message_id {
+        Some(id) => uuid::Uuid::parse_str(&id)
+            .map(|_| id.clone())
+            .map_err(|_| format!("Invalid message id: {id}")),
+        None => Ok(uuid::Uuid::now_v7().to_string()),
+    }
+}
+
+async fn save_user_message(
+    state: &AppState,
+    conversation_id: &str,
+    message_id: String,
+    content: &str,
+    sibling_of_message_id: Option<String>,
+) -> Result<Message, String> {
+    tracing::info!("📝 [send_message] Creating user message in database...");
+    // Sibling variant: the new message copies the original's parent. A
+    // first-turn original has no parent, expressed as the root sentinel.
+    let parent_id = match sibling_of_message_id.as_deref() {
+        Some(sibling_id) => {
+            let sibling = state
+                .db
+                .get_message(sibling_id)
+                .await
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| format!("Message not found: {sibling_id}"))?;
+            if sibling.conversation_id.as_deref() != Some(conversation_id) {
+                return Err(format!(
+                    "Message {sibling_id} does not belong to conversation {conversation_id}"
+                ));
+            }
+            Some(sibling.parent_id.unwrap_or_default())
+        }
+        None => None,
+    };
+    let user_message = state
+        .db
+        .create_message_with_id(
+            message_id,
+            CreateMessageRequest {
+                conversation_id: Some(conversation_id.to_string()),
+                parent_id,
+                sender_type: "user".to_string(),
+                sender_id: None,
+                content: content.to_string(),
+                tokens: None,
+            },
+        )
+        .await
+        .map_err(|e| {
+            tracing::info!("❌ [send_message] Failed to create message: {}", e);
+            e.to_string()
+        })?;
+
+    tracing::info!(
+        "✅ [send_message] User message created with id: {}",
+        user_message.id
+    );
+    Ok(user_message)
+}
+
+/// Stop an active generation
+#[tauri::command]
+pub async fn stop_generation(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+    conversation_id: String,
+) -> Result<bool, String> {
+    tracing::info!(
+        "🛑 [stop_generation] Stopping generation for conversation: {}",
+        conversation_id
+    );
+
+    let tasks = state.generation_tasks.read().await;
+
+    if let Some(cancel_token) = tasks.get(&conversation_id) {
+        cancel_token.cancel();
+        tracing::info!("✅ [stop_generation] Cancellation token triggered");
+
+        state.bash_session_manager.abort_running(&conversation_id);
+
+        let _ = app.emit(
+            "generation-stopped",
+            serde_json::json!({
+                "conversation_id": conversation_id,
+            }),
+        );
+
+        Ok(true)
+    } else {
+        tracing::warn!("⚠️ [stop_generation] No active task found for conversation");
+        Ok(false)
+    }
+}
+
+// ============================================================================
+// Private helper functions
+// ============================================================================
+
+fn log_send_message_params(
+    conversation_id: &str,
+    content: &str,
+    provider: &str,
+    model: &str,
+    base_url: &Option<String>,
+    system_prompt: &Option<String>,
+    user_prompt: &Option<String>,
+    model_db_id: &Option<String>,
+    assistant_db_id: &Option<String>,
+    urls_to_fetch: &Option<Vec<String>>,
+    images: &Option<Vec<ImageAttachmentInput>>,
+    files: &Option<Vec<FileAttachmentInput>>,
+    search_enabled: &Option<bool>,
+    parameter_overrides: &Option<types::ParameterOverrides>,
+    context_message_count: &Option<i64>,
+    use_provider_defaults: &Option<bool>,
+    reuse_fetch_result_ids: &Option<Vec<String>>,
+) {
+    tracing::info!("🚀 [send_message] Command received!");
+    tracing::info!("   conversation_id: {}", conversation_id);
+    tracing::info!("   content: {}", content);
+    tracing::info!("   provider: {}", provider);
+    tracing::info!("   model: {}", model);
+    tracing::info!("   base_url: {:?}", base_url);
+    tracing::info!("   has_system_prompt: {}", system_prompt.is_some());
+    tracing::info!("   has_user_prompt: {}", user_prompt.is_some());
+    tracing::info!("   model_db_id: {:?}", model_db_id);
+    tracing::info!("   assistant_db_id: {:?}", assistant_db_id);
+    tracing::info!("   urls_to_fetch: {:?}", urls_to_fetch);
+    tracing::info!("   images count: {:?}", images.as_ref().map(|v| v.len()));
+    tracing::info!("   files count: {:?}", files.as_ref().map(|v| v.len()));
+    tracing::info!("   search_enabled: {:?}", search_enabled);
+    tracing::info!("   parameter_overrides: {:?}", parameter_overrides);
+    tracing::info!("   context_message_count: {:?}", context_message_count);
+    tracing::info!("   use_provider_defaults: {:?}", use_provider_defaults);
+    tracing::info!(
+        "   reuse_fetch_result_ids: {:?}",
+        reuse_fetch_result_ids.as_ref().map(|v| v.len())
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn spawn_background_task(
+    state: AppState,
+    app: tauri::AppHandle,
+    conversation_id: String,
+    content: String,
+    provider: String,
+    model: String,
+    api_key: Option<String>,
+    base_url: Option<String>,
+    api_style: Option<String>,
+    include_history: Option<bool>,
+    system_prompt: Option<String>,
+    user_prompt: Option<String>,
+    model_db_id: Option<String>,
+    assistant_db_id: Option<String>,
+    urls_to_fetch: Option<Vec<String>>,
+    images: Option<Vec<ImageAttachmentInput>>,
+    files: Option<Vec<FileAttachmentInput>>,
+    search_enabled: bool,
+    user_message_id: String,
+    cancel_token: CancellationToken,
+    parameter_overrides: Option<types::ParameterOverrides>,
+    context_message_count: Option<i64>,
+    use_provider_defaults: bool,
+    disable_tools: bool,
+    reuse_fetch_result_ids: Option<Vec<String>>,
+    reuse_persisted_turn: bool,
+    reuse_attachment_ids: Vec<String>,
+) {
+    tracing::info!("🔄 [send_message] Spawning background task...");
+
+    tokio::spawn(async move {
+        process_llm_request(
+            state,
+            app,
+            conversation_id,
+            content,
+            provider,
+            model,
+            api_key,
+            base_url,
+            api_style,
+            include_history,
+            system_prompt,
+            user_prompt,
+            model_db_id,
+            assistant_db_id,
+            urls_to_fetch,
+            images,
+            files,
+            search_enabled,
+            user_message_id,
+            cancel_token,
+            parameter_overrides,
+            context_message_count,
+            use_provider_defaults,
+            disable_tools,
+            reuse_fetch_result_ids,
+            reuse_persisted_turn,
+            reuse_attachment_ids,
+        )
+        .await;
+    });
+}
+
+/// Enabled builtin/MCP tool ids for this turn. Mirrors the resolution in
+/// `handle_agent_streaming` closely enough for prompt-projection decisions:
+/// assistant tools + conversation-level enabled tools, gated by tool-use
+/// support. Skill-required tools are omitted deliberately — if a skill would
+/// enable a tool later, the conservative projection (inline/lazy fallback)
+/// stays correct.
+async fn enabled_tool_ids(
+    state: &AppState,
+    provider: &str,
+    model: &str,
+    assistant_db_id: Option<&str>,
+    conversation_id: &str,
+    disable_tools: bool,
+) -> Vec<String> {
+    if disable_tools {
+        return Vec::new();
+    }
+    if state
+        .capabilities_cache
+        .resolve(provider, model)
+        .await
+        .supports_tool_use
+        == Some(false)
+    {
+        return Vec::new();
+    }
+
+    let mut tool_ids = Vec::new();
+    if let Some(assistant_id) = assistant_db_id
+        && let Ok(ids) = state.db.get_assistant_tool_ids(assistant_id).await
+    {
+        tool_ids.extend(ids);
+    }
+    if let Ok(settings) = state.db.get_conversation_settings(conversation_id).await {
+        tool_ids.extend(settings.enabled_mcp_server_ids);
+    }
+    tool_ids
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn process_llm_request(
+    state: AppState,
+    app: tauri::AppHandle,
+    conversation_id: String,
+    content: String,
+    provider: String,
+    model: String,
+    api_key: Option<String>,
+    base_url: Option<String>,
+    api_style: Option<String>,
+    include_history: Option<bool>,
+    system_prompt: Option<String>,
+    user_prompt: Option<String>,
+    model_db_id: Option<String>,
+    assistant_db_id: Option<String>,
+    urls_to_fetch: Option<Vec<String>>,
+    images: Option<Vec<ImageAttachmentInput>>,
+    files: Option<Vec<FileAttachmentInput>>,
+    search_enabled: bool,
+    user_message_id: String,
+    cancel_token: CancellationToken,
+    parameter_overrides: Option<types::ParameterOverrides>,
+    context_message_count: Option<i64>,
+    use_provider_defaults: bool,
+    disable_tools: bool,
+    reuse_fetch_result_ids: Option<Vec<String>>,
+    reuse_persisted_turn: bool,
+    reuse_attachment_ids: Vec<String>,
+) {
+    tracing::info!("🎯 [background_task] Started processing LLM request");
+
+    let tool_ids = enabled_tool_ids(
+        &state,
+        &provider,
+        &model,
+        assistant_db_id.as_deref(),
+        &conversation_id,
+        disable_tools,
+    )
+    .await;
+    let read_available = tool_ids.iter().any(|id| id == BUILTIN_READ_ID);
+    // The model owns page retrieval when it can search or fetch; then the
+    // search path stops at the result page.
+    let model_can_fetch = tool_ids
+        .iter()
+        .any(|id| id == BUILTIN_WEB_SEARCH_ID || id == BUILTIN_WEB_FETCH_ID);
+
+    // Store the user's attachments first: they depend on nothing below,
+    // and the chat shows them only once stored, so they must not wait on
+    // the search decision or URL fetching.
+    // Resend: re-link the original message's stored attachments; the
+    // whole turn is then projected from storage below.
+    for (order, attachment_id) in reuse_attachment_ids.iter().enumerate() {
+        match state
+            .db
+            .link_message_attachment(&user_message_id, attachment_id, Some(order as i32))
+            .await
+        {
+            Ok(()) => {
+                let _ = app.emit(
+                    "attachment-update",
+                    serde_json::json!({
+                        "message_id": user_message_id,
+                        "conversation_id": conversation_id,
+                        "attachment_id": attachment_id,
+                    }),
+                );
+            }
+            Err(e) => tracing::error!("Failed to re-link attachment {}: {}", attachment_id, e),
+        }
+    }
+    let project_from_storage = reuse_persisted_turn || !reuse_attachment_ids.is_empty();
+
+    // Parse and store fresh attachments, or (regenerate, resend)
+    // load the stored turn's attachments so the model sees the same content.
+    let (user_images, user_files, stored_files, stored_images) = if project_from_storage {
+        // Fresh attachments sent alongside reused ones are stored first, so
+        // the storage load below includes them.
+        let fresh_images = attachment_processing::parse_image_attachments(images);
+        let fresh_files = attachment_processing::parse_file_attachments(files);
+        attachment_processing::store_file_attachments(
+            &state,
+            &app,
+            &fresh_files,
+            &user_message_id,
+            &conversation_id,
+        )
+        .await;
+        attachment_processing::store_image_attachments(
+            &state,
+            &app,
+            &fresh_images,
+            &user_message_id,
+            &conversation_id,
+        )
+        .await;
+        let turn = match crate::storage::get_attachments_dir(&app) {
+            Ok(dir) => {
+                attachment_processing::load_persisted_turn(&state.db, &dir, &user_message_id).await
+            }
+            Err(e) => {
+                tracing::error!("Attachments directory unavailable: {e}");
+                attachment_processing::PersistedTurn::default()
+            }
+        };
+        (
+            turn.images,
+            turn.files,
+            turn.stored_files,
+            turn.stored_images,
+        )
+    } else {
+        let user_images = attachment_processing::parse_image_attachments(images);
+        let user_files = attachment_processing::parse_file_attachments(files);
+        let stored_files = attachment_processing::store_file_attachments(
+            &state,
+            &app,
+            &user_files,
+            &user_message_id,
+            &conversation_id,
+        )
+        .await;
+        let stored_images = attachment_processing::store_image_attachments(
+            &state,
+            &app,
+            &user_images,
+            &user_message_id,
+            &conversation_id,
+        )
+        .await;
+        (user_images, user_files, stored_files, stored_images)
+    };
+
+    // Step 1: Process search if enabled
+    let search_result = if search_enabled {
+        search_processing::process_search_decision(
+            &state,
+            &app,
+            &content,
+            &provider,
+            &model,
+            api_key.as_deref(),
+            base_url.as_deref(),
+            api_style.as_deref(),
+            &user_message_id,
+            &conversation_id,
+            model_can_fetch,
+        )
+        .await
+    } else {
+        search_processing::SearchProcessingResult {
+            urls: Vec::new(),
+            search_result_id: None,
+            serp_context: None,
+        }
+    };
+
+    // User-provided URLs are always fetched: the user explicitly attached
+    // them. Result-page URLs are only fetched when the model cannot read
+    // them itself.
+    let mut urls_to_fetch = urls_to_fetch.unwrap_or_default();
+    let fetch_source_id = if search_result.urls.is_empty() {
+        None
+    } else {
+        search_result.search_result_id.clone()
+    };
+    urls_to_fetch.extend(search_result.urls);
+
+    // Step 2: Reuse existing fetch_results (resend path) and/or fetch new URLs.
+    // Reuse is processed first so reused ids win over any duplicate URL the
+    // frontend may have also included.
+    let reuse_ids_owned = reuse_fetch_result_ids.unwrap_or_default();
+    let url_result = url_processing::fetch_and_store_urls(
+        &state,
+        &app,
+        &urls_to_fetch,
+        &reuse_ids_owned,
+        &user_message_id,
+        &conversation_id,
+        fetch_source_id.as_deref(),
+    )
+    .await;
+
+    // Regenerate answers a stored user turn: its fetched pages are
+    // already linked to the message and are projected again from storage.
+    let mut fetched_resources = url_result.fetched_resources;
+    if reuse_persisted_turn {
+        fetched_resources.extend(
+            url_processing::load_message_fetch_resources(&state, &app, &user_message_id).await,
+        );
+    }
+
+    // Step 3: Build LLM content with fetched resources and the SERP block
+    let mut processed_content =
+        web_fetch::build_llm_content_with_attachments(&content, &fetched_resources);
+    if let Some(serp_context) = &search_result.serp_context {
+        processed_content.push_str("\n\n---\n");
+        processed_content.push_str(serp_context);
+    }
+
+    // Large attachments are projected as a path manifest only when the
+    // conversation can actually fetch them back with the read tool.
+    // (`read_available` is computed with the tool set above.)
+
+    // Data-file attachments get a bash-readable copy when bash is enabled:
+    // the attachments store itself is a private read root.
+    let attachments_dir = crate::storage::get_attachments_dir(&app).ok();
+    let bash_target =
+        crate::storage::conversation_scratch_dir(&app, &conversation_id).join("attachments");
+    let bash_copies = attachments_dir
+        .as_deref()
+        .filter(|_| tool_ids.iter().any(|id| id == BUILTIN_BASH_ID))
+        .map(|attachments_dir| message_builder::BashCopies {
+            attachments_dir,
+            target_dir: &bash_target,
+        });
+
+    // Step 6: Build chat messages with context limit
+    let chat_messages = message_builder::build_chat_messages(
+        &state,
+        &conversation_id,
+        &user_message_id,
+        &processed_content,
+        &user_prompt,
+        &system_prompt,
+        include_history.unwrap_or(true),
+        &user_images,
+        &user_files,
+        &stored_files,
+        read_available,
+        bash_copies.as_ref(),
+        context_message_count,
+    )
+    .await;
+
+    // Step 7: Get assistant config and build model params
+    let assistant_config = get_assistant_config(&state, &assistant_db_id).await;
+
+    // Determine model params based on settings:
+    // - use_provider_defaults: true -> use empty params (provider defaults)
+    // - parameter_overrides: set -> use custom overrides
+    // - conversation settings select a preset -> use that preset
+    // - otherwise -> use assistant preset (if available)
+    let model_params = if use_provider_defaults {
+        tracing::info!("📋 [background_task] Using provider defaults (no parameters sent)");
+        crate::models::ModelParameters::default()
+    } else if let Some(overrides) = parameter_overrides {
+        // Custom parameter overrides
+        let mut params = crate::models::ModelParameters::default();
+        if overrides.temperature.is_some() {
+            params.temperature = overrides.temperature;
+        }
+        if overrides.max_tokens.is_some() {
+            params.max_tokens = overrides.max_tokens;
+        }
+        if overrides.top_p.is_some() {
+            params.top_p = overrides.top_p;
+        }
+        if overrides.frequency_penalty.is_some() {
+            params.frequency_penalty = overrides.frequency_penalty;
+        }
+        if overrides.presence_penalty.is_some() {
+            params.presence_penalty = overrides.presence_penalty;
+        }
+        tracing::info!(
+            "📋 [background_task] Applied custom parameter overrides: temp={:?}, max_tokens={:?}, top_p={:?}",
+            params.temperature,
+            params.max_tokens,
+            params.top_p
+        );
+        params
+    } else if let Some(preset) = active_conversation_preset(&state, &conversation_id).await {
+        // The conversation selected a preset (directly, or inherited from
+        // its assistant when the assistant was picked)
+        tracing::info!(
+            "📋 [background_task] Using conversation preset '{}': temp={:?}, max_tokens={:?}",
+            preset.name,
+            preset.temperature,
+            preset.max_tokens
+        );
+        crate::models::ModelParameters::from(&preset)
+    } else {
+        // Fall back to the assistant preset (if any)
+        assistant_config
+            .as_ref()
+            .and_then(|a| a.preset.as_ref())
+            .map(|preset| {
+                tracing::info!(
+                    "📋 [background_task] Using assistant preset: temp={:?}, max_tokens={:?}",
+                    preset.temperature,
+                    preset.max_tokens
+                );
+                crate::models::ModelParameters::from(preset)
+            })
+            .unwrap_or_default()
+    };
+
+    let system_prompt_for_agent = chat_messages
+        .first()
+        .filter(|m| m.role == "system")
+        .map(|m| m.content.clone());
+
+    // Step 8: Stream LLM response
+    tracing::info!(
+        "📤 [background_task] Sending chat request to LLM (model: {})",
+        model
+    );
+    tracing::info!("🤖 [background_task] Using agent-based streaming");
+
+    streaming::handle_agent_streaming(
+        provider,
+        model,
+        chat_messages,
+        api_key,
+        base_url,
+        api_style,
+        system_prompt_for_agent,
+        model_params,
+        cancel_token,
+        state,
+        app,
+        conversation_id,
+        content,
+        user_message_id,
+        model_db_id,
+        assistant_db_id,
+        disable_tools,
+        stored_images,
+    )
+    .await;
+}
+
+/// The preset the conversation's saved settings select, if any. Draft
+/// settings are persisted before the first send, so this covers new chats.
+async fn active_conversation_preset(
+    state: &AppState,
+    conversation_id: &str,
+) -> Option<crate::models::ModelParameterPreset> {
+    match state
+        .db
+        .get_active_conversation_preset(conversation_id)
+        .await
+    {
+        Ok(preset) => preset,
+        Err(e) => {
+            tracing::warn!(
+                "⚠️  [background_task] Failed to load conversation preset: {}",
+                e
+            );
+            None
+        }
+    }
+}
+
+async fn get_assistant_config(
+    state: &AppState,
+    assistant_db_id: &Option<String>,
+) -> Option<crate::models::Assistant> {
+    if let Some(assistant_id) = assistant_db_id {
+        match state.db.get_assistant(assistant_id).await {
+            Ok(Some(assistant)) => {
+                let temp = assistant.preset.as_ref().and_then(|p| p.temperature);
+                let max_tokens = assistant.preset.as_ref().and_then(|p| p.max_tokens);
+                tracing::info!(
+                    "📋 [background_task] Using assistant config: temp={:?}, max_tokens={:?}",
+                    temp,
+                    max_tokens
+                );
+                Some(assistant)
+            }
+            Ok(None) => {
+                tracing::warn!(
+                    "⚠️  [background_task] Assistant not found: {}",
+                    assistant_id
+                );
+                None
+            }
+            Err(e) => {
+                tracing::warn!("⚠️  [background_task] Error fetching assistant: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn file(content_len: usize, base64_len: Option<usize>) -> FileAttachmentInput {
+        FileAttachmentInput {
+            name: "f".to_string(),
+            content: "x".repeat(content_len),
+            base64: base64_len.map(|n| "A".repeat(n)),
+            mime_type: "text/plain".to_string(),
+        }
+    }
+
+    #[test]
+    fn attachment_payload_ceiling_counts_text_and_base64() {
+        assert!(check_attachment_payload(None, None).is_ok());
+        assert!(check_attachment_payload(None, Some(&[file(10, Some(10))])).is_ok());
+        let half = MAX_ATTACHMENT_PAYLOAD_CHARS / 2;
+        let err = check_attachment_payload(None, Some(&[file(half, Some(half)), file(1, None)]))
+            .unwrap_err();
+        assert!(err.contains("too large to send"), "{err}");
+    }
+    use crate::db::Database;
+    use crate::llm::capabilities::CapabilitiesCache;
+    use crate::llm::tools::BashSessionManager;
+    use crate::mcp::McpConnectionManager;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    async fn bare_state() -> (crate::AppState, String, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::new(dir.path().join("t.db").to_str().unwrap())
+            .await
+            .unwrap();
+        let conv = db
+            .create_conversation(crate::models::CreateConversationRequest {
+                id: None,
+                title: "t".into(),
+            })
+            .await
+            .unwrap();
+        let state = crate::AppState {
+            db,
+            generation_tasks: Arc::new(RwLock::new(HashMap::new())),
+            mcp_manager: Arc::new(McpConnectionManager::new()),
+            pending_oauth: Arc::new(RwLock::new(HashMap::new())),
+            bash_session_manager: Arc::new(BashSessionManager::new()),
+            capabilities_cache: Arc::new(CapabilitiesCache::new()),
+            sync_engine: Arc::new(std::sync::Mutex::new(None)),
+            approval_registry: crate::llm::permission::ApprovalRegistry::new(),
+            permission_grants: std::sync::Arc::new(std::sync::Mutex::new(HashMap::new())),
+        };
+        (state, conv.id, dir)
+    }
+
+    /// A send arriving while a generation is active for the conversation
+    /// must be rejected before any state is written: accepting it would
+    /// overwrite the running task's cancellation token and race the
+    /// active-leaf pointer. send_message delegates its guard to
+    /// ensure_no_generation, exercised here.
+    #[tokio::test]
+    async fn send_message_rejected_while_generation_running() {
+        let (state, conv_id, _dir) = bare_state().await;
+        state
+            .generation_tasks
+            .write()
+            .await
+            .insert(conv_id.clone(), CancellationToken::new());
+
+        let err = super::super::ensure_no_generation(&state, &conv_id)
+            .await
+            .unwrap_err();
+        assert_eq!(err, "A generation is already running for this conversation");
+
+        // A quiet conversation passes the guard.
+        state.generation_tasks.write().await.remove(&conv_id);
+        assert!(
+            super::super::ensure_no_generation(&state, &conv_id)
+                .await
+                .is_ok()
+        );
+    }
+
+    /// The composer renders the user message under the id it sends, so the
+    /// stored row must carry exactly that id.
+    #[tokio::test]
+    async fn save_user_message_keeps_composer_id() {
+        let (state, conv_id, _dir) = bare_state().await;
+        let id = uuid::Uuid::now_v7().to_string();
+        let message = super::save_user_message(&state, &conv_id, id.clone(), "hi", None)
+            .await
+            .unwrap();
+        assert_eq!(message.id, id);
+        assert!(state.db.get_message(&id).await.unwrap().is_some());
+    }
+
+    #[test]
+    fn resolve_message_id_validates_or_generates() {
+        let id = uuid::Uuid::now_v7().to_string();
+        assert_eq!(super::resolve_message_id(Some(id.clone())).unwrap(), id);
+        assert!(super::resolve_message_id(Some("not-a-uuid".into())).is_err());
+        let generated = super::resolve_message_id(None).unwrap();
+        assert_eq!(
+            uuid::Uuid::parse_str(&generated).unwrap().get_version_num(),
+            7
+        );
+    }
+
+    /// Retry of a turn without a reply targets the user message itself;
+    /// regenerating a reply targets its parent user message.
+    #[tokio::test]
+    async fn regenerate_parent_answers_user_targets_in_place() {
+        let (state, conv_id, _dir) = bare_state().await;
+        let user = state
+            .db
+            .create_message(CreateMessageRequest {
+                conversation_id: Some(conv_id.clone()),
+                parent_id: None,
+                sender_type: "user".into(),
+                sender_id: None,
+                content: "question".into(),
+                tokens: None,
+            })
+            .await
+            .unwrap();
+        let reply = state
+            .db
+            .create_message(CreateMessageRequest {
+                conversation_id: Some(conv_id.clone()),
+                parent_id: Some(user.id.clone()),
+                sender_type: "model".into(),
+                sender_id: None,
+                content: "answer".into(),
+                tokens: None,
+            })
+            .await
+            .unwrap();
+
+        let from_user = super::regenerate_parent(&state, &conv_id, &user.id)
+            .await
+            .unwrap();
+        assert_eq!(from_user.id, user.id);
+        let from_reply = super::regenerate_parent(&state, &conv_id, &reply.id)
+            .await
+            .unwrap();
+        assert_eq!(from_reply.id, user.id);
+        assert!(
+            super::regenerate_parent(&state, "other", &user.id)
+                .await
+                .is_err()
+        );
+    }
+}

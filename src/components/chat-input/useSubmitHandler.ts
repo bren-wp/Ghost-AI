@@ -1,0 +1,320 @@
+import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
+import { useConversationStore } from '@/stores/conversation'
+import { useMessageStore } from '@/stores/message'
+import { useModelStore } from '@/stores/modelStore'
+import { useConversationSettingsStore } from '@/stores/conversationSettingsStore'
+import { usePromptStore } from '@/stores/promptStore'
+import { useInputHistoryStore } from '@/stores/inputHistoryStore'
+import type { Attachment } from './types'
+import type { Model } from '@/types'
+import { logger } from '@/lib/logger'
+import { requestSentMessageScroll } from '@/lib/transcript-scroll'
+
+interface UseSubmitHandlerOptions {
+  input: string
+  setInput: React.Dispatch<React.SetStateAction<string>>
+  attachments: Attachment[]
+  clearAttachments: () => void
+  webSearchEnabled: boolean
+}
+
+export function useSubmitHandler({
+  input,
+  setInput,
+  attachments,
+  clearAttachments,
+  webSearchEnabled,
+}: UseSubmitHandlerOptions) {
+  const { t } = useTranslation('messages')
+  // Store hooks - use granular selectors to avoid unnecessary re-renders
+  const currentConversation = useConversationStore((state) => state.currentConversation)
+  const selectedModel = useConversationStore((state) => state.selectedModel)
+  const selectedAssistant = useConversationStore((state) => state.selectedAssistant)
+
+  const getModelById = useModelStore((state) => state.getModelById)
+  const getProviderById = useModelStore((state) => state.getProviderById)
+
+  // Get conversation settings
+  const getSettings = useConversationSettingsStore((state) => state.getSettings)
+
+  // Get prompt by ID
+  const getPromptById = usePromptStore((state) => state.getPromptById)
+
+  // Get conversation-specific state
+  const conversationState = useMessageStore((state) =>
+    currentConversation ? state.getConversationState(currentConversation.id) : null
+  )
+  const sendMessage = useMessageStore((state) => state.sendMessage)
+  const addHistoryEntry = useInputHistoryStore((state) => state.addEntry)
+  const enqueueMessage = useMessageStore((state) => state.enqueueMessage)
+  const stopGeneration = useMessageStore((state) => state.stopGeneration)
+
+  // Get send/streaming state from current conversation
+  const isSending = conversationState?.isSending || false
+  const isStreaming = conversationState?.isStreaming || false
+  const isWaitingForAI = conversationState?.isWaitingForAI || false
+
+  const handleSend = async () => {
+    logger.info('handleSend called', {
+      input: input.trim(),
+      hasCurrentConversation: !!currentConversation,
+      selectedModel: selectedModel?.name,
+      selectedAssistant: selectedAssistant?.name,
+    })
+
+    if (!input.trim()) {
+      logger.warn('Cannot send: empty input')
+      return
+    }
+
+    // Check if we have either a model or assistant selected
+    if (!selectedModel && !selectedAssistant) {
+      toast.error(t('pleaseSelectModelOrAssistant'))
+      return
+    }
+
+    // Determine which model to use
+    let modelToUse: Model | undefined
+
+    if (selectedAssistant) {
+      // Use assistant's model
+      modelToUse = getModelById(selectedAssistant.model_id)
+      if (!modelToUse) {
+        logger.error('Model not found for assistant:', selectedAssistant.model_id)
+        toast.error(t('assistantConfigNotFound'))
+        return
+      }
+    } else if (selectedModel) {
+      // Use selected model directly
+      modelToUse = selectedModel
+    } else {
+      toast.error(t('pleaseSelectModelOrAssistant'))
+      return
+    }
+
+    // Get provider info
+    const provider = getProviderById(modelToUse.provider_id)
+    if (!provider) {
+      logger.error('Provider not found for model:', modelToUse.provider_id)
+      toast.error(t('providerConfigNotFound'))
+      return
+    }
+
+    const providerType = provider.provider_type
+    const modelIdStr = modelToUse.model_id
+    const providerApiStyle = provider.api_style
+
+    const content = input.trim()
+    setInput('')
+
+    try {
+      // Get API credentials from provider
+      const apiKey: string | undefined = provider.api_key
+      const baseUrl: string | undefined = provider.base_url
+
+      // Get conversation settings first to check for prompt overrides
+      const conversationId = currentConversation?.id
+      const settings = conversationId ? getSettings(conversationId) : null
+
+      // Determine system prompt based on conversation settings
+      let systemPrompt: string | undefined
+      if (settings?.systemPromptMode === 'existing' && settings.selectedSystemPromptId) {
+        // Use selected existing prompt
+        const prompt = getPromptById(settings.selectedSystemPromptId)
+        systemPrompt = prompt?.content
+        logger.info('Using existing system prompt from settings:', {
+          promptId: settings.selectedSystemPromptId,
+        })
+      } else if (settings?.systemPromptMode === 'custom' && settings.customSystemPrompt) {
+        // Use custom prompt
+        systemPrompt = settings.customSystemPrompt
+        logger.info('Using custom system prompt from settings')
+      } else if (selectedAssistant) {
+        // Fall back to assistant's system prompt
+        systemPrompt = selectedAssistant.system_prompt
+        logger.info('Using assistant system prompt')
+      }
+
+      // User prompt is now directly in the input field, so we don't send it separately
+      // Only fall back to assistant's user prompt if no user prompt is set in conversation settings
+      let userPrompt: string | undefined
+      if (settings?.userPromptMode === 'none' && selectedAssistant?.user_prompt) {
+        // Only use assistant's user prompt when mode is 'none'
+        userPrompt = selectedAssistant.user_prompt
+        logger.info('Using assistant user prompt')
+      }
+      // When userPromptMode is 'existing' or 'custom', the content is already in the input field
+
+      logger.info('Final prompts:', {
+        hasSystemPrompt: !!systemPrompt,
+        hasUserPrompt: !!userPrompt,
+        systemPromptMode: settings?.systemPromptMode,
+        userPromptMode: settings?.userPromptMode,
+      })
+
+      // Extract file attachments as structured data (sent via rig's Document)
+      const fileAttachments = attachments.filter(
+        (att) => att.type === 'file' && (att.content || att.base64)
+      )
+      const files = fileAttachments.map((file) => ({
+        name: file.name,
+        content: file.content ?? '',
+        base64: file.base64,
+        mimeType: file.mimeType || 'text/plain',
+      }))
+
+      // Extract image attachments with filename
+      const imageAttachments = attachments.filter((att) => att.type === 'image' && att.base64)
+      const images = imageAttachments.map((img) => ({
+        name: img.name,
+        base64: img.base64!,
+        mimeType: img.mimeType || 'image/png',
+      }))
+
+      logger.info('Sending message:', {
+        content: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
+        conversationId: currentConversation?.id,
+        provider: providerType,
+        model: modelIdStr,
+        hasApiKey: !!apiKey,
+        baseUrl,
+        hasSystemPrompt: !!systemPrompt,
+        hasUserPrompt: !!userPrompt,
+        modelDbId: selectedAssistant ? undefined : modelToUse.id,
+        assistantDbId: selectedAssistant?.id,
+        selectedAssistant: selectedAssistant?.name,
+        selectedModel: selectedModel?.name,
+        modelToUse: modelToUse?.name,
+        fileAttachmentsCount: files.length,
+        imagesCount: images.length,
+      })
+
+      // Extract webpage URLs from attachments
+      const webpageUrls = attachments.filter((att) => att.type === 'webpage').map((att) => att.name)
+
+      // Determine what parameters to send:
+      // - useProviderDefaults: true → send flag to skip all parameters
+      // - useCustomParameters: true → send custom overrides
+      // - otherwise → the backend loads the conversation's selected preset from
+      //   its saved settings, then falls back to the assistant preset
+      const useProviderDefaults = settings?.useProviderDefaults ?? false
+      const parameterOverrides =
+        settings?.useCustomParameters && settings.parameterOverrides
+          ? settings.parameterOverrides
+          : undefined
+      const contextMessageCount = settings?.contextMessageCount ?? undefined
+
+      logger.info('Using conversation settings:', {
+        useProviderDefaults: settings?.useProviderDefaults,
+        useCustomParameters: settings?.useCustomParameters,
+        hasParameterOverrides: !!parameterOverrides,
+        contextMessageCount,
+      })
+
+      const resolvedParams = {
+        content,
+        conversationId: currentConversation?.id ?? null,
+        provider: providerType,
+        model: modelIdStr,
+        apiKey,
+        baseUrl,
+        apiStyle: providerApiStyle,
+        includeHistory: undefined as boolean | undefined,
+        systemPrompt,
+        userPrompt,
+        modelDbId: selectedAssistant ? undefined : modelToUse.id,
+        assistantDbId: selectedAssistant?.id,
+        urlsToFetch: webpageUrls.length > 0 ? webpageUrls : undefined,
+        images: images.length > 0 ? images : undefined,
+        files: files.length > 0 ? files : undefined,
+        searchEnabled: webSearchEnabled,
+        parameterOverrides,
+        contextMessageCount,
+        useProviderDefaults,
+        reuseFetchResultIds: undefined as string[] | undefined,
+      }
+
+      if (isStreaming || isWaitingForAI) {
+        if (!currentConversation?.id) {
+          logger.warn('Cannot enqueue: no conversation ID while streaming')
+          return
+        }
+        enqueueMessage(currentConversation.id, {
+          ...resolvedParams,
+          conversationId: currentConversation.id,
+        })
+        logger.info('Message enqueued (AI is still responding)')
+      } else {
+        await sendMessage(
+          resolvedParams.content,
+          resolvedParams.conversationId,
+          resolvedParams.provider,
+          resolvedParams.model,
+          resolvedParams.apiKey,
+          resolvedParams.baseUrl,
+          resolvedParams.apiStyle,
+          resolvedParams.includeHistory,
+          resolvedParams.systemPrompt,
+          resolvedParams.userPrompt,
+          resolvedParams.modelDbId,
+          resolvedParams.assistantDbId,
+          resolvedParams.urlsToFetch,
+          resolvedParams.images,
+          resolvedParams.files,
+          resolvedParams.searchEnabled,
+          resolvedParams.parameterOverrides,
+          resolvedParams.contextMessageCount,
+          resolvedParams.useProviderDefaults,
+          resolvedParams.reuseFetchResultIds
+        )
+        // A new conversation opens on its last user message on its own; an
+        // existing one positions the sent message explicitly.
+        const sentTo = useConversationStore.getState().currentConversation?.id
+        if (sentTo) {
+          requestSentMessageScroll(
+            sentTo,
+            useMessageStore.getState().getConversationState(sentTo).messages
+          )
+        }
+        logger.info('Message sent successfully')
+      }
+
+      addHistoryEntry(content)
+
+      clearAttachments()
+    } catch (error) {
+      logger.error('Failed to send message:', error)
+      toast.error(t('failedMessageToSend'), {
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  const handleStop = async () => {
+    if (!currentConversation) {
+      logger.warn('Cannot stop: no current conversation')
+      return
+    }
+
+    logger.info('handleStop called for conversation:', currentConversation.id)
+
+    try {
+      await stopGeneration(currentConversation.id)
+      logger.info('Generation stopped successfully')
+    } catch (error) {
+      logger.error('Failed to stop generation:', error)
+    }
+  }
+
+  return {
+    handleSend,
+    handleStop,
+    isStreaming,
+    isWaitingForAI,
+    isSending,
+    selectedModel,
+    selectedAssistant,
+    currentConversation,
+  }
+}

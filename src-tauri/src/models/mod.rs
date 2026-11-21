@@ -1,0 +1,89 @@
+mod assistant;
+mod attachment;
+mod context;
+mod conversation;
+mod conversation_settings;
+mod message;
+mod message_resources;
+mod model;
+mod model_parameter_preset;
+mod process_step;
+mod prompt;
+mod provider;
+mod search;
+mod setting;
+mod skill;
+mod tool;
+mod translation_history;
+mod user;
+
+// Provider
+pub use provider::{CreateProviderRequest, Provider};
+
+// Model and parameters
+pub use model::{CreateModelRequest, Model, ModelParameters};
+
+// Model Parameter Preset
+pub use model_parameter_preset::{
+    CreateModelParameterPresetRequest, ModelParameterPreset, UpdateModelParameterPresetRequest,
+};
+
+// Assistant
+pub use assistant::{Assistant, CreateAssistantRequest};
+
+// Tool
+pub use tool::{CreateToolRequest, McpAuthType, McpConfig, McpTransportType, OAuthMetadata, Tool};
+
+// User
+pub use user::{CreateUserRequest, User};
+
+// Conversation
+pub use conversation::{
+    Conversation, ConversationParticipant, CreateConversationParticipantRequest,
+    CreateConversationRequest, ParticipantSummary,
+};
+
+// Conversation Settings
+pub use conversation_settings::{
+    ConversationSettings, ModelParameterOverrides, PermissionMode, PromptMode,
+    UpdateConversationSettingsRequest,
+};
+
+// Message
+pub use message::{CreateMessageRequest, Message, SiblingGroup};
+
+// Attachments (user-provided files)
+pub use attachment::{
+    BlobFetchStatus, CreateFileAttachmentRequest, FileAttachment, UserAttachment,
+};
+
+// Context enrichments (system-fetched content)
+pub use context::{
+    ContextEnrichment, ContextType, CreateFetchResultRequest, CreateSearchResultRequest,
+    FetchResult, SearchResult, SearchResultItem,
+};
+
+// Process steps (AI workflow artifacts)
+pub use process_step::{
+    CodeExecution, ContentBlock, CreateCodeExecutionRequest, CreateContentBlockRequest,
+    CreateSearchDecisionRequest, CreateThinkingStepRequest, CreateToolCallRequest, ProcessStep,
+    SearchDecision, StepType, ThinkingStep, ToolCall,
+};
+
+// Message resources
+pub use message_resources::MessageResources;
+
+// Prompt
+pub use prompt::{CreatePromptRequest, Prompt};
+
+// Skill
+pub use skill::{CreateSkillRequest, Skill};
+
+// Setting
+pub use setting::Setting;
+
+// Translation history (device-local)
+pub use translation_history::{CreateTranslationHistoryRequest, TranslationHistoryEntry};
+
+// Search
+pub use search::{ConversationSearchResult, MessageSearchResult, SearchResults};

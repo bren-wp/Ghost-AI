@@ -1,0 +1,198 @@
+import * as React from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
+import type { CreateProviderRequest, CreateModelRequest, Provider } from '@/types'
+import type { LLMProvider, ModelItem } from './types'
+import { isCustomProvider } from './types'
+import { logger } from '@/lib/logger'
+
+export interface UseProviderSaveReturn {
+  isSaving: boolean
+  /** The last save left the provider with zero models (dialog stays open). */
+  savedWithoutModels: boolean
+  handleSave: () => Promise<void>
+}
+
+interface UseProviderSaveParams {
+  models: ModelItem[]
+  modelsToDelete: string[]
+  originalModelNames: Record<string, string>
+  originalModelIds: Record<string, string>
+  existingProvider: Provider | null
+  apiKey: string
+  apiBaseUrl: string
+  providerName: string
+  apiStyle: string
+  compatibilityType: string
+  selectedProvider: LLMProvider
+  loadExistingData: () => void
+  onOpenChange: (open: boolean) => void
+  onProviderCreated?: (providerId: string) => void
+  /** Called instead of closing when the provider has no models after saving —
+   * the host opens model selection so the saved provider becomes usable. */
+  onSavedWithoutModels?: () => void
+}
+
+/**
+ * Handles saving provider and model changes to the backend
+ */
+export function useProviderSave({
+  models,
+  modelsToDelete,
+  originalModelNames,
+  originalModelIds,
+  existingProvider,
+  apiKey,
+  apiBaseUrl,
+  providerName,
+  apiStyle,
+  compatibilityType,
+  selectedProvider,
+  loadExistingData,
+  onOpenChange,
+  onProviderCreated,
+  onSavedWithoutModels,
+}: UseProviderSaveParams): UseProviderSaveReturn {
+  const { t } = useTranslation('messages')
+  const [isSaving, setIsSaving] = React.useState(false)
+  const [savedWithoutModels, setSavedWithoutModels] = React.useState(false)
+
+  React.useEffect(() => {
+    if (models.some((model) => !modelsToDelete.includes(model.id))) {
+      setSavedWithoutModels(false)
+    }
+  }, [models, modelsToDelete])
+
+  const handleSave = React.useCallback(async () => {
+    const newModels = models.filter((m) => !m.isExisting)
+    const modifiedModels = models.filter(
+      (m) =>
+        m.isExisting &&
+        (originalModelNames[m.id] !== m.displayName || originalModelIds[m.id] !== m.modelId)
+    )
+
+    const remainingModels =
+      models.filter((m) => m.isExisting && !modelsToDelete.includes(m.id)).length + newModels.length
+
+    setIsSaving(true)
+    try {
+      let providerId: string
+      const isCustom = isCustomProvider(selectedProvider)
+      const effectiveName = isCustom ? providerName || selectedProvider.name : selectedProvider.name
+      const effectiveProviderType = isCustom
+        ? compatibilityType === 'anthropic'
+          ? 'custom_anthropic'
+          : 'custom_openai'
+        : selectedProvider.id
+      const effectiveApiStyle = compatibilityType === 'openai' && isCustom ? apiStyle : undefined
+
+      if (existingProvider) {
+        const needsUpdate =
+          existingProvider.api_key !== apiKey ||
+          existingProvider.base_url !== apiBaseUrl ||
+          existingProvider.name !== effectiveName ||
+          existingProvider.provider_type !== effectiveProviderType ||
+          existingProvider.api_style !== effectiveApiStyle
+
+        if (needsUpdate) {
+          await invoke('update_provider', {
+            id: existingProvider.id,
+            req: {
+              name: effectiveName,
+              provider_type: effectiveProviderType,
+              api_key: apiKey || undefined,
+              base_url: apiBaseUrl || undefined,
+              api_style: effectiveApiStyle,
+              is_enabled: existingProvider.is_enabled,
+            },
+          })
+          logger.info('Updated provider:', effectiveName)
+        }
+        providerId = existingProvider.id
+      } else {
+        const providerReq: CreateProviderRequest = {
+          name: effectiveName,
+          provider_type: effectiveProviderType,
+          api_key: apiKey || undefined,
+          base_url: apiBaseUrl || undefined,
+          api_style: effectiveApiStyle,
+          is_enabled: true,
+        }
+
+        const provider = await invoke<Provider>('create_provider', { req: providerReq })
+        logger.info('Created provider:', provider)
+        providerId = provider.id
+        onProviderCreated?.(providerId)
+      }
+
+      for (const modelId of modelsToDelete) {
+        await invoke('delete_model', { id: modelId })
+        logger.info('Tombstoned model:', modelId)
+      }
+
+      for (const model of modifiedModels) {
+        const modelReq: CreateModelRequest = {
+          name: model.displayName,
+          provider_id: providerId,
+          model_id: model.modelId,
+          is_starred: false,
+        }
+        await invoke('update_model', { id: model.id, req: modelReq })
+        logger.info('Updated model', { id: model.id, newName: model.displayName })
+      }
+
+      for (const model of newModels) {
+        const modelReq: CreateModelRequest = {
+          name: model.displayName,
+          provider_id: providerId,
+          model_id: model.modelId,
+          is_starred: false,
+        }
+        await invoke('create_model', { req: modelReq })
+        logger.info('Created model', { name: model.displayName, id: model.modelId })
+      }
+
+      loadExistingData()
+      setSavedWithoutModels(remainingModels === 0)
+      if (remainingModels === 0) {
+        // Saved credentials are real; a chat cannot send until a model is
+        // added. Keep the editor open and let the host open model selection.
+        toast.success(t('providerSavedNeedsModels'))
+        onSavedWithoutModels?.()
+        return
+      }
+      toast.success(t('providerSavedSuccessfully'))
+      onOpenChange(false)
+    } catch (error) {
+      logger.error('Failed to save provider:', error)
+      toast.error(t('failedToSaveProvider'), {
+        description: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }, [
+    models,
+    modelsToDelete,
+    originalModelNames,
+    originalModelIds,
+    existingProvider,
+    apiKey,
+    apiBaseUrl,
+    providerName,
+    apiStyle,
+    compatibilityType,
+    selectedProvider,
+    loadExistingData,
+    onOpenChange,
+    onProviderCreated,
+    onSavedWithoutModels,
+  ])
+
+  return {
+    isSaving,
+    savedWithoutModels,
+    handleSave,
+  }
+}

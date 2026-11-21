@@ -1,0 +1,416 @@
+//! MCP tool execution.
+//!
+//! Routes invocations to the correct MCP server. The model should read the
+//! tool schema via `mcp_schema` first, then call this tool with the server,
+//! tool name, and arguments.
+//!
+//! For STDIO-transport servers the arguments are scanned for dangerous
+//! patterns (path blocklist + bash command analysis) before the call is
+//! forwarded.  HTTP-transport servers are exempt because they cannot access
+//! the local filesystem.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use ghost_ai_agent_core::mcp::{McpCallOptions, call_tool_with_options, render_call_tool_result};
+use rig::agent::tool::Tool;
+use rmcp::RoleClient;
+use rmcp::handler::client::progress::ProgressDispatcher;
+use rmcp::model::{CallToolRequestParams, ProgressNotificationParam};
+use rmcp::service::{Peer, ServiceError};
+use serde::Deserialize;
+use serde_json::json;
+use tokio::sync::RwLock;
+
+use super::bash_security::{self, SecurityContext, SecurityVerdict};
+use super::path_policy;
+
+#[derive(Debug, thiserror::Error)]
+pub enum McpToolUseError {
+    #[error("Unknown MCP tool: {0}. Check the available tools via mcp_schema.")]
+    UnknownTool(String),
+    #[error("MCP tool call failed: {0}")]
+    CallFailed(String),
+    #[error("MCP tool call blocked: {0}")]
+    Blocked(String),
+    #[error(
+        "MCP tool '{tool}' on server '{server}' timed out after {secs} s without a response. \
+         The server may still be working; do not assume the call had no effect."
+    )]
+    TimedOut {
+        server: String,
+        tool: String,
+        secs: u64,
+    },
+    #[error(
+        "MCP server '{server}' rejected Ghost AI's credentials; the user must sign in to it \
+         again in Ghost AI. Do not retry this call. ({detail})"
+    )]
+    AuthRequired { server: String, detail: String },
+}
+
+/// Called with the server name when a call fails because the MCP server
+/// rejected our credentials (a transport-level 401, never tool output).
+pub type McpAuthFailureNotifier = Arc<dyn Fn(&str) + Send + Sync>;
+
+#[derive(Debug, Deserialize)]
+pub struct McpToolUseArgs {
+    pub server: String,
+    pub tool: String,
+    #[serde(default)]
+    pub arguments: serde_json::Value,
+}
+
+/// Called with (server, tool, progress) for each `notifications/progress`
+/// a server sends about an in-flight call.
+pub type McpProgressNotifier = Arc<dyn Fn(&str, &str, &ProgressNotificationParam) + Send + Sync>;
+
+/// How to reach the server that owns a tool.
+#[derive(Clone)]
+pub struct McpClientEntry {
+    pub server_name: String,
+    pub peer: Peer<RoleClient>,
+    pub call_options: McpCallOptions,
+    pub progress: ProgressDispatcher,
+    /// The connection's handler: answers MRTR input rounds (FR-17).
+    pub handler: ghost_ai_agent_core::mcp::Ghost AIClientHandler,
+}
+
+/// Maps "server/tool" -> the owning server's client
+pub type McpClientMap = Arc<RwLock<HashMap<String, McpClientEntry>>>;
+
+#[derive(Clone)]
+pub struct McpToolUseTool {
+    clients: McpClientMap,
+    on_auth_failure: Option<McpAuthFailureNotifier>,
+    on_progress: Option<McpProgressNotifier>,
+}
+
+impl McpToolUseTool {
+    pub fn new(clients: McpClientMap) -> Self {
+        Self {
+            clients,
+            on_auth_failure: None,
+            on_progress: None,
+        }
+    }
+
+    /// Forward server progress for in-flight calls (the streaming layer
+    /// emits it to the frontend).
+    pub fn with_progress_notifier(mut self, notifier: McpProgressNotifier) -> Self {
+        self.on_progress = Some(notifier);
+        self
+    }
+
+    /// Report auth-classified call failures (the streaming layer drops the
+    /// cached connection and surfaces the needs-sign-in state).
+    pub fn with_auth_failure_notifier(mut self, notifier: McpAuthFailureNotifier) -> Self {
+        self.on_auth_failure = Some(notifier);
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Argument scanning
+// ---------------------------------------------------------------------------
+
+const COMMAND_LIKE_TOOL_NAMES: &[&str] = &[
+    "run",
+    "exec",
+    "execute",
+    "shell",
+    "bash",
+    "command",
+    "cmd",
+    "terminal",
+    "spawn",
+    "system",
+    "run_command",
+    "run_shell",
+    "execute_command",
+];
+
+fn security_context_for_tool(tool_name: &str) -> SecurityContext {
+    let lower = tool_name.to_lowercase();
+    if COMMAND_LIKE_TOOL_NAMES.iter().any(|p| lower.contains(p)) {
+        SecurityContext::Command
+    } else {
+        SecurityContext::Untrusted
+    }
+}
+
+fn collect_string_values(value: &serde_json::Value, out: &mut Vec<String>) {
+    match value {
+        serde_json::Value::String(s) => out.push(s.clone()),
+        serde_json::Value::Array(arr) => {
+            for v in arr {
+                collect_string_values(v, out);
+            }
+        }
+        serde_json::Value::Object(map) => {
+            for v in map.values() {
+                collect_string_values(v, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Scan MCP tool arguments for blocked paths and dangerous commands.
+/// Applies to every transport: an HTTP server can act on its arguments
+/// just as a STDIO one can (a remote shell, a filesystem bridge).
+fn scan_mcp_arguments(tool_name: &str, args: &serde_json::Value) -> Result<(), String> {
+    let context = security_context_for_tool(tool_name);
+    let mut strings = Vec::new();
+    collect_string_values(args, &mut strings);
+
+    for s in &strings {
+        // Path policy check
+        path_policy::check_blocked_path(s)?;
+
+        // Bash security analysis (reuses the full AST pipeline)
+        match bash_security::check_with_context(s, context) {
+            SecurityVerdict::Block(msg) => {
+                return Err(format!("Blocked: {msg}"));
+            }
+            SecurityVerdict::Warn(msg) => {
+                tracing::warn!("🛡️ [mcp_tool_use] Security warning for argument: {msg}");
+            }
+            SecurityVerdict::Allow => {}
+        }
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Tool implementation
+// ---------------------------------------------------------------------------
+
+impl Tool for McpToolUseTool {
+    const NAME: &'static str = "mcp_tool_use";
+
+    type Error = McpToolUseError;
+    type Args = McpToolUseArgs;
+    type Output = String;
+
+    fn description(&self) -> String {
+        "Call an MCP tool by server and name. \
+                          Always read the schema with mcp_schema first to understand \
+                          the required parameters."
+            .to_string()
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "server": {
+                    "type": "string",
+                    "description": "The MCP server name"
+                },
+                "tool": {
+                    "type": "string",
+                    "description": "The exact name of the MCP tool to call"
+                },
+                "arguments": {
+                    "type": "object",
+                    "description": "The arguments to pass to the tool, as specified in its schema"
+                }
+            },
+            "required": ["server", "tool"]
+        })
+    }
+
+    async fn call(
+        &self,
+        _context: &mut rig::agent::tool::ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
+        let key = format!("{}/{}", args.server, args.tool);
+
+        // Security: scan arguments (every transport)
+        scan_mcp_arguments(&args.tool, &args.arguments).map_err(McpToolUseError::Blocked)?;
+
+        let entry = self
+            .clients
+            .read()
+            .await
+            .get(&key)
+            .cloned()
+            .ok_or_else(|| McpToolUseError::UnknownTool(key.clone()))?;
+
+        tracing::info!(
+            "🔌 [mcp_tool_use] Calling '{}' on server '{}'",
+            args.tool,
+            args.server
+        );
+
+        let arguments = args.arguments.as_object().cloned().unwrap_or_default();
+
+        let mut params = CallToolRequestParams::new(args.tool.clone());
+        params.arguments = Some(arguments);
+        let on_progress = self.on_progress.clone();
+        let (server, tool) = (args.server.clone(), args.tool.clone());
+        let result = call_tool_with_options(
+            &entry.peer,
+            params,
+            entry.call_options,
+            Some(&entry.progress),
+            Some(&entry.handler),
+            move |update| {
+                if let Some(notify) = &on_progress {
+                    notify(&server, &tool, &update);
+                }
+            },
+        )
+        .await;
+        let result = match result {
+            Ok(r) => r,
+            Err(ServiceError::Timeout { timeout }) => {
+                tracing::warn!(
+                    "⏱️ [mcp_tool_use] '{}' on '{}' timed out after {:?}",
+                    args.tool,
+                    args.server,
+                    timeout
+                );
+                return Err(McpToolUseError::TimedOut {
+                    server: args.server.clone(),
+                    tool: args.tool.clone(),
+                    secs: timeout.as_secs(),
+                });
+            }
+            Err(e) => {
+                // Only this arm (a transport/protocol failure) can mean the
+                // server rejected our credentials; `is_error` results below
+                // are the tool's own output and are never classified.
+                if crate::mcp::auth_error::is_service_auth_error(&e) {
+                    tracing::warn!(
+                        "🔐 [mcp_tool_use] Server '{}' rejected credentials: {}",
+                        args.server,
+                        e
+                    );
+                    if let Some(notify) = &self.on_auth_failure {
+                        notify(&args.server);
+                    }
+                    return Err(McpToolUseError::AuthRequired {
+                        server: args.server.clone(),
+                        detail: e.to_string(),
+                    });
+                }
+                return Err(McpToolUseError::CallFailed(format!(
+                    "Tool returned an error: {e}"
+                )));
+            }
+        };
+
+        let rendered = render_call_tool_result(&result);
+        if rendered.is_error {
+            let msg = if rendered.text.is_empty() {
+                "No error message returned".to_string()
+            } else {
+                rendered.text
+            };
+            return Err(McpToolUseError::CallFailed(msg));
+        }
+        Ok(rendered.text)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn security_context_command_like_tools() {
+        assert_eq!(
+            security_context_for_tool("run_shell"),
+            SecurityContext::Command
+        );
+        assert_eq!(
+            security_context_for_tool("execute"),
+            SecurityContext::Command
+        );
+        assert_eq!(security_context_for_tool("bash"), SecurityContext::Command);
+    }
+
+    #[test]
+    fn security_context_normal_tools() {
+        assert_eq!(
+            security_context_for_tool("search"),
+            SecurityContext::Untrusted
+        );
+        assert_eq!(
+            security_context_for_tool("read_file"),
+            SecurityContext::Untrusted
+        );
+        assert_eq!(
+            security_context_for_tool("query"),
+            SecurityContext::Untrusted
+        );
+    }
+
+    #[test]
+    fn collect_strings_flat() {
+        let val = json!({"a": "hello", "b": 42, "c": true});
+        let mut out = Vec::new();
+        collect_string_values(&val, &mut out);
+        assert_eq!(out, vec!["hello"]);
+    }
+
+    #[test]
+    fn collect_strings_nested() {
+        let val = json!({"a": {"b": {"c": "deep"}}, "d": ["x", "y"]});
+        let mut out = Vec::new();
+        collect_string_values(&val, &mut out);
+        assert_eq!(out.len(), 3);
+        assert!(out.contains(&"deep".to_string()));
+        assert!(out.contains(&"x".to_string()));
+        assert!(out.contains(&"y".to_string()));
+    }
+
+    #[test]
+    fn scan_blocks_dangerous_path_regardless_of_transport() {
+        // Formerly HTTP arguments skipped the scan entirely.
+        let result = scan_mcp_arguments("dangerous_tool", &json!({"path": "~/.ssh/id_rsa"}));
+        assert!(result.is_err());
+        let result = scan_mcp_arguments("run_shell", &json!({"command": "rm -rf /"}));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn scan_stdio_blocks_dangerous_path() {
+        let result = scan_mcp_arguments(
+            "write_file",
+            &json!({"path": "~/.bashrc", "content": "evil"}),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn scan_stdio_blocks_dangerous_command() {
+        let result = scan_mcp_arguments("run_shell", &json!({"command": "rm -rf /"}));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn scan_stdio_allows_safe_args() {
+        let result = scan_mcp_arguments("search", &json!({"query": "hello world", "limit": 10}));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn scan_stdio_nested_dangerous_path() {
+        let result = scan_mcp_arguments("tool", &json!({"config": {"output": "/etc/shadow"}}));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn scan_stdio_normal_text_no_false_positive() {
+        let result = scan_mcp_arguments(
+            "chat",
+            &json!({"message": "Tell me about the > operator in Python"}),
+        );
+        assert!(result.is_ok());
+    }
+}

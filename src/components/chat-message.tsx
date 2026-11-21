@@ -1,0 +1,430 @@
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Copy, Undo, Scan, Check, GitFork, Download, RotateCcw, Trash2 } from 'lucide-react'
+import { useState, memo, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+import { MorphSpinner } from '@/components/ui/morph-spinner'
+import { ModelAvatar } from '@/components/model-avatar'
+import { AssistantAvatar } from '@/components/assistant-avatar'
+import { AssistantHoverCard } from '@/components/assistant-hover-card'
+import { MarkdownContent } from '@/components/markdown-content'
+
+interface ChatMessageProps {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp?: string
+  /**
+   * Display name for the AI sender (model name or "assistant name · model name")
+   */
+  displayName?: string
+  /**
+   * Type of sender: "model" or "assistant" - used to render the correct avatar
+   */
+  senderType?: 'model' | 'assistant'
+  /**
+   * For model senders: direct logo URL from getModelLogo()
+   */
+  modelLogo?: string
+  /**
+   * For assistant senders: custom image URL
+   */
+  assistantLogo?: string
+  /**
+   * For assistant senders with text avatars: background color
+   */
+  avatarBg?: string
+  /**
+   * For assistant senders with text avatars: text/emoji to display
+   */
+  avatarText?: string
+  /**
+   * Assistant name for hover card
+   */
+  assistantName?: string
+  /**
+   * Assistant role for hover card
+   */
+  assistantRole?: string
+  /**
+   * Assistant description for hover card
+   */
+  assistantDescription?: string
+  /**
+   * Assistant's model name for hover card
+   */
+  assistantModelName?: string
+  /**
+   * Assistant's model ID for hover card
+   */
+  assistantModelId?: string
+  userMessageAlign?: 'left' | 'right'
+  userMessageShowBackground?: boolean
+  isLoading?: boolean
+  /** Replaces the plain spinner while `isLoading` (e.g. waiting copy). */
+  loadingContent?: React.ReactNode
+  /**
+   * Whether this message is part of an active streaming turn.
+   * When true, shows loading spinner at the bottom and hides action buttons.
+   */
+  isStreaming?: boolean
+  /**
+   * Content to render after the header (avatar/name) but before the message content.
+   * Used for assistant attachments like search_decision and search_result.
+   */
+  headerContent?: React.ReactNode
+  /**
+   * Content rendered at the end of the assistant header row (avatar/name
+   * line). Used for the sibling-variant branch navigator.
+   */
+  headerExtras?: React.ReactNode
+  /**
+   * Content to render after the message text but before action buttons.
+   * Used for generated images during streaming.
+   */
+  footerContent?: React.ReactNode
+  /**
+   * Override the default text copy behavior (e.g., to copy an image instead).
+   * Should return a Promise; the component handles isCopied state.
+   */
+  onCopyOverride?: () => Promise<void>
+  /**
+   * Content to render after the message body but before action buttons (user messages only).
+   * Used for user attachments (files, images, URLs) so buttons appear below them.
+   */
+  userAfterContent?: React.ReactNode
+  onCopy?: () => void
+  onRevert?: () => void
+  onDeleteFromHere?: () => void
+  onRegenerate?: () => void
+  onFork?: () => void
+  onDownloadMarkdown?: () => void
+  onExportAll?: () => void
+  onExportConversation?: () => void
+  onExportMessage?: () => void
+}
+
+export const ChatMessage = memo(function ChatMessage({
+  role,
+  content,
+  timestamp,
+  displayName = 'AI Assistant',
+  senderType = 'model',
+  modelLogo,
+  assistantLogo,
+  avatarBg,
+  avatarText,
+  assistantName,
+  assistantRole,
+  assistantDescription,
+  assistantModelName,
+  assistantModelId,
+  userMessageAlign = 'right',
+  userMessageShowBackground = true,
+  isLoading = false,
+  loadingContent,
+  isStreaming = false,
+  headerContent,
+  headerExtras,
+  footerContent,
+  userAfterContent,
+  onCopyOverride,
+  onCopy,
+  onRevert,
+  onDeleteFromHere,
+  onRegenerate,
+  onFork,
+  onDownloadMarkdown,
+  onExportAll,
+  onExportConversation,
+  onExportMessage,
+}: ChatMessageProps) {
+  const { t: tCommon } = useTranslation('common')
+  const { t: tChat } = useTranslation('chat')
+  const [isExportOpen, setIsExportOpen] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
+
+  // Render the appropriate avatar based on sender type
+  const renderAvatar = () => {
+    if (senderType === 'assistant') {
+      // For assistants: use AssistantAvatar wrapped in HoverCard
+      const avatar = (
+        <AssistantAvatar
+          logo={assistantLogo}
+          avatarBg={avatarBg}
+          avatarText={avatarText}
+          name={displayName}
+          size="xs"
+        />
+      )
+
+      // Wrap with hover card if we have assistant info
+      if (assistantName) {
+        return (
+          <AssistantHoverCard
+            name={assistantName}
+            role={assistantRole}
+            description={assistantDescription}
+            modelName={assistantModelName}
+            modelId={assistantModelId}
+            logo={assistantLogo}
+            avatarBg={avatarBg}
+            avatarText={avatarText}
+            side="right"
+            align="start"
+          >
+            <div className="cursor-pointer">{avatar}</div>
+          </AssistantHoverCard>
+        )
+      }
+
+      return avatar
+    }
+    // For models: use ModelAvatar
+    // Extract model name from displayName (remove provider part like "Qwen3 - Ollama" -> "Qwen3")
+    const modelName = displayName.split(' - ')[0] || displayName
+    return <ModelAvatar logo={modelLogo} name={modelName} size="xs" />
+  }
+
+  const handleCopy = useCallback(async () => {
+    if (onCopyOverride) {
+      await onCopyOverride()
+    } else {
+      navigator.clipboard.writeText(content)
+    }
+    setIsCopied(true)
+    setTimeout(() => setIsCopied(false), 2000)
+    onCopy?.()
+  }, [content, onCopy, onCopyOverride])
+
+  if (role === 'user') {
+    const alignClass = userMessageAlign === 'right' ? 'justify-end' : 'justify-start'
+    const backgroundClass = userMessageShowBackground ? 'bg-muted/50' : ''
+
+    return (
+      <div className={`group relative isolate flex flex-col px-4 my-1`}>
+        {timestamp && (
+          <div className={`flex ${alignClass} mb-1`}>
+            <span className="text-xs text-muted-foreground transition-opacity opacity-0 group-hover:opacity-100">
+              {timestamp}
+            </span>
+          </div>
+        )}
+        <div className={`flex ${alignClass}`}>
+          <div className={`px-4 py-3 ${backgroundClass} rounded-lg max-w-[80%]`}>
+            <p className="text-base text-foreground whitespace-pre-wrap">{content}</p>
+          </div>
+        </div>
+        {userAfterContent}
+        <TooltipProvider delayDuration={300}>
+          <div
+            data-screenshot-exclude="true"
+            className={`flex gap-1 justify-end transition-opacity ${isExportOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleCopy}>
+                  {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isCopied ? tCommon('copied') : tCommon('copy')}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onRevert}>
+                  <Undo className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{tChat('resend')}</p>
+              </TooltipContent>
+            </Tooltip>
+            {onDeleteFromHere && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={onDeleteFromHere}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{tChat('deleteFromHere')}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <DropdownMenu open={isExportOpen} onOpenChange={setIsExportOpen}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <Scan className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{tChat('screenshot')}</p>
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={onExportAll}>
+                  {tChat('exportAllMessages')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExportConversation}>
+                  {tChat('exportCurrentConversation')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExportMessage}>
+                  {tChat('exportCurrentMessage')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </TooltipProvider>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group relative isolate px-4 py-2 mx-4 my-1">
+      <div className="flex items-center gap-2 mb-2">
+        {renderAvatar()}
+        <span className="text-xs text-muted-foreground">{displayName}</span>
+        {timestamp && (
+          <span className="text-xs text-muted-foreground transition-opacity opacity-0 group-hover:opacity-100">
+            {timestamp}
+          </span>
+        )}
+        {headerExtras && <div className="ml-auto">{headerExtras}</div>}
+      </div>
+      {/* Assistant attachments (search_decision, search_result) rendered after header, before content */}
+      {headerContent}
+      <div className="text-base text-foreground prose prose-sm dark:prose-invert max-w-none mb-2">
+        {isLoading ? (
+          (loadingContent ?? (
+            <div className="flex items-center gap-2 py-2">
+              <MorphSpinner size={16} />
+            </div>
+          ))
+        ) : (
+          <>
+            <MarkdownContent content={content} />
+            {isStreaming && (
+              <div className="flex items-center gap-2 py-2">
+                <MorphSpinner size={16} />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      {footerContent}
+      {!isStreaming && (
+        <TooltipProvider delayDuration={300}>
+          <div
+            data-screenshot-exclude="true"
+            className={`flex gap-1 transition-opacity ${isExportOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleCopy}>
+                  {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isCopied ? tCommon('copied') : tCommon('copy')}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={onDownloadMarkdown}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{tChat('downloadMarkdown')}</p>
+              </TooltipContent>
+            </Tooltip>
+            {onRegenerate && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onRegenerate}>
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{tChat('regenerateResponse')}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onFork}>
+                  <GitFork className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{tChat('fork')}</p>
+              </TooltipContent>
+            </Tooltip>
+            {onDeleteFromHere && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={onDeleteFromHere}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{tChat('deleteFromHere')}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <DropdownMenu open={isExportOpen} onOpenChange={setIsExportOpen}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <Scan className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{tChat('screenshot')}</p>
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={onExportAll}>
+                  {tChat('exportAllMessages')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExportConversation}>
+                  {tChat('exportCurrentConversation')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExportMessage}>
+                  {tChat('exportCurrentMessage')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </TooltipProvider>
+      )}
+    </div>
+  )
+})

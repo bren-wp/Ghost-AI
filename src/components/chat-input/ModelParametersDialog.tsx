@@ -1,0 +1,215 @@
+import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { ParameterSlider } from '@/components/parameter-slider'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import type { ModelParameterOverrides } from '@/types'
+import { PARAMETER_LIMITS } from '@/types'
+import { cn } from '@/lib/utils'
+import { usePresetStore } from '@/stores/presetStore'
+
+interface ModelParametersDialogProps {
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  // Current state
+  useProviderDefaults: boolean
+  useCustomParameters: boolean
+  selectedPresetId: string | null
+  parameterOverrides: ModelParameterOverrides
+  // Callbacks
+  onUseProviderDefaults: () => void
+  onSelectPreset: (presetId: string) => void
+  onUseCustom: () => void
+  onSaveCustomParameters: (overrides: ModelParameterOverrides) => void
+}
+
+export function ModelParametersDialog({
+  isOpen,
+  onOpenChange,
+  useProviderDefaults,
+  useCustomParameters,
+  selectedPresetId,
+  parameterOverrides,
+  onUseProviderDefaults,
+  onSelectPreset,
+  onUseCustom,
+  onSaveCustomParameters,
+}: ModelParametersDialogProps) {
+  const { t } = useTranslation(['chat', 'common'])
+  const [activeTab, setActiveTab] = useState<'presets' | 'custom'>(
+    useCustomParameters ? 'custom' : 'presets'
+  )
+
+  // Local state for custom parameters
+  const [localOverrides, setLocalOverrides] = useState<ModelParameterOverrides>(parameterOverrides)
+
+  // Presets come from the shared store; built-ins first in a fixed order,
+  // then user presets as listed
+  const storePresets = usePresetStore((state) => state.presets)
+  const ensurePresetsLoaded = usePresetStore((state) => state.ensureLoaded)
+  useEffect(() => {
+    if (isOpen) void ensurePresetsLoaded()
+  }, [isOpen, ensurePresetsLoaded])
+  const presets = useMemo(() => {
+    const presetOrder: Record<string, number> = { Creative: 0, Balanced: 1, Precise: 2 }
+    return [...storePresets].sort(
+      (a, b) =>
+        (a.is_system ? (presetOrder[a.name] ?? 50) : 99) -
+        (b.is_system ? (presetOrder[b.name] ?? 50) : 99)
+    )
+  }, [storePresets])
+
+  // Reset local state when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setLocalOverrides(parameterOverrides)
+      setActiveTab(useCustomParameters ? 'custom' : 'presets')
+    }
+  }, [isOpen, parameterOverrides, useCustomParameters])
+
+  const handleDefaultSelect = () => {
+    onUseProviderDefaults()
+    onOpenChange(false)
+  }
+
+  const handlePresetSelect = (presetId: string) => {
+    onSelectPreset(presetId)
+    onOpenChange(false)
+  }
+
+  const handleApplyCustom = () => {
+    onUseCustom()
+    onSaveCustomParameters(localOverrides)
+    onOpenChange(false)
+  }
+
+  const updateOverride = <K extends keyof ModelParameterOverrides>(
+    key: K,
+    value: ModelParameterOverrides[K]
+  ) => {
+    setLocalOverrides((prev) => ({
+      ...prev,
+      [key]: value,
+    }))
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle>{t('modelParameters')}</DialogTitle>
+          <DialogDescription>{t('configureParameters')}</DialogDescription>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'presets' | 'custom')}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="presets">{t('presets')}</TabsTrigger>
+            <TabsTrigger value="custom">{t('custom')}</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="presets" className="mt-4">
+            <div className="grid gap-2">
+              {/* Default option - uses provider defaults */}
+              <button
+                onClick={handleDefaultSelect}
+                className={cn(
+                  'flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors hover:bg-accent',
+                  useProviderDefaults ? 'border-primary bg-accent' : 'border-border'
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{t('common:default')}</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{t('useProviderDefaults')}</span>
+              </button>
+
+              {/* Presets */}
+              {presets.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => handlePresetSelect(preset.id)}
+                  className={cn(
+                    'flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors hover:bg-accent',
+                    selectedPresetId === preset.id && !useCustomParameters && !useProviderDefaults
+                      ? 'border-primary bg-accent'
+                      : 'border-border'
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{preset.name}</span>
+                  </div>
+                  {preset.description && (
+                    <span className="text-xs text-muted-foreground">{preset.description}</span>
+                  )}
+                  <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                    {preset.temperature !== undefined && (
+                      <span>{t('temp', { value: preset.temperature })}</span>
+                    )}
+                    {preset.top_p !== undefined && (
+                      <span>{t('topPValue', { value: preset.top_p })}</span>
+                    )}
+                    {preset.max_tokens !== undefined && (
+                      <span>{t('maxTokensValue', { value: preset.max_tokens })}</span>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="custom" className="mt-4 space-y-6">
+            <ParameterSlider
+              label={t('temperature')}
+              value={localOverrides.temperature}
+              onChange={(v) => updateOverride('temperature', v)}
+              {...PARAMETER_LIMITS.temperature}
+            />
+
+            <ParameterSlider
+              label={t('topP')}
+              value={localOverrides.top_p}
+              onChange={(v) => updateOverride('top_p', v)}
+              {...PARAMETER_LIMITS.top_p}
+            />
+
+            <ParameterSlider
+              label={t('maxTokens')}
+              value={localOverrides.max_tokens}
+              onChange={(v) => updateOverride('max_tokens', Math.round(v))}
+              {...PARAMETER_LIMITS.max_tokens}
+            />
+
+            <ParameterSlider
+              label={t('frequencyPenalty')}
+              value={localOverrides.frequency_penalty}
+              onChange={(v) => updateOverride('frequency_penalty', v)}
+              {...PARAMETER_LIMITS.frequency_penalty}
+            />
+
+            <ParameterSlider
+              label={t('presencePenalty')}
+              value={localOverrides.presence_penalty}
+              onChange={(v) => updateOverride('presence_penalty', v)}
+              {...PARAMETER_LIMITS.presence_penalty}
+            />
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                {t('common:cancel')}
+              </Button>
+              <Button onClick={handleApplyCustom}>{t('common:apply')}</Button>
+            </DialogFooter>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  )
+}

@@ -1,0 +1,81 @@
+import type { Conversation, ConversationParticipant, Model, Assistant } from '@/types'
+import type { Draft } from 'immer'
+
+// Conversation store state (without actions)
+export interface ConversationStoreState {
+  conversations: Conversation[]
+  currentConversation: Conversation | null
+  // New conversation shown in the UI but not saved until its first message
+  draftConversation: Conversation | null
+  currentParticipants: ConversationParticipant[]
+
+  // User can select EITHER a model OR an assistant (not both)
+  selectedModel: Model | null
+  selectedAssistant: Assistant | null
+
+  // Track last used model/assistant for default selection
+  lastUsedModel: Model | null
+  lastUsedAssistant: Assistant | null
+  isFirstConversationSinceStartup: boolean
+
+  isLoading: boolean
+  error: string | null
+
+  // Text to prefill the chat input with (e.g. an AI log-diagnosis request),
+  // consumed by ChatInput when the conversation becomes active
+  pendingInput: string | null
+}
+
+// Selector actions
+export interface ConversationStoreSelectors {
+  // Helper to get current effective model
+  getCurrentModel: () => Model | null
+}
+
+// Main actions (conversation CRUD, participant management, selection)
+export interface ConversationStoreActions {
+  // Conversation actions
+  loadConversations: () => Promise<void>
+  createConversation: (title: string) => Promise<Conversation>
+  updateConversation: (id: string, title: string) => Promise<Conversation>
+  deleteConversation: (id: string) => Promise<void>
+  selectConversation: (id: string) => Promise<void>
+  // Show a new, unsaved conversation (reusing the current draft if one is open)
+  openDraftConversation: () => Promise<Conversation>
+  // Save the draft with this id to the database; no-op for saved conversations
+  saveDraftConversation: (id: string) => Promise<void>
+  setCurrentConversation: (conversation: Conversation | null) => void
+  setPendingInput: (input: string | null) => void
+
+  // Participant actions
+  loadParticipants: (conversationId: string) => Promise<void>
+  addParticipant: (
+    conversationId: string,
+    participantType: string,
+    participantId?: string,
+    displayName?: string
+  ) => Promise<void>
+  removeParticipant: (participantId: string) => Promise<void>
+
+  // Selection actions
+  setSelectedModel: (model: Model | null) => void
+  setSelectedAssistant: (assistant: Assistant | null) => void
+
+  // Bump a conversation to the top of the list (called after sending a message)
+  bumpConversation: (id: string, lastMessage?: string) => void
+}
+
+// Combined conversation store type
+export interface ConversationStore
+  extends ConversationStoreState,
+    ConversationStoreSelectors,
+    ConversationStoreActions {}
+
+// Helper types for action creators
+export type ImmerSet = (
+  nextStateOrUpdater:
+    | ConversationStore
+    | Partial<ConversationStore>
+    | ((state: Draft<ConversationStore>) => void)
+) => void
+export type StoreGet = () => ConversationStore

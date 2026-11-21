@@ -1,0 +1,333 @@
+import * as React from 'react'
+import { useTranslation } from 'react-i18next'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Bot, ChevronDown, MoreVertical } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { ModelListItem } from '@/components/model-list-item'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+
+export interface Model {
+  /**
+   * Unique identifier for the model
+   */
+  id: string
+  /**
+   * Display name of the model
+   */
+  name: string
+  /**
+   * Model ID or identifier
+   */
+  modelId: string
+  /**
+   * Provider name to display
+   */
+  providerName?: string
+  /**
+   * ID of the provider this model belongs to
+   */
+  providerId?: string
+  /**
+   * URL or path to the model logo
+   */
+  logo?: string
+  /**
+   * Whether the model is starred
+   */
+  isStarred?: boolean
+}
+
+export interface ModelVendor {
+  /**
+   * Unique identifier for the vendor
+   */
+  id: string
+  /**
+   * Vendor name (e.g., OpenAI, OpenRouter, Ollama)
+   */
+  name: string
+  /**
+   * List of models from this vendor
+   */
+  models: Model[]
+  /**
+   * Whether the group is initially open
+   */
+  defaultOpen?: boolean
+}
+
+interface ModelListProps {
+  /**
+   * List of vendors and their models
+   */
+  vendors: ModelVendor[]
+  /**
+   * Currently selected model ID
+   */
+  selectedModelId?: string
+  /**
+   * Click handler for model selection
+   */
+  onModelClick?: (model: Model) => void
+  /**
+   * Double-click or Enter on a model
+   */
+  onModelActivate?: (model: Model) => void
+  /**
+   * Click handler for model settings
+   */
+  onModelSettings?: (model: Model) => void
+  /**
+   * Called after the user confirms removing a model
+   */
+  onModelDelete?: (model: Model) => void
+  /**
+   * Click handler for model star toggle
+   */
+  onModelStarToggle?: (model: Model) => void
+  /**
+   * Click handler for vendor settings
+   */
+  onVendorSettings?: (vendor: ModelVendor) => void
+  /**
+   * A sidebar filter is active: every group opens and the Starred group is
+   * hidden (it would repeat matches already shown in their own groups)
+   */
+  filtering?: boolean
+  /**
+   * Optional className for customization
+   */
+  className?: string
+  /**
+   * Use compact mode for list items
+   */
+  compact?: boolean
+}
+
+export function ModelList({
+  vendors,
+  selectedModelId,
+  onModelClick,
+  onModelActivate,
+  onModelSettings,
+  onModelDelete,
+  onModelStarToggle,
+  onVendorSettings,
+  className,
+  filtering = false,
+  compact = false,
+}: ModelListProps) {
+  const { t } = useTranslation('providers')
+  const { t: tSidebar } = useTranslation('sidebar')
+  // Collect all starred models from all vendors
+  const starredModels = React.useMemo(() => {
+    const models: Model[] = []
+    vendors.forEach((vendor) => {
+      vendor.models.forEach((model) => {
+        if (model.isStarred) {
+          models.push(model)
+        }
+      })
+    })
+    return models
+  }, [vendors])
+
+  const hasStarredModels = starredModels.length > 0
+
+  // Create a virtual vendor for starred models
+  const starredVendor: ModelVendor = {
+    id: 'starred',
+    name: tSidebar('starred'),
+    models: starredModels,
+    defaultOpen: true,
+  }
+
+  // Check if there are any models at all
+  const totalModels = vendors.reduce((acc, vendor) => acc + vendor.models.length, 0)
+
+  if (totalModels === 0) {
+    return (
+      <Empty className={className}>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Bot />
+          </EmptyMedia>
+          <EmptyTitle>{t('noModelsFound')}</EmptyTitle>
+          <EmptyDescription>{t('addYourFirstProvider')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
+
+  return (
+    <div className={cn('flex flex-col gap-1', className)}>
+      {/* Show starred models group first if there are any starred models */}
+      {hasStarredModels && !filtering && (
+        <ModelVendorGroup
+          vendor={starredVendor}
+          selectedModelId={selectedModelId}
+          onModelClick={onModelClick}
+          onModelActivate={onModelActivate}
+          onModelSettings={onModelSettings}
+          onModelDelete={onModelDelete}
+          onModelStarToggle={onModelStarToggle}
+          onVendorSettings={onVendorSettings}
+          hideVendorMenu
+          forceDefaultOpen
+          compact={compact}
+        />
+      )}
+
+      {/* Show all other vendor groups */}
+      {vendors.map((vendor, index) => (
+        <ModelVendorGroup
+          key={filtering ? `${vendor.id}:filtering` : vendor.id}
+          vendor={vendor}
+          selectedModelId={selectedModelId}
+          onModelClick={onModelClick}
+          onModelActivate={onModelActivate}
+          onModelSettings={onModelSettings}
+          onModelDelete={onModelDelete}
+          onModelStarToggle={onModelStarToggle}
+          onVendorSettings={onVendorSettings}
+          forceDefaultOpen={filtering || (!hasStarredModels && index === 0)}
+          ignoreVendorDefault={hasStarredModels}
+          compact={compact}
+        />
+      ))}
+    </div>
+  )
+}
+
+interface ModelVendorGroupProps {
+  vendor: ModelVendor
+  selectedModelId?: string
+  onModelClick?: (model: Model) => void
+  onModelActivate?: (model: Model) => void
+  onModelSettings?: (model: Model) => void
+  onModelDelete?: (model: Model) => void
+  onModelStarToggle?: (model: Model) => void
+  onVendorSettings?: (vendor: ModelVendor) => void
+  hideVendorMenu?: boolean
+  forceDefaultOpen?: boolean
+  ignoreVendorDefault?: boolean
+  compact?: boolean
+}
+
+function ModelVendorGroup({
+  vendor,
+  selectedModelId,
+  onModelClick,
+  onModelActivate,
+  onModelSettings,
+  onModelDelete,
+  onModelStarToggle,
+  onVendorSettings,
+  hideVendorMenu = false,
+  forceDefaultOpen = false,
+  ignoreVendorDefault = false,
+  compact = false,
+}: ModelVendorGroupProps) {
+  // Determine initial open state:
+  // - If forceDefaultOpen is true, always open
+  // - If ignoreVendorDefault is true, ignore vendor.defaultOpen (use false)
+  // - Otherwise use vendor.defaultOpen, default to false
+  const initialOpenState =
+    forceDefaultOpen || (!ignoreVendorDefault && (vendor.defaultOpen ?? false))
+  const [isOpen, setIsOpen] = React.useState(initialOpenState)
+  const [isHovered, setIsHovered] = React.useState(false)
+  const { t } = useTranslation('common')
+  const showVendorMenu = !hideVendorMenu && !!onVendorSettings
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div
+        className="group/vendor-header relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'w-full justify-start font-normal px-3',
+              compact ? 'text-xs h-7' : 'text-sm h-9'
+            )}
+          >
+            <ChevronDown
+              className={cn(
+                'transition-transform duration-200',
+                compact ? 'size-3' : 'size-4',
+                !isOpen && '-rotate-90'
+              )}
+            />
+            <span className="flex-1 text-left">{vendor.name}</span>
+          </Button>
+        </CollapsibleTrigger>
+
+        {/* Vendor menu button */}
+        {showVendorMenu && (
+          <div
+            className={cn(
+              'absolute right-2 top-1/2 -translate-y-1/2 transition-opacity',
+              !isHovered && 'opacity-0'
+            )}
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-7"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                  }}
+                >
+                  <MoreVertical className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onVendorSettings?.(vendor)
+                  }}
+                >
+                  {t('configuration')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+
+      <CollapsibleContent className="space-y-0.5 px-1 pb-1">
+        {vendor.models.map((model) => (
+          <ModelListItem
+            key={model.id}
+            logo={model.logo}
+            name={model.name}
+            modelId={model.modelId}
+            providerName={model.providerName}
+            isStarred={model.isStarred}
+            isActive={selectedModelId === model.id}
+            onClick={() => onModelClick?.(model)}
+            onActivate={onModelActivate ? () => onModelActivate(model) : undefined}
+            onSettingsClick={onModelSettings ? () => onModelSettings(model) : undefined}
+            onDeleteClick={onModelDelete ? () => onModelDelete(model) : undefined}
+            onStarClick={() => onModelStarToggle?.(model)}
+            compact={compact}
+          />
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}

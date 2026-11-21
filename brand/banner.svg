@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420">
+<defs><linearGradient id="g"><stop stop-color="#00E5FF"/><stop offset="1" stop-color="#874CFF"/></linearGradient></defs>
+<rect width="1200" height="420" rx="28" fill="#080F1A"/>
+<path d="M-20 345 C275 135 401 545 730 218 S1030 177 1240 20" stroke="url(#g)" fill="none" stroke-width="3" opacity=".65"/>
+<circle cx="123" cy="139" r="62" fill="#17243B"/><path d="M91 171 C98 115 123 93 153 104 C175 114 165 144 152 160 L140 143 L119 179 Z" fill="url(#g)"/>
+<text x="222" y="168" fill="#E5E7EB" font-family="Arial" font-size="76" font-weight="700">Ghost AI</text>
+<text x="75" y="264" fill="#E5E7EB" font-family="Arial" font-size="39" font-weight="600">Your AI. Your desktop.</text>
+<text x="77" y="323" fill="#B3C1DC" font-family="Arial" font-size="25">Chat · Create · Analyze · Automate</text>
+<text x="77" y="380" fill="#00E5FF" font-family="Arial" font-size="22">Ghost AI by Brendigo</text>
+</svg>

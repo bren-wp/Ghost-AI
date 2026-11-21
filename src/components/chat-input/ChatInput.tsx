@@ -1,0 +1,822 @@
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { open } from '@tauri-apps/plugin-dialog'
+import { InputGroup, InputGroupTextarea } from '@/components/ui/input-group'
+import {
+  ImageLightbox,
+  FilePreviewDialog,
+  type ImageAttachmentData,
+} from '@/components/attachment-preview'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { X, Sparkles } from 'lucide-react'
+
+import { useAttachments } from './useAttachments'
+import { useKeyboardHandlers } from './useKeyboardHandlers'
+import { useSubmitHandler } from './useSubmitHandler'
+import { AttachmentPreviewRow } from './AttachmentPreviewRow'
+import { WebPageDialog } from './WebPageDialog'
+import { DropZoneOverlay } from './DropZoneOverlay'
+import { InputToolbar } from './InputToolbar'
+import { ModelParametersDialog } from './ModelParametersDialog'
+import { ContextCountDialog } from './ContextCountDialog'
+import { SystemPromptDialog } from './SystemPromptDialog'
+import { UserPromptQuickSelectDialog } from './UserPromptQuickSelectDialog'
+import { MentionPopup } from './MentionPopup'
+import { useMentions } from './hooks'
+import { McpServersDialog } from './McpServersDialog'
+import { McpAuthBanner } from './McpAuthBanner'
+import { SkillsDialog } from './SkillsDialog'
+import { useConversationStore } from '@/stores/conversation'
+import { useConversationSettingsStore } from '@/stores/conversationSettingsStore'
+import { usePromptStore } from '@/stores/promptStore'
+import { usePresetStore } from '@/stores/presetStore'
+import { useMessageStore } from '@/stores/message'
+import { useInputHistoryStore } from '@/stores/inputHistoryStore'
+import { useMcpStore } from '@/stores/mcpStore'
+import { useSkillStore } from '@/stores/skillStore'
+import { useModelStore } from '@/stores/modelStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { useModelCapabilities } from '@/hooks/useModelCapabilities'
+import { useVisionFallbackStatus } from '@/hooks/useVisionFallbackStatus'
+import { getContextCountOptions } from '@/types'
+import type { PermissionMode, PromptMode } from '@/types'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { logger } from '@/lib/logger'
+import { COMPOSER_FOCUS_EVENT } from '@/lib/composer-focus'
+import {
+  defaultPermissionMode,
+  displayedPermissionMode,
+  useAutoReviewStatus,
+} from '@/lib/permission-mode'
+import { COMPOSE_SUBMIT_EVENT, type ComposeSubmitDetail } from '@/stores/autoReviewStore'
+
+// interface ChatInputProps {}
+
+export function ChatInput(/* _props: ChatInputProps */) {
+  const { t } = useTranslation('chat')
+  // State
+  const [input, setInput] = useState('')
+  const [activeTab, setActiveTab] = useState<'models' | 'assistants'>('models')
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
+  const [isWebPageDialogOpen, setIsWebPageDialogOpen] = useState(false)
+  const [isModelParametersDialogOpen, setIsModelParametersDialogOpen] = useState(false)
+  const [isContextCountDialogOpen, setIsContextCountDialogOpen] = useState(false)
+  const [isSystemPromptDialogOpen, setIsSystemPromptDialogOpen] = useState(false)
+  const [isUserPromptDialogOpen, setIsUserPromptDialogOpen] = useState(false)
+  const [isMcpServersDialogOpen, setIsMcpServersDialogOpen] = useState(false)
+  const [isSkillsDialogOpen, setIsSkillsDialogOpen] = useState(false)
+  // Preview state for attachments
+  const [previewingFileId, setPreviewingFileId] = useState<string | null>(null)
+  const [lightboxImageIndex, setLightboxImageIndex] = useState<number | null>(null)
+  // Parameter presets for displaying names
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const cursorPositionRef = useRef<number | null>(null)
+
+  // Model capability awareness (computed early so useAttachments can use visionDisabled)
+  const getProviderById = useModelStore((state) => state.getProviderById)
+  const selectedModelEarly = useConversationStore((state) => state.selectedModel)
+  const selectedProviderEarly = useMemo(
+    () => (selectedModelEarly ? getProviderById(selectedModelEarly.provider_id) : null),
+    [selectedModelEarly, getProviderById]
+  )
+  const capabilities = useModelCapabilities(selectedModelEarly, selectedProviderEarly ?? null)
+  const visionFallback = useVisionFallbackStatus()
+  const toolsDisabled = capabilities.supports_tool_use === false
+  // Images are only useless when the main model is text-only AND no vision
+  // fallback resolves — the backend annotates stripped images with storage
+  // paths so the model can inspect them via `read` + the aux vision model.
+  const visionDisabled = capabilities.supports_vision === false && !visionFallback.available
+
+  // Attachment handling hook
+  const {
+    attachments,
+    setAttachments,
+    addAttachment,
+    removeAttachment,
+    clearAttachments,
+    handleFileSelect,
+    handleImageSelect,
+    handleFolderSelect,
+    handlePaste,
+    isDraggingOver,
+    dragHandlers,
+  } = useAttachments({ visionDisabled })
+
+  // Submit handling hook
+  const {
+    handleSend,
+    handleStop,
+    isStreaming,
+    isWaitingForAI,
+    isSending,
+    selectedModel,
+    selectedAssistant,
+    currentConversation,
+  } = useSubmitHandler({
+    input,
+    setInput,
+    attachments,
+    clearAttachments,
+    webSearchEnabled: false,
+  })
+
+  // Run-anyway retry requests from auto-review markers: sent right away
+  // when the composer is empty, otherwise added to the draft for the user
+  // to send.
+  const [autoSendText, setAutoSendText] = useState<string | null>(null)
+  useEffect(() => {
+    const onComposeSubmit = (event: Event) => {
+      const detail = (event as CustomEvent<ComposeSubmitDetail>).detail
+      if (!detail || detail.conversationId !== currentConversation?.id) return
+      if (input.trim() === '' && attachments.length === 0) {
+        setInput(detail.text)
+        setAutoSendText(detail.text)
+      } else {
+        setInput((draft) => `${draft}\n\n${detail.text}`)
+        textareaRef.current?.focus()
+      }
+    }
+    window.addEventListener(COMPOSE_SUBMIT_EVENT, onComposeSubmit)
+    return () => window.removeEventListener(COMPOSE_SUBMIT_EVENT, onComposeSubmit)
+  }, [currentConversation?.id, input, attachments.length])
+  useEffect(() => {
+    if (autoSendText !== null && input === autoSendText) {
+      setAutoSendText(null)
+      void handleSend()
+    }
+  }, [autoSendText, input, handleSend])
+
+  // Global sent-prompt history (newest first), recorded by useSubmitHandler
+  const inputHistory = useInputHistoryStore((state) => state.history)
+  const ensureHistoryLoaded = useInputHistoryStore((state) => state.ensureLoaded)
+  useEffect(() => {
+    ensureHistoryLoaded()
+  }, [ensureHistoryLoaded])
+
+  // Keyboard handling hook
+  const { handleKeyDown } = useKeyboardHandlers({
+    input,
+    setInput,
+    onSubmit: handleSend,
+    inputHistory,
+  })
+
+  // Conversation settings - subscribe to the entire settings object for this conversation
+  const allSettings = useConversationSettingsStore((state) => state.settings)
+  const getSettings = useConversationSettingsStore((state) => state.getSettings)
+  const setUseProviderDefaults = useConversationSettingsStore(
+    (state) => state.setUseProviderDefaults
+  )
+  const setParameterOverrides = useConversationSettingsStore((state) => state.setParameterOverrides)
+  const setUseCustomParameters = useConversationSettingsStore(
+    (state) => state.setUseCustomParameters
+  )
+  const setSelectedPresetId = useConversationSettingsStore((state) => state.setSelectedPresetId)
+  const setContextMessageCount = useConversationSettingsStore(
+    (state) => state.setContextMessageCount
+  )
+  const setSystemPrompt = useConversationSettingsStore((state) => state.setSystemPrompt)
+  const setEnabledMcpServerIds = useConversationSettingsStore(
+    (state) => state.setEnabledMcpServerIds
+  )
+  const setEnabledSkillIds = useConversationSettingsStore((state) => state.setEnabledSkillIds)
+  const setWorkingDirectory = useConversationSettingsStore((state) => state.setWorkingDirectory)
+  const setPermissionMode = useConversationSettingsStore((state) => state.setPermissionMode)
+  // Prompt store for getting prompt names
+  const { prompts, ensureLoaded: ensurePromptsLoaded } = usePromptStore()
+
+  // MCP store for getting server names
+  const mcpServers = useMcpStore((state) => state.servers)
+  const ensureMcpServersLoaded = useMcpStore((state) => state.ensureLoaded)
+
+  // Skill store for getting skill names
+  const allSkills = useSkillStore((state) => state.skills)
+  const scanSkills = useSkillStore((state) => state.scanSkills)
+
+  // Messages of the current conversation (determines if system prompt can be changed)
+  const currentConversationId = currentConversation?.id
+  const conversationState = useMessageStore((state) =>
+    currentConversationId ? state.getConversationState(currentConversationId) : null
+  )
+  const hasMessages = (conversationState?.messages?.length ?? 0) > 0
+
+  // Get current conversation settings - this will update when allSettings changes
+  const conversationSettings = useMemo(() => {
+    if (!currentConversation) return null
+    return allSettings[currentConversation.id] || null
+  }, [currentConversation, allSettings])
+
+  // @-mentions of working-directory files
+  const { mentionState, syncCaret, handleMentionKeyDown, pickMention } = useMentions({
+    input,
+    setInput,
+    textareaRef,
+    workingDirectory: conversationSettings?.workingDirectory,
+    setAttachments,
+    visionDisabled,
+  })
+
+  // Consume a pending input prefilled by another surface (e.g. the log
+  // diagnosis action in settings). Subscribing to pendingInput makes
+  // consumption order-independent: it fires whether the value is set
+  // before or after this conversation becomes active.
+  const setPendingInput = useConversationStore((state) => state.setPendingInput)
+  const pendingInput = useConversationStore((state) => state.pendingInput)
+  useEffect(() => {
+    if (pendingInput === null) return
+    setPendingInput(null)
+    setInput(pendingInput)
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(pendingInput.length, pendingInput.length)
+    })
+  }, [pendingInput, currentConversationId, setPendingInput])
+
+  // Parameter presets come from the shared store so Library edits show up here
+  const parameterPresets = usePresetStore((state) => state.presets)
+  const ensurePresetsLoaded = usePresetStore((state) => state.ensureLoaded)
+  useEffect(() => {
+    void ensurePresetsLoaded()
+  }, [ensurePresetsLoaded])
+
+  // Compute display labels
+  const modelParametersLabel = useMemo(() => {
+    if (!conversationSettings) return t('common:default')
+    if (conversationSettings.useProviderDefaults) return t('common:default')
+    if (conversationSettings.useCustomParameters) return t('custom')
+    if (conversationSettings.selectedPresetId) {
+      const preset = parameterPresets.find((p) => p.id === conversationSettings.selectedPresetId)
+      return preset?.name || t('preset')
+    }
+    // No explicit selection - show Default (will use assistant preset if available)
+    return t('common:default')
+  }, [conversationSettings, parameterPresets, t])
+
+  const contextCountLabel = useMemo(() => {
+    if (!conversationSettings) return t('settings:contextUnlimited')
+    const count = conversationSettings.contextMessageCount
+    if (count === null) return t('settings:contextUnlimited')
+    const options = getContextCountOptions(t)
+    const option = options.find((opt) => opt.value === count)
+    return option?.label || t('countMsgs', { count })
+  }, [conversationSettings, t])
+
+  // Compute system prompt label based on current settings
+  const systemPromptLabel = useMemo(() => {
+    if (!conversationSettings) return t('common:default')
+
+    const { systemPromptMode, selectedSystemPromptId } = conversationSettings
+
+    // Default mode
+    if (systemPromptMode === 'none') {
+      return t('common:default')
+    }
+
+    // If system prompt is set, show its name or "Custom"
+    if (systemPromptMode === 'existing' && selectedSystemPromptId) {
+      const prompt = prompts.find((p) => p.id === selectedSystemPromptId)
+      return prompt?.name || t('common:selected')
+    }
+
+    if (systemPromptMode === 'custom') {
+      return t('custom')
+    }
+
+    return t('common:default')
+  }, [conversationSettings, prompts, t])
+
+  // Get active system prompt info for tag display
+  const activeSystemPromptInfo = useMemo(() => {
+    if (!conversationSettings) return null
+
+    const { systemPromptMode, selectedSystemPromptId, customSystemPrompt } = conversationSettings
+
+    if (systemPromptMode === 'existing' && selectedSystemPromptId) {
+      const prompt = prompts.find((p) => p.id === selectedSystemPromptId)
+      if (prompt) {
+        return { name: prompt.name, type: 'existing' as const }
+      }
+    }
+
+    if (systemPromptMode === 'custom' && customSystemPrompt) {
+      // Show first 20 chars of custom prompt as name
+      const truncated =
+        customSystemPrompt.length > 20
+          ? customSystemPrompt.substring(0, 20) + '...'
+          : customSystemPrompt
+      return { name: truncated, type: 'custom' as const }
+    }
+
+    return null
+  }, [conversationSettings, prompts])
+
+  // Compute tools label (includes both builtin and MCP tools)
+  const mcpServersLabel = useMemo(() => {
+    if (!conversationSettings) return t('common:none')
+    const enabledCount = conversationSettings.enabledMcpServerIds?.length || 0
+    if (enabledCount === 0) return t('common:none')
+    if (enabledCount === 1) {
+      const tool = mcpServers.find((s) => s.id === conversationSettings.enabledMcpServerIds[0])
+      return tool?.name || '1'
+    }
+    return `${enabledCount}`
+  }, [conversationSettings, mcpServers, t])
+
+  // Compute skills label
+  const skillsLabel = useMemo(() => {
+    if (!conversationSettings) return t('common:none')
+    const enabledCount = conversationSettings.enabledSkillIds?.length || 0
+    if (enabledCount === 0) return t('common:none')
+    if (enabledCount === 1) {
+      const skill = allSkills.find((s) => s.id === conversationSettings.enabledSkillIds[0])
+      return skill?.name || '1'
+    }
+    return `${enabledCount}`
+  }, [conversationSettings, allSkills, t])
+
+  // Handler to change enabled skill IDs
+  const handleSkillIdsChange = (skillIds: string[]) => {
+    if (currentConversation) {
+      setEnabledSkillIds(currentConversation.id, skillIds)
+    }
+  }
+
+  // Handler to change enabled MCP server IDs
+  const handleMcpServerIdsChange = (serverIds: string[]) => {
+    if (currentConversation) {
+      const previous = conversationSettings?.enabledMcpServerIds ?? []
+      setEnabledMcpServerIds(currentConversation.id, serverIds)
+      // Keep the sign-in banner in step with the selection: deselecting
+      // hides a server, re-selecting one that is still expired shows it.
+      const mcp = useMcpStore.getState()
+      for (const id of previous) {
+        if (!serverIds.includes(id)) mcp.clearAuthReport(currentConversation.id, id)
+      }
+      for (const id of serverIds) {
+        if (!previous.includes(id) && mcp.needsAuth[id]) {
+          mcp.reportNeedsAuth(currentConversation.id, id)
+        }
+      }
+    }
+  }
+
+  // Permission mode, an escalation ladder ask -> auto -> yolo: only
+  // crossing into yolo asks for explicit confirmation. A conversation that
+  // has not loaded its settings shows the device default. `auto` resolves
+  // per model: it is offered where the auto reviewer is eligible or a
+  // sandbox carries it, and shows as `ask` where neither does.
+  const autoReviewStatus = useAutoReviewStatus(
+    selectedModelEarly?.id ?? selectedAssistant?.model_id ?? null
+  )
+  const appSettings = useSettingsStore((state) => state.settings)
+  const permissionMode: PermissionMode = displayedPermissionMode(
+    conversationSettings?.permissionMode ?? defaultPermissionMode(appSettings),
+    autoReviewStatus
+  )
+  const autoAvailable = autoReviewStatus?.resolution !== 'ask'
+  const [isYoloConfirmOpen, setIsYoloConfirmOpen] = useState(false)
+  const handlePermissionModeSelect = (mode: PermissionMode) => {
+    if (!currentConversation) return
+    if (mode === 'yolo' && permissionMode !== 'yolo') {
+      setIsYoloConfirmOpen(true)
+      return
+    }
+    setPermissionMode(currentConversation.id, mode)
+  }
+  const confirmYolo = () => {
+    if (currentConversation) {
+      setPermissionMode(currentConversation.id, 'yolo')
+    }
+    setIsYoloConfirmOpen(false)
+  }
+  // Handler to clear system prompt
+  const handleClearSystemPrompt = () => {
+    if (currentConversation) {
+      setSystemPrompt(currentConversation.id, 'none', null, null)
+    }
+  }
+
+  // Atomic system prompt change handler
+  const handleSystemPromptChange = (
+    mode: PromptMode,
+    promptId?: string | null,
+    customContent?: string | null
+  ) => {
+    if (currentConversation) {
+      setSystemPrompt(currentConversation.id, mode, promptId, customContent)
+    }
+  }
+
+  // Handler to select working directory via native folder picker
+  const handleWorkingDirectorySelect = async () => {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: t('selectWorkingDirectoryTitle'),
+      })
+
+      if (selected && currentConversation) {
+        logger.info('Working directory selected:', selected)
+        setWorkingDirectory(currentConversation.id, selected as string)
+      }
+    } catch (error) {
+      logger.error('Failed to select working directory:', error)
+    }
+  }
+
+  // Handler to clear working directory
+  const handleClearWorkingDirectory = () => {
+    if (currentConversation) {
+      setWorkingDirectory(currentConversation.id, null)
+    }
+  }
+
+  // Auto-focus textarea when conversation changes
+  useEffect(() => {
+    if (currentConversation && textareaRef.current) {
+      // Use a small delay to ensure the component is fully rendered
+      setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 100)
+    }
+  }, [currentConversation])
+
+  // Explicit focus requests from other surfaces (e.g. new conversation while
+  // the empty draft is already open, where the conversation does not change)
+  useEffect(() => {
+    const onFocusRequest = () => {
+      requestAnimationFrame(() => {
+        const textarea = textareaRef.current
+        if (!textarea) return
+        textarea.focus()
+        const end = textarea.value.length
+        textarea.setSelectionRange(end, end)
+      })
+    }
+    window.addEventListener(COMPOSER_FOCUS_EVENT, onFocusRequest)
+    return () => window.removeEventListener(COMPOSER_FOCUS_EVENT, onFocusRequest)
+  }, [])
+
+  // Handlers for attachment types
+  const handleWebPageSelect = () => {
+    setIsWebPageDialogOpen(true)
+  }
+
+  const handleWebPageUrlSubmit = (url: string) => {
+    addAttachment('webpage', url)
+  }
+
+  // Handlers for settings dialogs
+  const handleUseProviderDefaults = () => {
+    if (currentConversation) {
+      setUseProviderDefaults(currentConversation.id, true)
+    }
+  }
+
+  const handleSelectPreset = (presetId: string) => {
+    if (currentConversation) {
+      setSelectedPresetId(currentConversation.id, presetId)
+    }
+  }
+
+  const handleUseCustomParameters = () => {
+    if (currentConversation) {
+      setUseCustomParameters(currentConversation.id, true)
+    }
+  }
+
+  const handleSaveCustomParameters = (params: import('@/types').ModelParameterOverrides) => {
+    if (currentConversation) {
+      setParameterOverrides(currentConversation.id, params)
+    }
+  }
+
+  const handleSaveContextCount = (count: number | null) => {
+    if (currentConversation) {
+      setContextMessageCount(currentConversation.id, count)
+    }
+  }
+
+  // Get all image attachments for lightbox navigation
+  const imageAttachments = attachments.filter((att) => att.type === 'image' && att.base64)
+  const lightboxImages: ImageAttachmentData[] = imageAttachments.map((img) => ({
+    id: img.id,
+    fileName: img.name,
+    base64: img.base64!,
+  }))
+
+  // Get previewing file attachment
+  const previewingFile = previewingFileId
+    ? attachments.find((att) => att.id === previewingFileId && att.type === 'file')
+    : null
+
+  return (
+    <div
+      className="flex flex-col w-full gap-6 relative flex-1"
+      onDragEnter={dragHandlers.onDragEnter}
+      onDragLeave={dragHandlers.onDragLeave}
+      onDragOver={dragHandlers.onDragOver}
+      onDrop={dragHandlers.onDrop}
+    >
+      {/* Drop zone overlay */}
+      <DropZoneOverlay isVisible={isDraggingOver} />
+
+      {/* Lightbox for images */}
+      {lightboxImageIndex !== null && lightboxImages.length > 0 && (
+        <ImageLightbox
+          images={lightboxImages}
+          initialIndex={lightboxImageIndex}
+          onClose={() => setLightboxImageIndex(null)}
+        />
+      )}
+
+      {/* File preview dialog */}
+      {previewingFile && (previewingFile.content || previewingFile.base64) && (
+        <FilePreviewDialog
+          isOpen={true}
+          onClose={() => setPreviewingFileId(null)}
+          fileName={previewingFile.name}
+          content={previewingFile.content}
+          base64={previewingFile.base64}
+          mimeType={previewingFile.mimeType}
+          size={previewingFile.size}
+        />
+      )}
+
+      <div className="flex flex-col gap-2 flex-1">
+        {/* Tags row: System Prompt */}
+        {activeSystemPromptInfo && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* System Prompt Tag */}
+            {activeSystemPromptInfo &&
+              (hasMessages ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className="text-muted-foreground gap-1.5 cursor-not-allowed opacity-70"
+                    >
+                      <Sparkles className="size-3" />
+                      <span className="max-w-[200px] truncate">
+                        {activeSystemPromptInfo.type === 'custom' ? `${t('custom')}: ` : ''}
+                        {activeSystemPromptInfo.name}
+                      </span>
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('systemPromptDisabledTooltip')}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="hover:bg-accent transition-colors text-muted-foreground hover:text-foreground gap-1.5"
+                >
+                  <button
+                    type="button"
+                    onClick={handleClearSystemPrompt}
+                    className="hover:text-destructive transition-colors -ml-0.5"
+                    title={t('clearSystemPrompt')}
+                  >
+                    <X className="size-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (currentConversation) {
+                        getSettings(currentConversation.id)
+                        ensurePromptsLoaded()
+                      }
+                      setIsSystemPromptDialogOpen(true)
+                    }}
+                    className="flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer"
+                  >
+                    <Sparkles className="size-3" />
+                    <span className="max-w-[200px] truncate">
+                      {activeSystemPromptInfo.type === 'custom' ? `${t('custom')}: ` : ''}
+                      {activeSystemPromptInfo.name}
+                    </span>
+                  </button>
+                </Badge>
+              ))}
+          </div>
+        )}
+
+        {currentConversation && <McpAuthBanner conversationId={currentConversation.id} />}
+
+        <MentionPopup state={mentionState} onPick={pickMention}>
+          <InputGroup className="flex-1 relative">
+            <AttachmentPreviewRow
+              attachments={attachments}
+              onRemove={removeAttachment}
+              onImageClick={setLightboxImageIndex}
+              onFileClick={setPreviewingFileId}
+            />
+            <InputGroupTextarea
+              ref={textareaRef}
+              placeholder={t('typeMessage')}
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value)
+                syncCaret()
+              }}
+              onSelect={syncCaret}
+              onKeyDown={(e) => {
+                if (handleMentionKeyDown(e)) return
+                handleKeyDown(e)
+              }}
+              onPaste={handlePaste}
+              disabled={!selectedModel && !selectedAssistant}
+            />
+            <InputToolbar
+              onFileSelect={handleFileSelect}
+              onImageSelect={handleImageSelect}
+              onFolderSelect={handleFolderSelect}
+              onWebPageSelect={handleWebPageSelect}
+              onUserPromptSelect={() => {
+                cursorPositionRef.current = textareaRef.current?.selectionStart ?? null
+                ensurePromptsLoaded()
+                setIsUserPromptDialogOpen(true)
+              }}
+              isModelMenuOpen={isModelMenuOpen}
+              onModelMenuOpenChange={setIsModelMenuOpen}
+              activeTab={activeTab}
+              onActiveTabChange={setActiveTab}
+              isStreaming={isStreaming}
+              isWaitingForAI={isWaitingForAI}
+              isSending={isSending}
+              canSend={!!input.trim()}
+              selectedModel={selectedModel}
+              selectedAssistant={selectedAssistant}
+              onSend={handleSend}
+              onStop={handleStop}
+              onModelParametersClick={() => {
+                // Ensure settings exist before opening dialog
+                if (currentConversation) {
+                  getSettings(currentConversation.id)
+                }
+                setIsModelParametersDialogOpen(true)
+              }}
+              modelParametersLabel={modelParametersLabel}
+              onContextCountClick={() => {
+                // Ensure settings exist before opening dialog
+                if (currentConversation) {
+                  getSettings(currentConversation.id)
+                }
+                setIsContextCountDialogOpen(true)
+              }}
+              contextCountLabel={contextCountLabel}
+              onSystemPromptClick={() => {
+                // Ensure settings exist and prompts are loaded before opening dialog
+                if (currentConversation) {
+                  getSettings(currentConversation.id)
+                  ensurePromptsLoaded()
+                }
+                setIsSystemPromptDialogOpen(true)
+              }}
+              systemPromptLabel={systemPromptLabel}
+              systemPromptDisabled={hasMessages}
+              onMcpServersClick={() => {
+                if (currentConversation) {
+                  getSettings(currentConversation.id)
+                  ensureMcpServersLoaded()
+                }
+                setIsMcpServersDialogOpen(true)
+              }}
+              mcpServersLabel={mcpServersLabel}
+              onSkillsClick={() => {
+                if (currentConversation) {
+                  getSettings(currentConversation.id)
+                  scanSkills()
+                }
+                setIsSkillsDialogOpen(true)
+              }}
+              skillsLabel={skillsLabel}
+              workingDirectory={conversationSettings?.workingDirectory}
+              onWorkingDirectorySelect={handleWorkingDirectorySelect}
+              onWorkingDirectoryClear={handleClearWorkingDirectory}
+              permissionMode={permissionMode}
+              onPermissionModeSelect={handlePermissionModeSelect}
+              autoAvailable={autoAvailable}
+              autoUnavailableReason={autoReviewStatus?.reason ?? null}
+              autoUnavailableCause={autoReviewStatus?.cause ?? null}
+              toolsDisabled={toolsDisabled}
+              skillsDisabled={toolsDisabled}
+              imageAttachDisabled={visionDisabled}
+            />
+          </InputGroup>
+        </MentionPopup>
+      </div>
+
+      {/* Web Page URL Dialog */}
+      <WebPageDialog
+        isOpen={isWebPageDialogOpen}
+        onOpenChange={setIsWebPageDialogOpen}
+        onSubmit={handleWebPageUrlSubmit}
+        existingAttachments={attachments}
+      />
+
+      {/* Model Parameters Dialog */}
+      <ModelParametersDialog
+        isOpen={isModelParametersDialogOpen}
+        onOpenChange={setIsModelParametersDialogOpen}
+        useProviderDefaults={conversationSettings?.useProviderDefaults ?? false}
+        useCustomParameters={conversationSettings?.useCustomParameters ?? false}
+        parameterOverrides={conversationSettings?.parameterOverrides ?? {}}
+        selectedPresetId={conversationSettings?.selectedPresetId ?? null}
+        onUseProviderDefaults={handleUseProviderDefaults}
+        onSelectPreset={handleSelectPreset}
+        onUseCustom={handleUseCustomParameters}
+        onSaveCustomParameters={handleSaveCustomParameters}
+      />
+
+      {/* Context Count Dialog */}
+      <ContextCountDialog
+        isOpen={isContextCountDialogOpen}
+        onOpenChange={setIsContextCountDialogOpen}
+        contextMessageCount={conversationSettings?.contextMessageCount ?? null}
+        onSave={handleSaveContextCount}
+      />
+
+      {/* System Prompt Dialog */}
+      <SystemPromptDialog
+        isOpen={isSystemPromptDialogOpen}
+        onOpenChange={setIsSystemPromptDialogOpen}
+        systemPromptMode={conversationSettings?.systemPromptMode ?? 'none'}
+        selectedSystemPromptId={conversationSettings?.selectedSystemPromptId ?? null}
+        customSystemPrompt={conversationSettings?.customSystemPrompt ?? ''}
+        onSystemPromptChange={handleSystemPromptChange}
+      />
+
+      {/* User Prompt Quick Select Dialog */}
+      <UserPromptQuickSelectDialog
+        isOpen={isUserPromptDialogOpen}
+        onOpenChange={setIsUserPromptDialogOpen}
+        mcpServerIds={conversationSettings?.enabledMcpServerIds ?? []}
+        onSelectPrompt={(_promptId, content) => {
+          const pos = cursorPositionRef.current
+          if (pos !== null && input.length > 0) {
+            const before = input.slice(0, pos)
+            const after = input.slice(pos)
+            const newInput = before + content + after
+            setInput(newInput)
+            const newCursorPos = pos + content.length
+            requestAnimationFrame(() => {
+              if (textareaRef.current) {
+                textareaRef.current.focus()
+                textareaRef.current.setSelectionRange(newCursorPos, newCursorPos)
+              }
+            })
+          } else {
+            setInput(content)
+          }
+          cursorPositionRef.current = null
+        }}
+      />
+
+      {/* MCP Servers Dialog */}
+      <McpServersDialog
+        open={isMcpServersDialogOpen}
+        onOpenChange={setIsMcpServersDialogOpen}
+        enabledServerIds={conversationSettings?.enabledMcpServerIds ?? []}
+        onServerIdsChange={handleMcpServerIdsChange}
+        enabledSkillIds={conversationSettings?.enabledSkillIds ?? []}
+        modelSupportsToolUse={capabilities.supports_tool_use}
+      />
+
+      {/* Skills Dialog */}
+      <SkillsDialog
+        open={isSkillsDialogOpen}
+        onOpenChange={setIsSkillsDialogOpen}
+        enabledSkillIds={conversationSettings?.enabledSkillIds ?? []}
+        onSkillIdsChange={handleSkillIdsChange}
+        modelSupportsToolUse={capabilities.supports_tool_use}
+      />
+
+      {/* Permission escalation confirm (any mode -> yolo) */}
+      <AlertDialog open={isYoloConfirmOpen} onOpenChange={setIsYoloConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('permission.escalateTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('permission.escalateBody')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common:cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmYolo}>
+              {t('permission.escalateConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}

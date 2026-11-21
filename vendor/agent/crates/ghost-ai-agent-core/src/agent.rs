@@ -1,0 +1,1011 @@
+use std::sync::Arc;
+
+use futures::StreamExt;
+use rig::agent::{Agent, AgentBuilder, ModelHandle, MultiTurnStreamItem};
+use rig::client::{CompletionClient, Nothing};
+use rig::completion::{CompletionModel, FinishReason, Message, ToolDefinition};
+use rig::message::{
+    AssistantContent, DocumentSourceKind, Image, ImageDetail, ImageMediaType, Reasoning,
+    UserContent,
+};
+use rig::prelude::StreamingChat;
+use rig::providers::{anthropic, ollama, openai, openrouter};
+use rig::streaming::StreamedAssistantContent;
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
+
+use crate::thinking::parse_thinking_content;
+use crate::types::{
+    AgentError, AgentEvent, AgentRequest, ChatMessage, MessageRole, ProviderKind,
+    SamplingParameters,
+};
+
+/// Create an Anthropic completion model with prompt caching enabled.
+///
+/// The single construction site shared by core's `run_generation` and
+/// desktop's `create_anthropic_agent`: same HTTP client (attribution +
+/// explicit Content-Type headers), same default base URL from the provider
+/// catalog, same `with_prompt_caching()` wiring.
+pub fn create_anthropic_completion_model(
+    api_key: &str,
+    base_url: Option<&str>,
+    model_id: &str,
+) -> Result<anthropic::completion::CompletionModel, AgentError> {
+    let http_client = create_http_client();
+    let client = anthropic::Client::<reqwest::Client>::builder()
+        .api_key(api_key)
+        .base_url(base_url.unwrap_or(kind_default_url(crate::types::ProviderKind::Anthropic)))
+        .http_client(http_client)
+        .build()
+        .map_err(provider_error)?;
+    Ok(client.completion_model(model_id).with_prompt_caching())
+}
+
+/// The sampling parameters of an Anthropic request: the caller's, plus a
+/// model-sized `max_tokens` (required by the API) and a readable-thinking
+/// default when the caller set neither (see [`crate::anthropic_models`]).
+fn anthropic_sampling_parameters(
+    model_id: &str,
+    parameters: &SamplingParameters,
+) -> Result<SamplingParameters, AgentError> {
+    let additional = parameters
+        .additional_params_json
+        .as_deref()
+        .map(serde_json::from_str::<serde_json::Value>)
+        .transpose()
+        .map_err(|error| AgentError::InvalidProvider(error.to_string()))?;
+    let additional = crate::anthropic_models::with_anthropic_thinking_default(
+        model_id,
+        parameters.temperature,
+        additional,
+    );
+    Ok(SamplingParameters {
+        temperature: parameters.temperature,
+        max_tokens: Some(
+            parameters
+                .max_tokens
+                .unwrap_or_else(|| crate::anthropic_models::anthropic_default_max_tokens(model_id)),
+        ),
+        additional_params_json: additional.map(|value| value.to_string()),
+    })
+}
+
+/// A built agent plus the model handle it was built from. The handle is kept
+/// so the client-side tool path can issue raw completion requests (bypassing
+/// the agent's server-side tool execution).
+struct ProviderAgent {
+    #[allow(dead_code)]
+    kind: ProviderKind,
+    agent: Agent,
+    model: ModelHandle,
+}
+
+pub async fn run_generation(
+    request: AgentRequest,
+    sender: mpsc::Sender<Result<AgentEvent, AgentError>>,
+    cancellation: CancellationToken,
+) -> Result<(), AgentError> {
+    let (prompt, history, system_prompt) = build_messages(&request.messages)?;
+    let agent = create_agent(&request, system_prompt.as_deref())?;
+
+    // The client-tool path builds its request from these parameters, not
+    // from the agent, so it needs the same Anthropic defaults.
+    let parameters = if request.provider.kind == ProviderKind::Anthropic {
+        anthropic_sampling_parameters(&request.model, &request.parameters)?
+    } else {
+        request.parameters.clone()
+    };
+
+    run_stream(
+        agent,
+        Turn {
+            prompt,
+            history,
+            tools: request.tools.clone(),
+            system_prompt: system_prompt.as_deref(),
+        },
+        &parameters,
+        &EventSink {
+            sender: &sender,
+            cancellation: &cancellation,
+        },
+    )
+    .await
+}
+
+fn create_agent(
+    request: &AgentRequest,
+    system_prompt: Option<&str>,
+) -> Result<ProviderAgent, AgentError> {
+    let http_client = create_http_client();
+    let model = request.model.as_str();
+    let parameters = &request.parameters;
+    let kind = request.provider.kind;
+
+    match kind {
+        ProviderKind::OpenAi | ProviderKind::CustomOpenAi => {
+            let key = required_key(request, "OpenAI-compatible")?;
+            let base_url = request
+                .provider
+                .base_url
+                .as_deref()
+                .unwrap_or(kind_default_url(crate::types::ProviderKind::OpenAi));
+            if request.provider.api_style.as_deref() == Some("chat_completions") {
+                // Chat Completions API - for OpenAI-compatible providers that
+                // do not implement the Responses API (e.g. MiniMax, DeepSeek).
+                let client = crate::openai_compat::client(base_url, key, http_client)
+                    .map_err(provider_error)?;
+                let model = crate::openai_compat::CompletionModel::new(client, model);
+                build_provider_agent(kind, model, system_prompt, parameters)
+            } else {
+                // Responses API - default for OpenAI and custom_openai,
+                // matching desktop's `create_openai_agent`.
+                let client = openai::Client::<reqwest::Client>::builder()
+                    .api_key(key)
+                    .base_url(base_url)
+                    .http_client(http_client)
+                    .build()
+                    .map_err(provider_error)?;
+                let model = client.completion_model(model);
+                build_provider_agent(kind, model, system_prompt, parameters)
+            }
+        }
+        ProviderKind::Anthropic => {
+            let key = required_key(request, "Anthropic")?;
+            let model = create_anthropic_completion_model(
+                key,
+                request.provider.base_url.as_deref(),
+                model,
+            )?;
+            let anthropic_parameters = anthropic_sampling_parameters(&request.model, parameters)?;
+            build_provider_agent(kind, model, system_prompt, &anthropic_parameters)
+        }
+        ProviderKind::OpenRouter => {
+            let key = required_key(request, "OpenRouter")?;
+            let base_url = request
+                .provider
+                .base_url
+                .as_deref()
+                .unwrap_or(kind_default_url(crate::types::ProviderKind::OpenRouter));
+            let client = openrouter::Client::<reqwest::Client>::builder()
+                .api_key(key)
+                .base_url(base_url)
+                .http_client(http_client)
+                .build()
+                .map_err(provider_error)?;
+            // Tool results must be text on this wire; images move out.
+            let model = crate::tool_images::ToolResultImagesAsUserContent::new(
+                client.completion_model(model),
+            );
+            build_provider_agent(kind, model, system_prompt, parameters)
+        }
+        ProviderKind::Ollama => {
+            let base_url = request
+                .provider
+                .base_url
+                .as_deref()
+                .unwrap_or(kind_default_url(crate::types::ProviderKind::Ollama));
+            let client = ollama::Client::<reqwest::Client>::builder()
+                .api_key(Nothing)
+                .base_url(base_url)
+                .http_client(http_client)
+                .build()
+                .map_err(provider_error)?;
+            // Tool results must be text on this wire; images move out.
+            let model = crate::tool_images::ToolResultImagesAsUserContent::new(
+                client.completion_model(model),
+            );
+            build_provider_agent(kind, model, system_prompt, parameters)
+        }
+    }
+}
+
+/// Erase a concrete model into an [`Agent`] plus the [`ModelHandle`] it was
+/// built from, applying the shared sampling parameters.
+fn build_provider_agent<M>(
+    kind: ProviderKind,
+    model: M,
+    system_prompt: Option<&str>,
+    parameters: &SamplingParameters,
+) -> Result<ProviderAgent, AgentError>
+where
+    M: CompletionModel + 'static,
+{
+    let handle = ModelHandle::new(model);
+    let builder = build_agent(AgentBuilder::new(handle.clone()), system_prompt, parameters)?;
+    Ok(ProviderAgent {
+        kind,
+        agent: builder,
+        model: handle,
+    })
+}
+
+/// Default base URL for a named provider kind, sourced from the shared
+/// provider catalog (single home for URL knowledge).
+fn kind_default_url(kind: crate::types::ProviderKind) -> &'static str {
+    crate::provider_catalog::default_base_url_for_kind(kind).expect("named kind has default url")
+}
+
+/// Create the shared HTTP client for provider requests.
+///
+/// Carries app attribution headers (OpenRouter attribution) and an explicit
+/// `Content-Type` - rig's streaming path does not set one on its own, and
+/// without it providers like Anthropic reject the request with "unsupported
+/// content type". Re-exported for desktop so both clients send identical
+/// header sets.
+pub fn create_http_client() -> reqwest::Client {
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(
+        "HTTP-Referer",
+        reqwest::header::HeaderValue::from_static("https://github.com/bren-wp/Ghost-AI"),
+    );
+    headers.insert(
+        "X-Title",
+        reqwest::header::HeaderValue::from_static("Ghost AI"),
+    );
+    headers.insert(
+        reqwest::header::CONTENT_TYPE,
+        reqwest::header::HeaderValue::from_static("application/json"),
+    );
+    reqwest::Client::builder()
+        .user_agent("Ghost AI/0.1")
+        .default_headers(headers)
+        .build()
+        .unwrap_or_default()
+}
+
+fn required_key<'a>(
+    request: &'a AgentRequest,
+    provider_name: &'static str,
+) -> Result<&'a str, AgentError> {
+    request
+        .provider
+        .api_key
+        .as_deref()
+        .filter(|key| !key.is_empty())
+        .ok_or(AgentError::MissingApiKey(provider_name))
+}
+
+fn build_agent(
+    mut builder: AgentBuilder,
+    system_prompt: Option<&str>,
+    parameters: &SamplingParameters,
+) -> Result<Agent, AgentError> {
+    if let Some(prompt) = system_prompt {
+        builder = builder.preamble(prompt);
+    }
+    if let Some(temperature) = parameters.temperature {
+        builder = builder.temperature(temperature);
+    }
+    if let Some(max_tokens) = parameters.max_tokens {
+        builder = builder.max_tokens(max_tokens);
+    }
+    if let Some(json) = parameters.additional_params_json.as_deref() {
+        let value = serde_json::from_str(json)
+            .map_err(|error| AgentError::InvalidProvider(error.to_string()))?;
+        builder = builder.additional_params(value);
+    }
+    Ok(builder.build())
+}
+
+fn build_messages(
+    messages: &[ChatMessage],
+) -> Result<(Message, Vec<Message>, Option<String>), AgentError> {
+    let system_prompt = messages
+        .iter()
+        .find(|message| message.role == MessageRole::System)
+        .map(|message| message.content.clone());
+
+    // The last non-system message is the prompt; everything else (except the
+    // system message) becomes history. This supports both the normal path
+    // (last message is the user's input) and the client-side tool path (last
+    // message is a tool result).
+    let last_prompt_index = messages
+        .iter()
+        .rposition(|message| message.role != MessageRole::System)
+        .ok_or(AgentError::MissingUserMessage)?;
+
+    let mut history = Vec::new();
+    for (index, message) in messages.iter().enumerate() {
+        if message.role == MessageRole::System || index == last_prompt_index {
+            continue;
+        }
+        history.push(to_rig_message(message));
+    }
+
+    Ok((
+        to_rig_message(&messages[last_prompt_index]),
+        history,
+        system_prompt,
+    ))
+}
+
+fn to_rig_message(message: &ChatMessage) -> Message {
+    match message.role {
+        MessageRole::User | MessageRole::System => {
+            let mut contents: Vec<UserContent> = Vec::new();
+            contents.push(UserContent::text(message.content.clone()));
+            for image in &message.images {
+                if let Some(media_type) = mime_to_image_media_type(&image.media_type) {
+                    contents.push(UserContent::Image(Image {
+                        data: DocumentSourceKind::Base64(image.base64.clone()),
+                        media_type: Some(media_type),
+                        // OpenAI-compatible path (rig) requires `detail` to be
+                        // `Some` for base64 images; MiniMax additionally
+                        // rejects `"auto"` (error 2013) and accepts only
+                        // `low` / `default` / `high`. `High` is the only
+                        // value in rig's `ImageDetail` enum that satisfies both
+                        // OpenAI and MiniMax, so we use it for all providers.
+                        detail: Some(ImageDetail::High),
+                        additional_params: None,
+                    }));
+                }
+            }
+            Message::User { content: contents }
+        }
+        MessageRole::Assistant => {
+            let mut content = Vec::new();
+            if let Some(reasoning) = message.reasoning_content.as_deref()
+                && !reasoning.is_empty()
+            {
+                content.push(AssistantContent::reasoning(reasoning));
+            }
+            if !message.content.is_empty() {
+                content.push(AssistantContent::text(message.content.clone()));
+            }
+            for tc in &message.tool_calls {
+                let arguments = serde_json::from_str(&tc.arguments_json)
+                    .unwrap_or_else(|_| serde_json::Value::Object(Default::default()));
+                let function = rig::message::ToolFunction::new(tc.name.clone(), arguments);
+                let rig_tool_call = match &tc.call_id {
+                    // Dual-identifier boundary (OpenAI Responses): `id` is the
+                    // output-item handle, `call_id` the replay correlator.
+                    Some(call_id) => rig::message::ToolCall::from_dual_wire(
+                        tc.id.clone(),
+                        call_id.clone(),
+                        function,
+                    ),
+                    None => rig::message::ToolCall::from_wire(tc.id.clone(), function),
+                };
+                content.push(AssistantContent::ToolCall(rig_tool_call));
+            }
+            if content.is_empty() {
+                content.push(AssistantContent::text(message.content.clone()));
+            }
+            Message::Assistant { id: None, content }
+        }
+        MessageRole::Tool => {
+            let id = message.tool_call_id.clone().unwrap_or_default();
+            let call_id = message
+                .tool_result_call_id
+                .clone()
+                .or_else(|| message.tool_call_id.clone());
+            // Hosts executing tools client-side return images as
+            // `data:image/...;base64,` lines (read tool pages, video
+            // frames); send those as image blocks, not base64 text.
+            let text =
+                crate::tool_images::tool_result_content(&message.content).unwrap_or_else(|| {
+                    vec![rig::message::ToolResultContent::text(
+                        message.content.clone(),
+                    )]
+                });
+            let content = match call_id {
+                Some(call_id) if !call_id.is_empty() && !id.is_empty() => {
+                    vec![UserContent::tool_result_with_call_id(
+                        id, call_id,
+                        // The tool name is not carried on Tool-role messages;
+                        // wires that key replay on the name (Gemini) are not
+                        // routed through this path.
+                        "", text,
+                    )]
+                }
+                _ => vec![UserContent::tool_result(id, "", text)],
+            };
+            Message::User { content }
+        }
+    }
+}
+
+/// Convert a MIME string (e.g. `image/png`) to rig's `ImageMediaType`.
+/// Returns `None` for unsupported types so unknown formats are skipped
+/// rather than aborting the whole request.
+fn mime_to_image_media_type(mime: &str) -> Option<ImageMediaType> {
+    match mime.to_ascii_lowercase().as_str() {
+        "image/jpeg" | "image/jpg" => Some(ImageMediaType::JPEG),
+        "image/png" => Some(ImageMediaType::PNG),
+        "image/gif" => Some(ImageMediaType::GIF),
+        "image/webp" => Some(ImageMediaType::WEBP),
+        _ => None,
+    }
+}
+
+/// Extract inline assistant images as data URLs. rig 0.42 delivers generated
+/// images inside the final aggregated response content rather than as a
+/// dedicated stream variant.
+fn image_data_urls(content: &[AssistantContent]) -> Vec<String> {
+    content
+        .iter()
+        .filter_map(|item| match item {
+            AssistantContent::Image(Image {
+                data: DocumentSourceKind::Base64(b64),
+                media_type,
+                ..
+            }) => {
+                let mime = media_type
+                    .as_ref()
+                    .map(|mt| rig::message::MimeType::to_mime_type(mt).to_string())
+                    .unwrap_or_else(|| "image/png".to_string());
+                Some(format!("data:{mime};base64,{b64}"))
+            }
+            AssistantContent::Image(Image {
+                data: DocumentSourceKind::Url(url),
+                ..
+            }) => Some(url.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+async fn stream_agent(
+    agent: Agent,
+    prompt: Message,
+    history: Vec<Message>,
+    sender: &mpsc::Sender<Result<AgentEvent, AgentError>>,
+    cancellation: &CancellationToken,
+) -> Result<(), AgentError> {
+    let mut stream = agent.stream_chat(prompt, history).max_turns(8).await;
+    let mut content = String::new();
+    let mut reasoning = String::new();
+    let mut input_tokens = 0;
+    let mut output_tokens = 0;
+    let mut output_limited = false;
+
+    loop {
+        let item = tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => {
+                send_event(
+                    sender,
+                    AgentEvent::Completed {
+                        content,
+                        reasoning: (!reasoning.is_empty()).then_some(reasoning),
+                        input_tokens,
+                        output_tokens,
+                        cancelled: true,
+                        output_limited: false,
+                    },
+                ).await?;
+                return Ok(());
+            }
+            item = stream.next() => match item {
+                Some(item) => item,
+                None => break,
+            }
+        };
+
+        match item {
+            Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(text))) => {
+                if !text.text.is_empty() {
+                    content.push_str(&text.text);
+                    send_event(sender, AgentEvent::TextDelta { text: text.text }).await?;
+                }
+            }
+            Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Reasoning {
+                reasoning: Reasoning { content: parts, .. },
+                ..
+            })) => {
+                let delta = reasoning_text(&parts);
+                if !delta.is_empty() {
+                    reasoning.push_str(&delta);
+                    send_event(sender, AgentEvent::ReasoningDelta { text: delta }).await?;
+                }
+            }
+            Ok(MultiTurnStreamItem::StreamAssistantItem(
+                StreamedAssistantContent::ReasoningDelta {
+                    reasoning: delta, ..
+                },
+            )) => {
+                if !delta.is_empty() {
+                    reasoning.push_str(&delta);
+                    send_event(sender, AgentEvent::ReasoningDelta { text: delta }).await?;
+                }
+            }
+            Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::ToolCall {
+                tool_call,
+                ..
+            })) => {
+                let arguments_json = serde_json::to_string(&tool_call.function.arguments)
+                    .unwrap_or_else(|_| "{}".to_string());
+                let (id, call_id) = tool_call_identity(&tool_call);
+                send_event(
+                    sender,
+                    AgentEvent::ToolCallStarted {
+                        id,
+                        call_id,
+                        name: tool_call.function.name,
+                        arguments_json,
+                    },
+                )
+                .await?;
+            }
+            Ok(MultiTurnStreamItem::FinalResponse(response)) => {
+                let usage = response.usage();
+                input_tokens = usage.input_tokens;
+                output_tokens = usage.output_tokens;
+                output_limited = response
+                    .completion_calls()
+                    .last()
+                    .is_some_and(|call| call.finish_reason == Some(FinishReason::Length));
+                for data_url in image_data_urls(response.content()) {
+                    send_event(sender, AgentEvent::Image { data_url }).await?;
+                }
+            }
+            Ok(_) => {}
+            Err(error) => return Err(provider_error(error)),
+        }
+    }
+
+    let parsed = parse_thinking_content(&content);
+    if reasoning.is_empty() {
+        reasoning = parsed.thinking_content.unwrap_or_default();
+    }
+    send_event(
+        sender,
+        AgentEvent::Completed {
+            content: parsed.content,
+            reasoning: (!reasoning.is_empty()).then_some(reasoning),
+            input_tokens,
+            output_tokens,
+            cancelled: false,
+            output_limited,
+        },
+    )
+    .await
+}
+
+/// One completion turn's request: the new prompt, its history, the client
+/// tool definitions, and the system prompt.
+struct Turn<'a> {
+    prompt: Message,
+    history: Vec<Message>,
+    tools: Vec<crate::types::ClientToolDefinition>,
+    system_prompt: Option<&'a str>,
+}
+
+/// Where a generation reports events, and how it learns to stop.
+#[derive(Clone, Copy)]
+struct EventSink<'a> {
+    sender: &'a mpsc::Sender<Result<AgentEvent, AgentError>>,
+    cancellation: &'a CancellationToken,
+}
+
+/// Route a generation to the normal multi-turn stream or the client-side tool
+/// stream depending on whether tool definitions were provided.
+async fn run_stream(
+    agent: ProviderAgent,
+    turn: Turn<'_>,
+    parameters: &SamplingParameters,
+    sink: &EventSink<'_>,
+) -> Result<(), AgentError> {
+    let ProviderAgent { agent, model, .. } = agent;
+
+    if turn.tools.is_empty() {
+        stream_agent(
+            agent,
+            turn.prompt,
+            turn.history,
+            sink.sender,
+            sink.cancellation,
+        )
+        .await
+    } else {
+        stream_agent_with_client_tools(Arc::new(model), turn, parameters, sink).await
+    }
+}
+
+/// Stream a single completion turn with client-side tool definitions. Tool
+/// calls are emitted as `ToolCallStarted` events and NOT executed server-side;
+/// the caller must execute them and send a follow-up `AgentRequest` containing
+/// the assistant tool-call message and a `Tool`-role result message. This
+/// bypasses rig's multi-turn auto-execution so tool execution can happen in
+/// the client (Swift), reusing the platform's native networking.
+async fn stream_agent_with_client_tools(
+    model: Arc<ModelHandle>,
+    turn: Turn<'_>,
+    parameters: &SamplingParameters,
+    sink: &EventSink<'_>,
+) -> Result<(), AgentError> {
+    let Turn {
+        prompt,
+        history,
+        tools,
+        system_prompt,
+    } = turn;
+    let EventSink {
+        sender,
+        cancellation,
+    } = *sink;
+    let tool_defs: Vec<ToolDefinition> = tools
+        .into_iter()
+        .map(|t| {
+            let parameters = serde_json::from_str(&t.parameters_json)
+                .unwrap_or_else(|_| serde_json::Value::Object(Default::default()));
+            ToolDefinition {
+                name: t.name,
+                description: t.description,
+                parameters,
+            }
+        })
+        .collect();
+
+    let mut builder = model.as_ref().completion_request(prompt).messages(history);
+    if let Some(p) = system_prompt {
+        builder = builder.preamble(p.to_string());
+    }
+    if let Some(temperature) = parameters.temperature {
+        builder = builder.temperature(temperature);
+    }
+    if let Some(max_tokens) = parameters.max_tokens {
+        builder = builder.max_tokens(max_tokens);
+    }
+    if let Some(json) = parameters.additional_params_json.as_deref() {
+        let value = serde_json::from_str(json)
+            .map_err(|error| AgentError::InvalidProvider(error.to_string()))?;
+        builder = builder.additional_params(value);
+    }
+    builder = builder.tools(tool_defs);
+
+    let mut stream = builder.stream().await.map_err(provider_error)?;
+    let mut content = String::new();
+    let mut reasoning = String::new();
+    let mut input_tokens = 0u64;
+    let mut output_tokens = 0u64;
+    let mut output_limited = false;
+
+    loop {
+        let item = tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => {
+                send_event(
+                    sender,
+                    AgentEvent::Completed {
+                        content,
+                        reasoning: (!reasoning.is_empty()).then_some(reasoning),
+                        input_tokens,
+                        output_tokens,
+                        cancelled: true,
+                        output_limited: false,
+                    },
+                )
+                .await?;
+                return Ok(());
+            }
+            item = stream.next() => match item {
+                Some(item) => item,
+                None => break,
+            }
+        };
+
+        match item {
+            Ok(StreamedAssistantContent::Text(text)) => {
+                if !text.text.is_empty() {
+                    content.push_str(&text.text);
+                    send_event(sender, AgentEvent::TextDelta { text: text.text }).await?;
+                }
+            }
+            Ok(StreamedAssistantContent::Reasoning {
+                reasoning: Reasoning { content: parts, .. },
+                ..
+            }) => {
+                let delta = reasoning_text(&parts);
+                if !delta.is_empty() {
+                    reasoning.push_str(&delta);
+                    send_event(sender, AgentEvent::ReasoningDelta { text: delta }).await?;
+                }
+            }
+            Ok(StreamedAssistantContent::ReasoningDelta {
+                reasoning: delta, ..
+            }) => {
+                if !delta.is_empty() {
+                    reasoning.push_str(&delta);
+                    send_event(sender, AgentEvent::ReasoningDelta { text: delta }).await?;
+                }
+            }
+            Ok(StreamedAssistantContent::ToolCall { tool_call, .. }) => {
+                let arguments_json = serde_json::to_string(&tool_call.function.arguments)
+                    .unwrap_or_else(|_| "{}".to_string());
+                let (id, call_id) = tool_call_identity(&tool_call);
+                send_event(
+                    sender,
+                    AgentEvent::ToolCallStarted {
+                        id,
+                        call_id,
+                        name: tool_call.function.name,
+                        arguments_json,
+                    },
+                )
+                .await?;
+                // Client-side execution: do NOT call the tool here. Continue
+                // consuming the stream so trailing Final/usage is captured.
+            }
+            Ok(StreamedAssistantContent::Final(final_resp)) => {
+                input_tokens = final_resp.usage.input_tokens;
+                output_tokens = final_resp.usage.output_tokens;
+                output_limited = final_resp.finish_reason == Some(FinishReason::Length);
+            }
+            Ok(_) => {}
+            Err(error) => return Err(provider_error(error)),
+        }
+    }
+
+    let parsed = parse_thinking_content(&content);
+    if reasoning.is_empty() {
+        reasoning = parsed.thinking_content.unwrap_or_default();
+    }
+    send_event(
+        sender,
+        AgentEvent::Completed {
+            content: parsed.content,
+            reasoning: (!reasoning.is_empty()).then_some(reasoning),
+            input_tokens,
+            output_tokens,
+            cancelled: false,
+            output_limited,
+        },
+    )
+    .await
+}
+
+/// Join the text-like blocks of a reasoning part list into display text.
+fn reasoning_text(parts: &[rig::message::ReasoningContent]) -> String {
+    parts
+        .iter()
+        .filter_map(|part| match part {
+            rig::message::ReasoningContent::Text { text, .. } => Some(text.as_str()),
+            rig::message::ReasoningContent::Summary(summary) => Some(summary.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Split a rig 0.42 [`rig::message::ToolCall`] into the legacy event pair:
+/// the item id (rig's correlation handle when no provider id exists) and the
+/// provider-issued call id.
+fn tool_call_identity(tool_call: &rig::message::ToolCall) -> (String, Option<String>) {
+    let call_id = tool_call
+        .provider
+        .as_ref()
+        .map(|provider| provider.call_id.to_string());
+    (tool_call.id.to_string(), call_id)
+}
+
+async fn send_event(
+    sender: &mpsc::Sender<Result<AgentEvent, AgentError>>,
+    event: AgentEvent,
+) -> Result<(), AgentError> {
+    sender
+        .send(Ok(event))
+        .await
+        .map_err(|_| AgentError::ConsumerClosed)
+}
+
+fn provider_error(error: impl std::fmt::Display) -> AgentError {
+    AgentError::Provider(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::ProviderConfig;
+
+    #[test]
+    fn selects_last_user_message_as_prompt() {
+        let messages = vec![
+            ChatMessage {
+                role: MessageRole::System,
+                content: "Be concise".into(),
+                reasoning_content: None,
+                images: vec![],
+                tool_calls: vec![],
+                tool_call_id: None,
+                tool_result_call_id: None,
+            },
+            ChatMessage {
+                role: MessageRole::User,
+                content: "First".into(),
+                reasoning_content: None,
+                images: vec![],
+                tool_calls: vec![],
+                tool_call_id: None,
+                tool_result_call_id: None,
+            },
+            ChatMessage {
+                role: MessageRole::Assistant,
+                content: "Reply".into(),
+                reasoning_content: None,
+                images: vec![],
+                tool_calls: vec![],
+                tool_call_id: None,
+                tool_result_call_id: None,
+            },
+            ChatMessage {
+                role: MessageRole::User,
+                content: "Second".into(),
+                reasoning_content: None,
+                images: vec![],
+                tool_calls: vec![],
+                tool_call_id: None,
+                tool_result_call_id: None,
+            },
+        ];
+
+        let (_, history, system) = build_messages(&messages).unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(system.as_deref(), Some("Be concise"));
+    }
+
+    #[test]
+    fn rejects_missing_api_key() {
+        let request = AgentRequest {
+            provider: ProviderConfig {
+                kind: ProviderKind::OpenAi,
+                api_key: None,
+                base_url: None,
+                api_style: None,
+            },
+            model: "test".into(),
+            messages: vec![],
+            parameters: SamplingParameters::default(),
+            tools: vec![],
+        };
+        assert_eq!(
+            required_key(&request, "OpenAI-compatible"),
+            Err(AgentError::MissingApiKey("OpenAI-compatible"))
+        );
+    }
+
+    #[tokio::test]
+    async fn routes_openai_to_responses_by_default() {
+        let request = AgentRequest {
+            provider: ProviderConfig {
+                kind: ProviderKind::OpenAi,
+                api_key: Some("sk-test".into()),
+                base_url: None,
+                api_style: None,
+            },
+            model: "gpt-4o".into(),
+            messages: vec![],
+            parameters: SamplingParameters::default(),
+            tools: vec![],
+        };
+        let agent = create_agent(&request, None).unwrap();
+        assert_eq!(agent.kind, ProviderKind::OpenAi);
+    }
+
+    #[tokio::test]
+    async fn routes_chat_completions_style_to_compat_model() {
+        let request = AgentRequest {
+            provider: ProviderConfig {
+                kind: ProviderKind::CustomOpenAi,
+                api_key: Some("sk-test".into()),
+                base_url: Some("https://api.deepseek.com".into()),
+                api_style: Some("chat_completions".into()),
+            },
+            model: "deepseek-chat".into(),
+            messages: vec![],
+            parameters: SamplingParameters::default(),
+            tools: vec![],
+        };
+        let agent = create_agent(&request, None).unwrap();
+        assert_eq!(agent.kind, ProviderKind::CustomOpenAi);
+    }
+
+    #[test]
+    fn converts_tool_result_message_to_user() {
+        let message = ChatMessage {
+            role: MessageRole::Tool,
+            content: "result text".into(),
+            reasoning_content: None,
+            images: vec![],
+            tool_calls: vec![],
+            tool_call_id: Some("call_1".into()),
+            tool_result_call_id: Some("call_1".into()),
+        };
+        let rig_message = to_rig_message(&message);
+        assert!(
+            matches!(rig_message, Message::User { .. }),
+            "tool result should map to a User message"
+        );
+    }
+
+    #[test]
+    fn tool_result_image_lines_become_image_blocks() {
+        let message = ChatMessage {
+            role: MessageRole::Tool,
+            content: "Page 1\ndata:image/png;base64,iVBORw0KGgo=".into(),
+            reasoning_content: None,
+            images: vec![],
+            tool_calls: vec![],
+            tool_call_id: Some("call_1".into()),
+            tool_result_call_id: Some("call_1".into()),
+        };
+        let Message::User { content } = to_rig_message(&message) else {
+            panic!("tool result should map to a User message");
+        };
+        let Some(UserContent::ToolResult(result)) = content.first() else {
+            panic!("expected a tool result");
+        };
+        let blocks: Vec<_> = result.content.iter().collect();
+        assert_eq!(blocks.len(), 2, "text plus one image block");
+        assert!(matches!(
+            blocks[1],
+            rig::message::ToolResultContent::Image(_)
+        ));
+    }
+
+    #[test]
+    fn converts_assistant_tool_calls_with_call_id() {
+        let message = ChatMessage {
+            role: MessageRole::Assistant,
+            content: String::new(),
+            reasoning_content: None,
+            images: vec![],
+            tool_calls: vec![crate::types::ChatToolCall {
+                id: "fc_123".into(),
+                call_id: Some("call_abc".into()),
+                name: "web_search".into(),
+                arguments_json: r#"{"query":"rust"}"#.into(),
+            }],
+            tool_call_id: None,
+            tool_result_call_id: None,
+        };
+        let rig_message = to_rig_message(&message);
+        match rig_message {
+            Message::Assistant { content, .. } => {
+                let tool_call = content.iter().find_map(|item| match item {
+                    AssistantContent::ToolCall(tool_call) => Some(tool_call),
+                    _ => None,
+                });
+                let tool_call = tool_call.expect("expected tool call content");
+                let provider = tool_call
+                    .provider
+                    .as_ref()
+                    .expect("expected provider-issued ids");
+                assert_eq!(provider.item_id.clone(), Some("fc_123".into()));
+                assert_eq!(provider.call_id.to_string(), "call_abc");
+            }
+            _ => panic!("expected Assistant message"),
+        }
+    }
+
+    #[test]
+    fn converts_assistant_message_with_tool_calls() {
+        let message = ChatMessage {
+            role: MessageRole::Assistant,
+            content: String::new(),
+            reasoning_content: None,
+            images: vec![],
+            tool_calls: vec![crate::types::ChatToolCall {
+                id: "call_1".into(),
+                call_id: None,
+                name: "web_search".into(),
+                arguments_json: r#"{"query":"rust"}"#.into(),
+            }],
+            tool_call_id: None,
+            tool_result_call_id: None,
+        };
+        let rig_message = to_rig_message(&message);
+        match rig_message {
+            Message::Assistant { content, .. } => {
+                let has_tool_call = content
+                    .iter()
+                    .any(|c| matches!(c, AssistantContent::ToolCall(_)));
+                assert!(
+                    has_tool_call,
+                    "assistant tool-call message should carry the tool call"
+                );
+            }
+            _ => panic!("expected Assistant message"),
+        }
+    }
+}

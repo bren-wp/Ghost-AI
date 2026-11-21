@@ -1,0 +1,404 @@
+//! Skill tool for LLM agents.
+//!
+//! Loads the full instructions for a skill by name. The tool description contains
+//! an XML catalog of all available skills so the model can discover them without
+//! needing a separate system-prompt section.
+
+use rig::agent::tool::Tool;
+use serde::Deserialize;
+use serde_json::json;
+
+#[derive(Debug, Clone)]
+pub struct SkillCatalogEntry {
+    pub name: String,
+    pub description: Option<String>,
+    /// Absolute path to the SKILL.md file
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SkillArgs {
+    pub name: String,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Skill error: {0}")]
+pub struct SkillError(String);
+
+#[derive(Clone)]
+pub struct SkillTool {
+    skills: Vec<SkillCatalogEntry>,
+}
+
+impl SkillTool {
+    pub fn new(skills: Vec<SkillCatalogEntry>) -> Self {
+        Self { skills }
+    }
+}
+
+impl Tool for SkillTool {
+    const NAME: &'static str = "skill";
+
+    type Error = SkillError;
+    type Args = SkillArgs;
+    type Output = String;
+
+    fn description(&self) -> String {
+        // Catalog budget: discovery needs names plus a one-line gist, not
+        // full descriptions or filesystem paths - the tool returns the whole
+        // SKILL.md on call. Bounds keep the schema cost flat as the skill
+        // library grows.
+        const MAX_SKILLS: usize = 40;
+        const MAX_DESC_CHARS: usize = 120;
+
+        let mut desc = String::from(
+            "Load the full instructions for a skill by name. \
+             Use this when a task matches an available skill.\n\n\
+             <available_skills>\n",
+        );
+        let total = self.skills.len();
+        for entry in self.skills.iter().take(MAX_SKILLS) {
+            let d = entry.description.as_deref().unwrap_or("No description");
+            desc.push_str(&format!(
+                "  <skill name=\"{}\">{}</skill>\n",
+                entry.name,
+                ghost_ai_agent_core::context_pruning::ellipsize(d, MAX_DESC_CHARS)
+            ));
+        }
+        if total > MAX_SKILLS {
+            desc.push_str(&format!("  ...and {} more skills\n", total - MAX_SKILLS));
+        }
+        desc.push_str("</available_skills>");
+        desc
+    }
+
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Skill name from the available_skills catalog"
+                }
+            },
+            "required": ["name"]
+        })
+    }
+
+    async fn call(
+        &self,
+        _context: &mut rig::agent::tool::ToolContext,
+        args: Self::Args,
+    ) -> Result<Self::Output, Self::Error> {
+        tracing::info!("🔧 [tool-call] skill: name=\"{}\"", args.name);
+
+        let entry = self
+            .skills
+            .iter()
+            .find(|e| e.name == args.name)
+            .ok_or_else(|| SkillError(format!("Unknown skill: {}", args.name)))?;
+
+        let path = std::path::Path::new(&entry.path);
+        if !path.exists() {
+            return Err(SkillError(format!(
+                "Skill file not found: {}",
+                path.display()
+            )));
+        }
+        if !path.is_file() {
+            return Err(SkillError(format!(
+                "Skill path is not a file: {}",
+                path.display()
+            )));
+        }
+
+        let content = tokio::fs::read_to_string(path)
+            .await
+            .map_err(|e| SkillError(format!("Failed to read skill file: {}", e)))?;
+
+        let body = strip_frontmatter(&content);
+        let skill_dir = path.parent().unwrap_or(path);
+        let dir = skill_dir.to_string_lossy().to_string();
+
+        let resource_files = collect_resource_files(skill_dir).await;
+
+        let path_note = if resource_files.is_empty() {
+            format!("Skill directory: {}", dir)
+        } else {
+            let files_xml: String = resource_files
+                .iter()
+                .map(|f| format!("  <file>{}</file>", f))
+                .collect::<Vec<_>>()
+                .join("\n");
+            format!(
+                "Skill directory: {}\nRelative paths in this skill are relative to the skill directory.\n\n<skill_resources>\n{}\n</skill_resources>",
+                dir, files_xml
+            )
+        };
+
+        Ok(format!(
+            "<skill_content name=\"{}\">\n{}\n\n{}\n</skill_content>",
+            args.name, body, path_note
+        ))
+    }
+}
+
+/// Recursively collect all files in the skill directory except SKILL.md, returning
+/// paths relative to that directory. Capped at 20 entries to keep output concise.
+async fn collect_resource_files(dir: &std::path::Path) -> Vec<String> {
+    const MAX_FILES: usize = 20;
+    let mut results = Vec::new();
+    collect_recursive(dir, dir, &mut results, MAX_FILES);
+    results
+}
+
+fn collect_recursive(
+    base: &std::path::Path,
+    current: &std::path::Path,
+    out: &mut Vec<String>,
+    limit: usize,
+) {
+    if out.len() >= limit {
+        return;
+    }
+    let entries = match std::fs::read_dir(current) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    let mut sorted: Vec<_> = entries.flatten().collect();
+    sorted.sort_by_key(|e| e.file_name());
+    for entry in sorted {
+        if out.len() >= limit {
+            break;
+        }
+        let path = entry.path();
+        let file_name = entry.file_name();
+        let name = file_name.to_string_lossy();
+        // Skip hidden files/dirs and SKILL.md
+        if name.starts_with('.') || name == "SKILL.md" {
+            continue;
+        }
+        if path.is_dir() {
+            collect_recursive(base, &path, out, limit);
+        } else if path.is_file()
+            && let Ok(rel) = path.strip_prefix(base)
+        {
+            out.push(rel.to_string_lossy().to_string());
+        }
+    }
+}
+
+fn strip_frontmatter(content: &str) -> &str {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("---") {
+        return content;
+    }
+    let after_opening = &trimmed[3..];
+    if let Some(end_pos) = after_opening.find("\n---") {
+        let body_start = end_pos + 4;
+        after_opening[body_start..].trim_start()
+    } else {
+        content
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn entry(name: &str, description: &str) -> SkillCatalogEntry {
+        SkillCatalogEntry {
+            name: name.to_string(),
+            description: if description.is_empty() {
+                None
+            } else {
+                Some(description.to_string())
+            },
+            path: format!("/skills/{name}/SKILL.md"),
+        }
+    }
+
+    #[test]
+    fn description_budgets_long_skill_descriptions() {
+        let long = "Does many detailed things. ".repeat(30);
+        let tool = SkillTool::new(vec![entry("big-skill", &long)]);
+        let desc = rig::agent::tool::Tool::description(&tool);
+        assert!(desc.contains("big-skill"));
+        assert!(
+            desc.chars().count() < 400,
+            "description must stay budgeted: {} chars",
+            desc.chars().count()
+        );
+        assert!(desc.contains('\u{2026}'), "must end with ellipsis: {desc}");
+        assert!(!desc.contains("/skills/"), "paths must not ride the schema");
+    }
+
+    #[test]
+    fn description_caps_entry_count() {
+        let skills: Vec<SkillCatalogEntry> =
+            (0..50).map(|i| entry(&format!("skill-{i}"), "d")).collect();
+        let tool = SkillTool::new(skills);
+        let desc = rig::agent::tool::Tool::description(&tool);
+        assert!(desc.contains("skill-0"));
+        assert!(!desc.contains("skill-45"), "beyond the entry cap");
+        assert!(desc.contains("...and 10 more skills"));
+    }
+
+    fn skill_dir(name: &str, markdown: &str) -> (tempfile::TempDir, SkillCatalogEntry) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("SKILL.md");
+        std::fs::write(&path, markdown).unwrap();
+        let entry = SkillCatalogEntry {
+            name: name.to_string(),
+            description: Some("d".to_string()),
+            path: path.to_string_lossy().to_string(),
+        };
+        (dir, entry)
+    }
+
+    async fn call_skill(tool: &SkillTool, name: &str) -> Result<String, SkillError> {
+        let mut context = rig::agent::tool::ToolContext::new();
+        rig::agent::tool::Tool::call(
+            tool,
+            &mut context,
+            SkillArgs {
+                name: name.to_string(),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn call_returns_body_without_frontmatter_plus_resource_manifest() {
+        let (dir, entry) = skill_dir(
+            "pdf",
+            "---\nname: pdf\ndescription: d\n---\n\n## PDF steps\nUse the extractor.",
+        );
+        std::fs::write(dir.path().join("reference.md"), "r").unwrap();
+        std::fs::create_dir(dir.path().join("scripts")).unwrap();
+        std::fs::write(dir.path().join("scripts").join("run.sh"), "r").unwrap();
+        std::fs::write(dir.path().join(".hidden"), "r").unwrap();
+        let tool = SkillTool::new(vec![entry]);
+
+        let out = call_skill(&tool, "pdf").await.unwrap();
+
+        assert!(
+            out.starts_with("<skill_content name=\"pdf\">"),
+            "wrapped output: {out}"
+        );
+        assert!(out.contains("## PDF steps"), "body present: {out}");
+        assert!(
+            !out.contains("name: pdf"),
+            "frontmatter must be stripped: {out}"
+        );
+        assert!(
+            out.contains("<file>reference.md</file>"),
+            "resources: {out}"
+        );
+        let script = format!("scripts{}run.sh", std::path::MAIN_SEPARATOR);
+        assert!(out.contains(&format!("<file>{script}</file>")), "{out}");
+        assert!(!out.contains(".hidden"), "hidden files skipped: {out}");
+        assert!(!out.contains("<file>SKILL.md</file>"), "{out}");
+    }
+
+    #[tokio::test]
+    async fn call_without_resources_lists_the_directory_only() {
+        let (dir, entry) = skill_dir("bare", "Just instructions.");
+        let tool = SkillTool::new(vec![entry]);
+
+        let out = call_skill(&tool, "bare").await.unwrap();
+
+        assert!(out.contains("Just instructions."), "{out}");
+        assert!(
+            out.contains(&format!(
+                "Skill directory: {}",
+                dir.path().to_string_lossy()
+            )),
+            "{out}"
+        );
+        assert!(!out.contains("<skill_resources>"), "{out}");
+    }
+
+    #[tokio::test]
+    async fn resource_listing_caps_at_twenty_files() {
+        let (dir, entry) = skill_dir("big", "Body.");
+        for i in 0..25 {
+            std::fs::write(dir.path().join(format!("f{i:02}.txt")), "x").unwrap();
+        }
+        let tool = SkillTool::new(vec![entry]);
+
+        let out = call_skill(&tool, "big").await.unwrap();
+
+        assert_eq!(out.matches("<file>").count(), 20, "{out}");
+        assert!(out.contains("<file>f00.txt</file>"), "{out}");
+        assert!(
+            !out.contains("f24.txt"),
+            "cap keeps the first 20 sorted: {out}"
+        );
+    }
+
+    #[tokio::test]
+    async fn unknown_skill_name_is_rejected() {
+        let tool = SkillTool::new(vec![]);
+
+        let error = call_skill(&tool, "nope").await.unwrap_err();
+
+        assert!(
+            error.to_string().contains("Unknown skill: nope"),
+            "error: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_skill_file_is_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let entry = SkillCatalogEntry {
+            name: "gone".to_string(),
+            description: None,
+            path: dir
+                .path()
+                .join("nope")
+                .join("SKILL.md")
+                .to_string_lossy()
+                .to_string(),
+        };
+        let tool = SkillTool::new(vec![entry]);
+
+        let error = call_skill(&tool, "gone").await.unwrap_err();
+
+        assert!(
+            error.to_string().contains("Skill file not found"),
+            "error: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn directory_path_is_rejected_as_a_skill_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let entry = SkillCatalogEntry {
+            name: "dir-skill".to_string(),
+            description: None,
+            path: dir.path().to_string_lossy().to_string(),
+        };
+        let tool = SkillTool::new(vec![entry]);
+
+        let error = call_skill(&tool, "dir-skill").await.unwrap_err();
+
+        assert!(
+            error.to_string().contains("Skill path is not a file"),
+            "error: {error}"
+        );
+    }
+
+    #[test]
+    fn frontmatter_without_closing_fence_is_kept_verbatim() {
+        let content = "---\nname: broken\nstill body";
+        assert_eq!(strip_frontmatter(content), content);
+    }
+
+    #[test]
+    fn frontmatter_strip_skips_leading_whitespace() {
+        let content = "\n  ---\nname: x\n---\n  Body here.";
+        assert_eq!(strip_frontmatter(content), "Body here.");
+    }
+}

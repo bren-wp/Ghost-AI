@@ -1,0 +1,60 @@
+{
+  "onboarding": {
+    "title": "在多台设备间同步你的对话",
+    "description": "对话通过 iCloud Drive 同步，端到端加密。",
+    "explainer": "Ghost AI 可以让你拥有的每台设备上的对话历史保持一致，使用你现有的 iCloud Drive 空间。云端副本使用永不离开你设备的密钥加密。",
+    "pointEncrypted": "快照与附件以密文传输；云服务提供商只能看到加密数据。",
+    "pointOffDevice": "随时可以在设置中关闭；你的其他设备继续正常同步。",
+    "passphraseTitle": "保存你的同步口令",
+    "passphraseGuidance": "请写下或存入密码管理器。此口令无法从应用中找回。",
+    "confirmSaved": "我已将口令保存在安全的地方",
+    "recoveryEducation": "此口令用于在新设备上解锁云端历史。如果遗失，已加入的设备不受影响，但云端备份无法在新设备上恢复。",
+    "copy": "复制",
+    "copied": "口令已复制",
+    "begin": "设置加密",
+    "enable": "开启同步",
+    "decline": "暂不开启",
+    "enabled": "同步已开启 — 已加密并在后台运行",
+    "error": "同步加密设置失败",
+    "joinExplainer": "此账号下已存在同步的历史。输入其同步口令加入——开启同步的授权依然有效。",
+    "joined": "已加入同步 — 正在拉取云端历史",
+    "join": "加入同步",
+    "unavailable": "此设备上的 iCloud Drive 不可用，暂时无法开启同步。",
+    "unavailableSettings": "登录你的 iCloud 账户后，随时可以在设置中开启同步。"
+  },
+  "errors": {
+    "wrongPassphrase": "口令不匹配。请核对首次开启同步时保存的口令。",
+    "corruptData": "iCloud Drive 中的同步数据似乎已损坏，或是由更新版本的 Ghost AI 写入。请在所有设备上更新应用后重试。",
+    "failed": "操作失败。请检查与 iCloud Drive 的连接后重试。"
+  },
+  "locked": {
+    "banner": "云同步正在等待你的同步口令。本设备上的一切照常可用。",
+    "action": "输入口令",
+    "dialogTitle": "解锁同步",
+    "dialogDescription": "输入首次开启同步时保存的同步口令。它将解包云端历史的加密密钥。",
+    "placeholder": "同步口令",
+    "unlock": "解锁",
+    "unlocked": "同步已解锁 — 正在拉取云端历史"
+  },
+  "settings": {
+    "title": "云同步",
+    "description": "通过 iCloud Drive 的加密对话同步。云端副本在没有你设备上持有的密钥时无法读取。",
+    "statusEnabled": "同步已开启。",
+    "statusDisabled": "同步已关闭。",
+    "statusLocked": "正在等待你的同步口令。",
+    "enable": "开启同步",
+    "icloudRequired": "此设备上的 iCloud Drive 不可用。请登录你的 iCloud 账户，然后回到此处开启同步。",
+    "stopPublishing": "停止发布",
+    "syncNow": "立即同步",
+    "forcePublish": "强制发布",
+    "forcePublishHint": "即使同步认为已是最新，也会将本设备的完整状态重新发送到 iCloud。当其他设备缺少最近更改时使用。",
+    "syncNowDone": "同步完成：{{action}}，合并 {{rows}} 行",
+    "unlock": "输入口令",
+    "lastErrorPrefix": "上次同步尝试失败：",
+    "deleteCloudData": "删除云端数据",
+    "deleteTitle": "删除云端数据？",
+    "deleteDescription": "这将从 iCloud Drive 移除加密快照与附件存储。你的其他设备将停止接收更新。本设备上的数据不受影响。此操作不可撤销。",
+    "deleteCancel": "取消",
+    "deleteConfirm": "删除云端数据"
+  }
+}

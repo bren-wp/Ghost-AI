@@ -1,0 +1,75 @@
+import type { Message } from './message'
+
+// Event payloads
+export interface ChatStreamEvent {
+  conversation_id: string
+  content: string
+}
+
+// Event for streaming reasoning/thinking content (from models like GPT-5, Gemini with thinking)
+export interface ChatStreamReasoningEvent {
+  conversation_id: string
+  content: string
+}
+
+export interface ChatCompleteEvent {
+  conversation_id: string
+  // Null when the generation was stopped before any output
+  message: Message | null
+  // The stream broke on this error after producing output; `message` holds
+  // the partial reply
+  error?: string | null
+  cancelled?: boolean
+}
+
+export interface ChatErrorEvent {
+  conversation_id: string
+  error: string
+}
+
+export interface ChatWarningEvent {
+  conversation_id: string
+  warning: string
+  images?: number
+  annotated?: boolean
+}
+
+export interface AttachmentProcessingStartedEvent {
+  message_id: string
+  conversation_id: string
+  urls: string[]
+}
+
+export interface AttachmentProcessingCompleteEvent {
+  message_id: string
+  conversation_id: string
+  attachment_ids: string[]
+}
+
+export interface AttachmentProcessingErrorEvent {
+  message_id: string
+  conversation_id: string
+  attachment_id?: string
+  error: string
+}
+
+export interface AttachmentUpdateEvent {
+  message_id: string
+  conversation_id: string
+  completed_url?: string
+  attachment?: {
+    type: string
+    id: string
+    [key: string]: unknown
+  }
+}
+
+export interface ChatStreamImageEvent {
+  conversation_id: string
+  image_url: string
+}
+
+export interface SearchDecisionCompleteEvent {
+  message_id: string
+  conversation_id: string
+}

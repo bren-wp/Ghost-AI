@@ -1,0 +1,118 @@
+[package]
+name = "ghost-ai-desktop"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["Brendigo"]
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "ghost_ai_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ghost-ai-agent-core = { path = "../vendor/agent/crates/ghost-ai-agent-core" }
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+
+# HTTP client
+reqwest = { version = "0.13", features = ["json", "stream", "gzip", "deflate", "brotli", "zstd"] }
+oauth2 = { version = "5.0", default-features = false, features = ["reqwest", "rustls-tls"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+futures = "0.3"
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Cryptography
+aes-gcm = "0.10"
+rand = "0.8"
+base64 = "0.21"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+
+# Hashing
+blake3 = "1"
+
+# Utilities
+uuid = { version = "1", features = ["v7", "v5", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+# Ripgrep core (in-process search)
+lazy_static = "1.4"
+async-trait = "0.1"
+dirs = "5"
+shell-words = "1"
+nanoid = "0.4"
+
+# LLM framework (0.42 facade: rig-core portable contracts + rig-agent runtime)
+rig = "0.42"
+# MCP SDK, used directly (no rig `rmcp` bridge: our mcp_tool_use is a plain
+# rig tool). Default features pull in server-side dependencies.
+rmcp = { version = "3.11", default-features = false, features = ["client", "transport-streamable-http-client-reqwest", "transport-child-process"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "ansi", "json"] }
+once_cell = "1.20"
+parking_lot = "0.12"
+
+# Clipboard (native image copy)
+arboard = { version = "3", features = ["image-data"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
+
+# Bash AST-based security analysis
+
+# PDF text extraction
+
+# Web scraping
+scraper = "0.18"
+htmd = "0.5"
+url = "2"
+urlencoding = "2"
+readability = { version = "0.3", default-features = false }
+headless_chrome = "1"
+async-stream = "0.3.6"
+http = "1"
+ts-rs = { version = "12", features = ["serde-json-impl"] }
+iana-time-zone = "0.1.65"
+sys-locale = "0.3.2"
+whatlang = "0.18.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3.7.0"
+security-framework-sys = "2.17.0"
+core-foundation = "0.10"
+# WebView fetch delivery: WKScriptMessageHandler registration (same
+# version tree as wry 0.53.5; no added compile units).
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSResponder", "NSView", "NSWindow", "NSWorkspace"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSNotification", "NSOperation", "block2"] }
+# Block-based NSWorkspace sleep/wake observers (sync scheduler).
+block2 = "0.6"
+objc2-web-kit = { version = "0.3", default-features = false, features = ["std", "WKScriptMessage", "WKScriptMessageHandler", "WKUserContentController", "WKWebView", "WKWebViewConfiguration"] }
+
+[dev-dependencies]
+tempfile = "3"
+zstd = "0.13"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tauri = { version = "2", features = ["test"] }

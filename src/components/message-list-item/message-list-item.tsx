@@ -1,0 +1,111 @@
+import * as React from 'react'
+import { useTranslation } from 'react-i18next'
+import { Item, ItemContent, ItemTitle, ItemDescription, ItemHeader } from '@/components/ui/item'
+import { cn } from '@/lib/utils'
+import { MorphSpinner } from '@/components/ui/morph-spinner'
+import type { MessageListItemProps } from './types'
+import { MessageAvatarGroup } from './message-avatar'
+import { ActionsMenu } from './actions-menu'
+import { RenameDialog } from './rename-dialog'
+import { DeleteDialog } from './delete-dialog'
+import { useTypewriterTitle } from './useTypewriterTitle'
+
+export function MessageListItem({
+  avatars,
+  summary,
+  timestamp,
+  lastMessage,
+  onClick,
+  className,
+  isActive = false,
+  onGenerateTitle,
+  onEditTitle,
+  onDelete,
+  placeholderTitle,
+  isStreaming = false,
+}: MessageListItemProps) {
+  const { t: tChat } = useTranslation('chat')
+  const [isHovered, setIsHovered] = React.useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
+  const [showRenameDialog, setShowRenameDialog] = React.useState(false)
+  const displayTitle = useTypewriterTitle(summary, placeholderTitle)
+
+  const hasActions = onGenerateTitle || onEditTitle || onDelete
+
+  return (
+    <>
+      <Item
+        className={cn(
+          'cursor-pointer hover:bg-accent/50 transition-colors',
+          isActive && 'bg-accent',
+          className
+        )}
+        onClick={onClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        tabIndex={0}
+        role="button"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onClick?.()
+          }
+        }}
+      >
+        <ItemContent>
+          {/* First line: Summary (can wrap) with action overlay */}
+          <ItemHeader className="relative">
+            <ItemTitle className="line-clamp-2">{displayTitle}</ItemTitle>
+
+            {/* Floating action overlay */}
+            {hasActions && (
+              <ActionsMenu
+                isVisible={isHovered}
+                onGenerateTitle={onGenerateTitle}
+                onRename={onEditTitle ? () => setShowRenameDialog(true) : undefined}
+                onDelete={onDelete ? () => setShowDeleteDialog(true) : undefined}
+              />
+            )}
+          </ItemHeader>
+
+          {/* Second line: Last message content (truncated) */}
+          <ItemDescription className="line-clamp-1 text-xs">{lastMessage}</ItemDescription>
+
+          {/* Third line: Timestamp (spinner while generating) and small avatars */}
+          <div className="flex items-center justify-between gap-2">
+            {isStreaming ? (
+              <MorphSpinner
+                size={14}
+                role="status"
+                aria-label={tChat('generatingResponse')}
+                className="flex-shrink-0"
+              />
+            ) : (
+              <span className="text-xs text-muted-foreground">{timestamp}</span>
+            )}
+            <MessageAvatarGroup avatars={avatars} summary={summary} />
+          </div>
+        </ItemContent>
+      </Item>
+
+      {/* Rename dialog */}
+      {onEditTitle && (
+        <RenameDialog
+          open={showRenameDialog}
+          onOpenChange={setShowRenameDialog}
+          currentTitle={summary}
+          onRename={onEditTitle}
+        />
+      )}
+
+      {/* Delete confirmation dialog */}
+      {onDelete && (
+        <DeleteDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          onConfirm={onDelete}
+        />
+      )}
+    </>
+  )
+}

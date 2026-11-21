@@ -1,0 +1,60 @@
+{
+  "onboarding": {
+    "title": "Sync your chats across devices",
+    "description": "Your conversations sync through your iCloud Drive, end-to-end encrypted.",
+    "explainer": "Ghost AI can keep your conversation history consistent on every device you own, using the iCloud Drive folder you already have. The cloud copy is encrypted with a key that never leaves your devices.",
+    "pointEncrypted": "Snapshots and attachments travel as ciphertext; the cloud provider sees only encrypted data.",
+    "pointOffDevice": "Turn this off any time in Settings — your other devices keep syncing.",
+    "passphraseTitle": "Save your sync passphrase",
+    "passphraseGuidance": "Write it down or store it in a password manager. It is not recoverable from this app.",
+    "confirmSaved": "I saved this passphrase somewhere safe",
+    "recoveryEducation": "This phrase unlocks your cloud history on new devices. If you lose it, enrolled devices keep working, but the cloud backup cannot be restored anywhere new.",
+    "copy": "Copy",
+    "copied": "Passphrase copied",
+    "begin": "Set up encryption",
+    "enable": "Turn on sync",
+    "decline": "Not now",
+    "enabled": "Sync enabled — encrypted and running in the background",
+    "error": "Failed to set up sync encryption",
+    "joinExplainer": "A synced history already exists on this account. Enter its sync passphrase to join — your consent to sync still applies.",
+    "joined": "Sync joined — pulling your cloud history",
+    "join": "Join sync",
+    "unavailable": "iCloud Drive is not available on this device, so sync cannot be turned on right now.",
+    "unavailableSettings": "Sign in to your iCloud account, then turn on sync any time in Settings."
+  },
+  "errors": {
+    "wrongPassphrase": "That passphrase doesn't match. Check the phrase you saved when sync was first enabled.",
+    "corruptData": "The synced data in iCloud Drive appears damaged or was written by a newer version of Ghost AI. Update the app on every device and try again.",
+    "failed": "That didn't work. Check your connection to iCloud Drive and try again."
+  },
+  "locked": {
+    "banner": "Cloud sync is waiting for your sync passphrase. Everything on this device keeps working.",
+    "action": "Enter passphrase",
+    "dialogTitle": "Unlock sync",
+    "dialogDescription": "Enter the sync passphrase you saved when sync was first enabled. It unwraps the encryption key for your cloud history.",
+    "placeholder": "Sync passphrase",
+    "unlock": "Unlock",
+    "unlocked": "Sync unlocked — pulling your cloud history"
+  },
+  "settings": {
+    "title": "Cloud sync",
+    "description": "Encrypted conversation sync through iCloud Drive (ADR: transport encryption). The cloud copy is unreadable without a key held on your devices.",
+    "statusEnabled": "Sync is on.",
+    "statusDisabled": "Sync is off.",
+    "statusLocked": "Waiting for your sync passphrase.",
+    "enable": "Turn on sync",
+    "icloudRequired": "iCloud Drive is not available on this device. Sign in to your iCloud account, then come back here to turn on sync.",
+    "stopPublishing": "Stop publishing",
+    "syncNow": "Sync now",
+    "forcePublish": "Force publish",
+    "forcePublishHint": "Re-sends this device's full state to iCloud even if sync thinks it is up to date. Use it when another device is missing recent changes.",
+    "syncNowDone": "Sync finished: {{action}}, {{rows}} rows merged",
+    "unlock": "Enter passphrase",
+    "lastErrorPrefix": "Last sync attempt failed:",
+    "deleteCloudData": "Delete cloud data",
+    "deleteTitle": "Delete cloud data?",
+    "deleteDescription": "This removes the encrypted snapshot and attachment store from iCloud Drive. Your other devices stop receiving updates. Data on this device is untouched. This cannot be undone.",
+    "deleteCancel": "Cancel",
+    "deleteConfirm": "Delete cloud data"
+  }
+}

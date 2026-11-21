@@ -1,0 +1,1155 @@
+import { invoke } from '@tauri-apps/api/core'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { useMessageStore, createDefaultConversationState, unconfirmedMessageIds } from '../message'
+import { toLocalAttachments } from '../message/crudActions'
+import type { ConversationState } from '../message'
+import type { PendingMessage } from '../message/types'
+import { logger } from '@/lib/logger'
+import type { Message } from '@/types'
+
+// Mock Tauri invoke
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
+}))
+
+// Mock Tauri event
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn(() => Promise.resolve(() => {})),
+  emit: vi.fn(),
+}))
+
+// Mock logger to avoid console noise
+vi.mock('@/lib/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}))
+
+// crudActions dynamically imports the conversation store to save a draft
+// before the first send and to bump the sidebar afterwards
+const conversationMocks = vi.hoisted(() => ({
+  bumpConversation: vi.fn(),
+  saveDraftConversation: vi.fn(),
+}))
+
+vi.mock('../conversation', () => ({
+  useConversationStore: {
+    getState: () => conversationMocks,
+  },
+}))
+
+const toastMocks = vi.hoisted(() => ({ error: vi.fn() }))
+vi.mock('sonner', () => ({ toast: toastMocks }))
+
+const invokeMock = vi.mocked(invoke)
+
+function sending(conversationId: string) {
+  return useMessageStore.getState().getConversationState(conversationId).isSending
+}
+
+function setSending(conversationId: string) {
+  useMessageStore.getState().getConversationState(conversationId)
+  useMessageStore.setState((draft) => {
+    draft.conversationStates[conversationId].isSending = true
+  })
+}
+
+const createMockMessage = (id: string, content: string, sender_type: string = 'user'): Message => ({
+  id,
+  conversation_id: 'conv-1',
+  sender_type,
+  content,
+  created_at: '2024-01-01T00:00:00Z',
+})
+
+const page = (count: number, prefix: string, startTs = 0) =>
+  Array.from({ length: count }, (_, i) => ({
+    ...createMockMessage(`${prefix}${i}`, `content ${prefix}${i}`),
+    created_at: new Date(2026, 0, 1, 0, 0, startTs + i).toISOString(),
+  }))
+
+const patchConv = (id: string, patch: Partial<ConversationState>) => {
+  useMessageStore.setState((s) => ({
+    conversationStates: {
+      ...s.conversationStates,
+      [id]: { ...(s.conversationStates[id] ?? createDefaultConversationState()), ...patch },
+    },
+  }))
+}
+
+describe('message store crudActions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // loadMessages also fetches sibling variant groups; unstubbed commands
+    // must resolve (empty) instead of returning a bare undefined.
+    vi.mocked(invoke).mockResolvedValue([] as never)
+    // Reset store state to initial values
+    useMessageStore.setState({
+      conversationStates: {},
+      error: null,
+      onNewConversationCreated: undefined,
+    })
+  })
+
+  describe('sendMessage', () => {
+    it('sends through an existing conversation, resets streaming leftovers and waits for the assistant', async () => {
+      useMessageStore.setState({
+        conversationStates: {
+          'conv-1': {
+            ...createDefaultConversationState(),
+            failedTurn: { kind: 'failed', error: 'previous failure', previousReplyId: null },
+            stopRequested: true,
+            streamingContent: 'leftover',
+            streamingReasoningContent: 'leftover reasoning',
+            streamingToolCalls: {
+              tool1: {
+                id: 'tool1',
+                tool_name: 'search',
+                tool_input: '{}',
+                status: 'running',
+                order: 0,
+              },
+            },
+          },
+        },
+      })
+      const userMessage = createMockMessage('msg-u', 'hello')
+      let resolveSend!: (value: Message) => void
+      invokeMock.mockImplementation(
+        () => new Promise<Message>((resolve) => (resolveSend = resolve))
+      )
+
+      const pending = useMessageStore.getState().sendMessage('hello', 'conv-1', 'openai', 'gpt-4')
+      // Sending flag flips on synchronously before the backend call resolves
+      expect(sending('conv-1')).toBe(true)
+
+      // send_message goes out after the draft check
+      await vi.waitFor(() =>
+        expect(invokeMock).toHaveBeenCalledWith('send_message', expect.anything())
+      )
+      resolveSend(userMessage)
+      await pending
+
+      const state = useMessageStore.getState()
+      expect(sending('conv-1')).toBe(false)
+      expect(state.error).toBeNull()
+      const cs = state.getConversationState('conv-1')
+      expect(cs.messages).toHaveLength(1)
+      expect(cs.messages[0]).toEqual(userMessage)
+      expect(cs.failedTurn).toBeNull()
+      expect(cs.stopRequested).toBe(false)
+      expect(cs.streamingContent).toBe('')
+      expect(cs.streamingReasoningContent).toBe('')
+      expect(cs.streamingToolCalls).toEqual({})
+      // Still waiting for the assistant message delivered via the chat-complete event
+      expect(cs.isStreaming).toBe(true)
+      expect(cs.isWaitingForAI).toBe(true)
+      expect(conversationMocks.saveDraftConversation).toHaveBeenCalledWith('conv-1')
+      expect(conversationMocks.bumpConversation).toHaveBeenCalledWith('conv-1', 'hello')
+
+      const [cmd, args] = invokeMock.mock.calls[0]
+      expect(cmd).toBe('send_message')
+      expect(args).toMatchObject({
+        conversationId: 'conv-1',
+        content: 'hello',
+        provider: 'openai',
+        model: 'gpt-4',
+      })
+    })
+
+    it('passes every optional parameter through to the backend command', async () => {
+      invokeMock.mockResolvedValue(createMockMessage('msg-full', 'with extras'))
+
+      await useMessageStore
+        .getState()
+        .sendMessage(
+          'with extras',
+          'conv-1',
+          'openai',
+          'gpt-4o',
+          'sk-test',
+          'https://example.com/v1',
+          'openai',
+          true,
+          'sys prompt',
+          'usr prompt',
+          'model-7',
+          'assistant-3',
+          ['https://example.com/page'],
+          [{ name: 'pic.png', base64: 'aGk=', mimeType: 'image/png' }],
+          [{ name: 'doc.txt', content: 'hello file', mimeType: 'text/plain' }],
+          true,
+          { temperature: 0.7, max_tokens: 512 },
+          10,
+          false,
+          ['res-1', 'res-2']
+        )
+
+      expect(invokeMock).toHaveBeenCalledWith('send_message', {
+        conversationId: 'conv-1',
+        content: 'with extras',
+        provider: 'openai',
+        model: 'gpt-4o',
+        apiKey: 'sk-test',
+        baseUrl: 'https://example.com/v1',
+        apiStyle: 'openai',
+        includeHistory: true,
+        systemPrompt: 'sys prompt',
+        userPrompt: 'usr prompt',
+        modelDbId: 'model-7',
+        assistantDbId: 'assistant-3',
+        urlsToFetch: ['https://example.com/page'],
+        images: [{ name: 'pic.png', base64: 'aGk=', mimeType: 'image/png' }],
+        files: [{ name: 'doc.txt', content: 'hello file', mimeType: 'text/plain' }],
+        searchEnabled: true,
+        parameterOverrides: { temperature: 0.7, max_tokens: 512 },
+        contextMessageCount: 10,
+        useProviderDefaults: false,
+        reuseFetchResultIds: ['res-1', 'res-2'],
+        messageId: expect.any(String),
+      })
+    })
+
+    it('shows the user message before send_message returns, under the id it sends', async () => {
+      const { promise, resolve } = Promise.withResolvers<Message>()
+      invokeMock.mockReturnValue(promise)
+
+      const sending = useMessageStore.getState().sendMessage('hello', 'conv-1', 'openai', 'gpt-4')
+      await vi.waitFor(() => expect(invokeMock).toHaveBeenCalled())
+
+      const [, args] = invokeMock.mock.calls[0]
+      const messageId = (args as { messageId: string }).messageId
+      const pending = useMessageStore.getState().getConversationState('conv-1').messages
+      expect(pending).toHaveLength(1)
+      expect(pending[0]).toMatchObject({ id: messageId, sender_type: 'user', content: 'hello' })
+      expect(unconfirmedMessageIds.has(messageId)).toBe(true)
+
+      const stored = { ...createMockMessage(messageId, 'hello'), conversation_id: 'conv-1' }
+      resolve(stored)
+      await sending
+
+      const messages = useMessageStore.getState().getConversationState('conv-1').messages
+      expect(messages).toEqual([stored])
+      expect(unconfirmedMessageIds.has(messageId)).toBe(false)
+    })
+
+    it('keeps the sent attachments in memory for the optimistic message', async () => {
+      const { promise, resolve } = Promise.withResolvers<Message>()
+      invokeMock.mockReturnValue(promise)
+
+      const sending = useMessageStore
+        .getState()
+        .sendMessage(
+          'see attached',
+          'conv-1',
+          'openai',
+          'gpt-4',
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          [{ name: 'pic.png', base64: 'aGVsbG8=', mimeType: 'image/png' }],
+          [{ name: 'doc.txt', content: 'héllo', mimeType: 'text/plain' }]
+        )
+      await vi.waitFor(() => expect(invokeMock).toHaveBeenCalled())
+
+      const messageId = (invokeMock.mock.calls[0][1] as { messageId: string }).messageId
+      const local = useMessageStore.getState().getConversationState('conv-1').localAttachments[
+        messageId
+      ]
+      expect(local.map((a) => [a.name, a.mimeType, a.size])).toEqual([
+        ['doc.txt', 'text/plain', 6],
+        ['pic.png', 'image/png', 5],
+      ])
+      expect(local[0].content).toBe('héllo')
+      expect(local[1].dataUrl).toBe('data:image/png;base64,aGVsbG8=')
+
+      resolve({ ...createMockMessage(messageId, 'see attached'), conversation_id: 'conv-1' })
+      await sending
+      // Kept after confirmation: the stored rows are written later
+      expect(
+        useMessageStore.getState().getConversationState('conv-1').localAttachments[messageId]
+      ).toHaveLength(2)
+    })
+
+    it('drops the in-memory attachments of a failed send', async () => {
+      invokeMock.mockRejectedValue(new Error('send failed'))
+
+      await expect(
+        useMessageStore
+          .getState()
+          .sendMessage(
+            'hi',
+            'conv-1',
+            'openai',
+            'gpt-4',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            [{ name: 'pic.png', base64: 'aGVsbG8=', mimeType: 'image/png' }]
+          )
+      ).rejects.toThrow('send failed')
+
+      expect(useMessageStore.getState().getConversationState('conv-1').localAttachments).toEqual({})
+    })
+
+    it('drops in-memory attachments only once all of them are stored', () => {
+      const local = toLocalAttachments('m1', [
+        { name: 'a.png', base64: 'aGk=', mimeType: 'image/png' },
+        { name: 'b.png', base64: 'aGk=', mimeType: 'image/png' },
+      ])
+      patchConv('conv-1', { localAttachments: { m1: local } })
+      const store = useMessageStore.getState()
+
+      store.reconcileLocalAttachments('conv-1', 'm1', 1)
+      expect(store.getConversationState('conv-1').localAttachments.m1).toHaveLength(2)
+
+      store.reconcileLocalAttachments('conv-1', 'm1', 2)
+      expect(useMessageStore.getState().getConversationState('conv-1').localAttachments).toEqual({})
+    })
+
+    it('shows attached links as being fetched right away, and withdraws that on failure', async () => {
+      const { promise, reject } = Promise.withResolvers<Message>()
+      invokeMock.mockReturnValue(promise)
+      const urls = ['https://a.example/page', 'https://b.example/']
+
+      const sending = useMessageStore
+        .getState()
+        .sendMessage(
+          'read these',
+          'conv-1',
+          'openai',
+          'gpt-4',
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          urls
+        )
+      await vi.waitFor(() => expect(invokeMock).toHaveBeenCalled())
+
+      const messageId = (invokeMock.mock.calls[0][1] as { messageId: string }).messageId
+      expect(useMessageStore.getState().getConversationState('conv-1').urlStatuses).toEqual({
+        [messageId]: { [urls[0]]: 'fetching', [urls[1]]: 'fetching' },
+      })
+
+      reject(new Error('send failed'))
+      await expect(sending).rejects.toThrow('send failed')
+      expect(useMessageStore.getState().getConversationState('conv-1').urlStatuses).toEqual({})
+    })
+
+    it('a turn that ends early stops showing its links as being fetched', () => {
+      patchConv('conv-1', { urlStatuses: { m1: { 'https://a.example/': 'fetching' } } })
+
+      useMessageStore.getState().failTurn('conv-1', 'failed', 'boom')
+
+      expect(useMessageStore.getState().getConversationState('conv-1').urlStatuses).toEqual({})
+    })
+
+    it('lists reused stored attachments first, as stored rows', () => {
+      const reused = {
+        type: 'file' as const,
+        id: 'att-1',
+        file_name: 'old.png',
+        file_size: 9,
+        mime_type: 'image/png',
+        storage_path: '/store/old.png',
+        content_hash: 'h',
+        created_at: '2026-01-01T00:00:00Z',
+      }
+      const local = toLocalAttachments(
+        'm1',
+        [{ name: 'new.png', base64: 'aGk=', mimeType: 'image/png' }],
+        [],
+        [reused]
+      )
+      expect(local.map((a) => a.name)).toEqual(['old.png', 'new.png'])
+      expect(local[0]).toMatchObject({ id: 'att-1', size: 9, stored: reused })
+      expect(local[1].stored).toBeUndefined()
+    })
+
+    it('sizes base64 attachments by their decoded bytes', () => {
+      const [file, image] = toLocalAttachments(
+        'm1',
+        [{ name: 'x.png', base64: 'data:image/png;base64,aGVsbG8hIQ==', mimeType: 'image/png' }],
+        [{ name: 'x.pdf', content: '', base64: 'aGVsbG8=', mimeType: 'application/pdf' }]
+      )
+      expect(file).toMatchObject({ size: 5, base64: 'aGVsbG8=', content: undefined })
+      expect(image).toMatchObject({ size: 7, dataUrl: 'data:image/png;base64,aGVsbG8hIQ==' })
+    })
+
+    it('withdraws the optimistic message when send_message fails', async () => {
+      invokeMock.mockRejectedValue(new Error('send failed'))
+
+      await expect(
+        useMessageStore.getState().sendMessage('hi', 'conv-1', 'openai', 'gpt-4')
+      ).rejects.toThrow('send failed')
+
+      expect(useMessageStore.getState().getConversationState('conv-1').messages).toEqual([])
+      expect(unconfirmedMessageIds.size).toBe(0)
+    })
+
+    it('creates a conversation first when none exists and notifies the listener', async () => {
+      const onCreated = vi.fn()
+      useMessageStore.setState({ onNewConversationCreated: onCreated })
+      const newConversation = {
+        id: 'conv-new',
+        title: '',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      }
+      const userMessage = { ...createMockMessage('msg-new', 'hi'), conversation_id: 'conv-new' }
+      invokeMock.mockImplementation(async (cmd: string) => {
+        if (cmd === 'create_conversation') return newConversation
+        return userMessage
+      })
+
+      await useMessageStore.getState().sendMessage('hi', null, 'openai', 'gpt-4')
+
+      expect(invokeMock).toHaveBeenCalledWith('create_conversation', { req: { title: '' } })
+      expect(onCreated).toHaveBeenCalledTimes(1)
+      expect(onCreated).toHaveBeenCalledWith(newConversation)
+      expect(conversationMocks.bumpConversation).toHaveBeenCalledWith('conv-new', 'hi')
+
+      const cs = useMessageStore.getState().getConversationState('conv-new')
+      expect(cs.messages).toHaveLength(1)
+      expect(cs.messages[0].id).toBe('msg-new')
+      expect(cs.isSending).toBe(false)
+    })
+
+    it('records the error, stops sending and rethrows when send_message fails', async () => {
+      invokeMock.mockRejectedValue(new Error('send failed'))
+
+      await expect(
+        useMessageStore.getState().sendMessage('hi', 'conv-1', 'openai', 'gpt-4')
+      ).rejects.toThrow('send failed')
+
+      const state = useMessageStore.getState()
+      expect(state.error).toBe('Error: send failed')
+      expect(sending('conv-1')).toBe(false)
+    })
+
+    it('rethrows when creating a new conversation fails before sending', async () => {
+      invokeMock.mockRejectedValueOnce(new Error('create failed'))
+
+      await expect(
+        useMessageStore.getState().sendMessage('hi', null, 'openai', 'gpt-4')
+      ).rejects.toThrow('create failed')
+
+      const state = useMessageStore.getState()
+      expect(state.error).toBe('Error: create failed')
+      // No conversation exists yet, so none is left marked as sending
+      expect(Object.values(state.conversationStates).some((cs) => cs.isSending)).toBe(false)
+      expect(conversationMocks.bumpConversation).not.toHaveBeenCalled()
+    })
+
+    it('does not send when saving the draft conversation fails', async () => {
+      conversationMocks.saveDraftConversation.mockRejectedValueOnce(new Error('save failed'))
+
+      await expect(
+        useMessageStore.getState().sendMessage('hi', 'conv-draft', 'openai', 'gpt-4')
+      ).rejects.toThrow('save failed')
+
+      expect(invokeMock).not.toHaveBeenCalledWith('send_message', expect.anything())
+      expect(sending('conv-draft')).toBe(false)
+    })
+
+    it('leaves the waiting state when send_message fails', async () => {
+      invokeMock.mockRejectedValue(new Error('send failed'))
+
+      await expect(
+        useMessageStore.getState().sendMessage('hi', 'conv-1', 'openai', 'gpt-4')
+      ).rejects.toThrow('send failed')
+
+      const cs = useMessageStore.getState().getConversationState('conv-1')
+      expect(cs.isStreaming).toBe(false)
+      expect(cs.isWaitingForAI).toBe(false)
+    })
+
+    it('keeps the waiting state of a turn it never started', async () => {
+      patchConv('conv-draft', { isStreaming: true, isWaitingForAI: true })
+      conversationMocks.saveDraftConversation.mockRejectedValueOnce(new Error('save failed'))
+
+      await expect(
+        useMessageStore.getState().sendMessage('hi', 'conv-draft', 'openai', 'gpt-4')
+      ).rejects.toThrow('save failed')
+
+      const cs = useMessageStore.getState().getConversationState('conv-draft')
+      expect(cs.isStreaming).toBe(true)
+      expect(cs.isWaitingForAI).toBe(true)
+    })
+  })
+
+  describe('branch-following window', () => {
+    const turn = () => [
+      createMockMessage('u1', 'q1'),
+      createMockMessage('a1', 'r1', 'assistant'),
+      createMockMessage('u2', 'q2'),
+      createMockMessage('a2', 'r2', 'assistant'),
+    ]
+
+    it('regenerating a reply drops it and its descendants from the window', async () => {
+      patchConv('conv-1', { messages: turn() })
+      invokeMock.mockResolvedValue(undefined)
+
+      await useMessageStore.getState().regenerateMessage('conv-1', 'a1', 'openai', 'gpt-4')
+
+      const cs = useMessageStore.getState().getConversationState('conv-1')
+      expect(cs.messages.map((m) => m.id)).toEqual(['u1'])
+      expect(cs.regenerateTargetId).toBe('a1')
+      expect(cs.isWaitingForAI).toBe(true)
+    })
+
+    it('retrying a user message keeps it and the reply a failed regenerate replaced', async () => {
+      patchConv('conv-1', {
+        messages: turn().slice(0, 3),
+        failedTurn: { kind: 'failed', error: 'boom', previousReplyId: 'a2-old' },
+      })
+      invokeMock.mockResolvedValue(undefined)
+
+      await useMessageStore.getState().regenerateMessage('conv-1', 'u2', 'openai', 'gpt-4')
+
+      const cs = useMessageStore.getState().getConversationState('conv-1')
+      expect(cs.messages.map((m) => m.id)).toEqual(['u1', 'a1', 'u2'])
+      expect(cs.regenerateTargetId).toBe('a2-old')
+      expect(cs.failedTurn).toBeNull()
+      expect(invokeMock).toHaveBeenCalledWith(
+        'regenerate_message',
+        expect.objectContaining({ conversationId: 'conv-1', messageId: 'u2' })
+      )
+    })
+
+    it('resending replaces the original user message and its branch', async () => {
+      patchConv('conv-1', { messages: turn() })
+      invokeMock.mockResolvedValue(createMockMessage('u2b', 'q2 again'))
+
+      await useMessageStore.getState().resendMessage('q2 again', 'conv-1', 'u2', 'openai', 'gpt-4')
+
+      const cs = useMessageStore.getState().getConversationState('conv-1')
+      expect(cs.messages.map((m) => m.id)).toEqual(['u1', 'a1', 'u2b'])
+    })
+  })
+
+  describe('per-conversation send flag', () => {
+    it("does not block another conversation's send control", async () => {
+      let resolveSend!: (value: Message) => void
+      invokeMock.mockImplementation(
+        () => new Promise<Message>((resolve) => (resolveSend = resolve))
+      )
+
+      const pending = useMessageStore.getState().sendMessage('hello', 'conv-1', 'openai', 'gpt-4')
+
+      expect(sending('conv-1')).toBe(true)
+      expect(sending('conv-2')).toBe(false)
+
+      await vi.waitFor(() =>
+        expect(invokeMock).toHaveBeenCalledWith('send_message', expect.anything())
+      )
+      resolveSend(createMockMessage('msg-u', 'hello'))
+      await pending
+      expect(sending('conv-1')).toBe(false)
+    })
+  })
+
+  describe('loadMessages racing deliveries', () => {
+    // Holds list_messages_by_conversation open so a delivery can land
+    // while the window fetch is in flight
+    function holdWindowFetch(rows: Message[]) {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      invokeMock.mockImplementation((async (cmd: string) => {
+        if (cmd === 'list_messages_by_conversation') {
+          await gate
+          return rows
+        }
+        if (cmd === 'get_sibling_groups') return []
+        return undefined
+      }) as never)
+      return release
+    }
+
+    it('keeps a reply delivered while the window was being fetched', async () => {
+      const user = createMockMessage('u1', 'hi')
+      // The fetch read the database before the reply row was saved
+      const release = holdWindowFetch([user])
+
+      const load = useMessageStore.getState().loadMessages('conv-1')
+      const reply = createMockMessage('a1', 'Hi! What can I help you with today?', 'model')
+      useMessageStore.getState().addMessage('conv-1', reply)
+      release()
+      await load
+
+      const cs = useMessageStore.getState().getConversationState('conv-1')
+      expect(cs.messages.map((m) => m.id)).toEqual(['u1', 'a1'])
+    })
+
+    it('prefers the delivered copy when the fetch also returned the row', async () => {
+      const stale = createMockMessage('a1', 'old', 'model')
+      const release = holdWindowFetch([createMockMessage('u1', 'hi'), stale])
+
+      const load = useMessageStore.getState().loadMessages('conv-1')
+      useMessageStore.getState().addMessage('conv-1', { ...stale, content: 'new' })
+      release()
+      await load
+
+      const cs = useMessageStore.getState().getConversationState('conv-1')
+      expect(cs.messages.map((m) => [m.id, m.content])).toEqual([
+        ['u1', 'hi'],
+        ['a1', 'new'],
+      ])
+    })
+
+    it('keeps an optimistic user message the backend has not stored yet', async () => {
+      const release = holdWindowFetch([])
+      const load = useMessageStore.getState().loadMessages('conv-1')
+
+      unconfirmedMessageIds.add('opt-1')
+      patchConv('conv-1', { messages: [createMockMessage('opt-1', 'pending')] })
+      release()
+      await load
+      unconfirmedMessageIds.delete('opt-1')
+
+      const cs = useMessageStore.getState().getConversationState('conv-1')
+      expect(cs.messages.map((m) => m.id)).toEqual(['opt-1'])
+    })
+
+    it('does not carry deliveries over to a later load', async () => {
+      const release = holdWindowFetch([])
+      const load = useMessageStore.getState().loadMessages('conv-1')
+      useMessageStore.getState().addMessage('conv-1', createMockMessage('a1', 'reply', 'model'))
+      release()
+      await load
+
+      // The row was later deleted; a fresh load must not resurrect it
+      invokeMock.mockImplementation((async (cmd: string) =>
+        cmd === 'list_messages_by_conversation' || cmd === 'get_sibling_groups'
+          ? []
+          : undefined) as never)
+      await useMessageStore.getState().loadMessages('conv-1')
+
+      expect(useMessageStore.getState().getConversationState('conv-1').messages).toEqual([])
+    })
+  })
+
+  describe('stopGeneration', () => {
+    it('asks the backend to stop and resets the sending flag', async () => {
+      setSending('conv-1')
+      invokeMock.mockResolvedValue(undefined)
+
+      await useMessageStore.getState().stopGeneration('conv-1')
+
+      expect(invokeMock).toHaveBeenCalledWith('stop_generation', { conversationId: 'conv-1' })
+      expect(sending('conv-1')).toBe(false)
+      expect(useMessageStore.getState().getConversationState('conv-1').stopRequested).toBe(true)
+    })
+
+    it('settles a run that already ended backend-side and reloads its reply', async () => {
+      // The completion event was missed: the store still shows the run
+      useMessageStore.getState().setIsStreaming('conv-1', true)
+      useMessageStore.getState().setIsWaitingForAI('conv-1', true)
+      useMessageStore.getState().setStreamingContent('conv-1', 'Hi! What can I help')
+      const saved = createMockMessage('a1', 'Hi! What can I help you with today?')
+      invokeMock.mockImplementation((async (cmd: string) => {
+        if (cmd === 'stop_generation') return false
+        if (cmd === 'list_messages_by_conversation') return [saved]
+        if (cmd === 'get_sibling_groups') return []
+        return undefined
+      }) as never)
+
+      await useMessageStore.getState().stopGeneration('conv-1')
+
+      const cs = useMessageStore.getState().getConversationState('conv-1')
+      expect(cs.isStreaming).toBe(false)
+      expect(cs.isWaitingForAI).toBe(false)
+      expect(cs.streamingContent).toBe('')
+      expect(cs.stopRequested).toBe(false)
+      expect(cs.messages.map((m) => m.id)).toEqual(['a1'])
+    })
+
+    it('swallows backend errors without resetting the sending flag', async () => {
+      setSending('conv-1')
+      invokeMock.mockRejectedValue(new Error('stop refused'))
+
+      await expect(useMessageStore.getState().stopGeneration('conv-1')).resolves.toBeUndefined()
+
+      expect(sending('conv-1')).toBe(true)
+      expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
+        '[messageStore] Failed to stop generation:',
+        expect.any(Error)
+      )
+    })
+  })
+
+  describe('clearMessages', () => {
+    it('empties the window after the backend clears history', async () => {
+      const store = useMessageStore.getState()
+      store.addMessage('conv-1', createMockMessage('m1', 'one'))
+      store.addMessage('conv-1', createMockMessage('m2', 'two'))
+      invokeMock.mockResolvedValue(undefined)
+
+      await store.clearMessages('conv-1')
+
+      expect(invokeMock).toHaveBeenCalledWith('clear_messages_by_conversation', {
+        conversationId: 'conv-1',
+      })
+      const cs = useMessageStore.getState().getConversationState('conv-1')
+      expect(cs.messages).toHaveLength(0)
+      expect(cs.isLoading).toBe(false)
+    })
+
+    it('rethrows and records the error when clearing fails', async () => {
+      useMessageStore.getState().getConversationState('conv-1')
+      invokeMock.mockRejectedValue(new Error('clear failed'))
+
+      await expect(useMessageStore.getState().clearMessages('conv-1')).rejects.toThrow(
+        'clear failed'
+      )
+
+      const state = useMessageStore.getState()
+      expect(state.error).toBe('Error: clear failed')
+      expect(state.getConversationState('conv-1').isLoading).toBe(false)
+    })
+  })
+
+  describe('deleteMessagesFrom', () => {
+    it('removes the message and everything after it', async () => {
+      const store = useMessageStore.getState()
+      store.addMessage('conv-1', createMockMessage('m1', 'one'))
+      store.addMessage('conv-1', createMockMessage('m2', 'two'))
+      store.addMessage('conv-1', createMockMessage('m3', 'three'))
+      store.addMessage('conv-1', createMockMessage('m4', 'four'))
+      invokeMock.mockResolvedValue(undefined)
+
+      await store.deleteMessagesFrom('conv-1', 'm3')
+
+      expect(invokeMock).toHaveBeenCalledWith('delete_messages_from', {
+        conversationId: 'conv-1',
+        messageId: 'm3',
+      })
+      expect(
+        useMessageStore
+          .getState()
+          .getConversationState('conv-1')
+          .messages.map((m) => m.id)
+      ).toEqual(['m1', 'm2'])
+    })
+
+    it('keeps the window when the message is not loaded', async () => {
+      useMessageStore.getState().addMessage('conv-1', createMockMessage('m1', 'one'))
+      invokeMock.mockResolvedValue(undefined)
+
+      await useMessageStore.getState().deleteMessagesFrom('conv-1', 'missing')
+
+      expect(
+        useMessageStore
+          .getState()
+          .getConversationState('conv-1')
+          .messages.map((m) => m.id)
+      ).toEqual(['m1'])
+    })
+
+    it('rethrows when the backend delete fails', async () => {
+      useMessageStore.getState().getConversationState('conv-1')
+      invokeMock.mockRejectedValue(new Error('delete failed'))
+
+      await expect(useMessageStore.getState().deleteMessagesFrom('conv-1', 'm1')).rejects.toThrow(
+        'delete failed'
+      )
+
+      expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
+        '[messageStore] Failed to delete messages from:',
+        expect.any(Error)
+      )
+    })
+  })
+
+  describe('addMessage idempotency', () => {
+    it('replaces an existing message in place instead of duplicating it', () => {
+      const store = useMessageStore.getState()
+      store.addMessage('conv-1', createMockMessage('m1', 'one'))
+      store.addMessage('conv-1', createMockMessage('m2', 'two'))
+      store.addMessage('conv-1', createMockMessage('m2', 'two (edited)'))
+
+      const cs = useMessageStore.getState().getConversationState('conv-1')
+      expect(cs.messages).toHaveLength(2)
+      expect(cs.messages.map((m) => m.id)).toEqual(['m1', 'm2'])
+      expect(cs.messages[1].content).toBe('two (edited)')
+    })
+
+    it('clears the waiting flag once the message lands', () => {
+      patchConv('conv-1', { isWaitingForAI: true })
+
+      useMessageStore.getState().addMessage('conv-1', createMockMessage('m-a', 'done', 'assistant'))
+
+      expect(useMessageStore.getState().getConversationState('conv-1').isWaitingForAI).toBe(false)
+    })
+  })
+
+  describe('pending message queue', () => {
+    const queued = (content: string, extra: Partial<PendingMessage> = {}): PendingMessage => ({
+      content,
+      conversationId: 'conv-q',
+      provider: 'openai',
+      model: 'gpt-4',
+      ...extra,
+    })
+
+    it('enqueueMessage appends messages in order', () => {
+      const store = useMessageStore.getState()
+      store.enqueueMessage('conv-q', queued('first'))
+      store.enqueueMessage('conv-q', queued('second'))
+
+      const cs = useMessageStore.getState().getConversationState('conv-q')
+      expect(cs.pendingMessages.map((m) => m.content)).toEqual(['first', 'second'])
+    })
+
+    it('removePendingMessage drops only valid indices', () => {
+      const store = useMessageStore.getState()
+      store.enqueueMessage('conv-q', queued('first'))
+      store.enqueueMessage('conv-q', queued('second'))
+      store.enqueueMessage('conv-q', queued('third'))
+
+      store.removePendingMessage('conv-q', 9)
+      store.removePendingMessage('conv-q', -1)
+      expect(
+        useMessageStore.getState().getConversationState('conv-q').pendingMessages
+      ).toHaveLength(3)
+
+      store.removePendingMessage('conv-q', 1)
+      expect(
+        useMessageStore
+          .getState()
+          .getConversationState('conv-q')
+          .pendingMessages.map((m) => m.content)
+      ).toEqual(['first', 'third'])
+    })
+
+    it('clearPendingMessages empties the queue', () => {
+      const store = useMessageStore.getState()
+      store.enqueueMessage('conv-q', queued('first'))
+      store.enqueueMessage('conv-q', queued('second'))
+
+      store.clearPendingMessages('conv-q')
+
+      expect(
+        useMessageStore.getState().getConversationState('conv-q').pendingMessages
+      ).toHaveLength(0)
+    })
+
+    it('processNextPendingMessage is a no-op when the queue is empty', () => {
+      useMessageStore.getState().getConversationState('conv-q')
+
+      useMessageStore.getState().processNextPendingMessage('conv-q')
+
+      expect(invokeMock).not.toHaveBeenCalled()
+      expect(
+        useMessageStore.getState().getConversationState('conv-q').pendingMessages
+      ).toHaveLength(0)
+    })
+
+    it('puts a failed queued send back at the head, marked failed, and toasts', async () => {
+      useMessageStore.getState().enqueueMessage('conv-q', queued('first'))
+      useMessageStore.getState().enqueueMessage('conv-q', queued('second'))
+      invokeMock.mockRejectedValue('Attachments are too large to send')
+
+      useMessageStore.getState().processNextPendingMessage('conv-q')
+
+      await vi.waitFor(() => {
+        expect(toastMocks.error).toHaveBeenCalledWith(expect.any(String), {
+          description: 'Attachments are too large to send',
+        })
+      })
+      const cs = useMessageStore.getState().getConversationState('conv-q')
+      expect(cs.pendingMessages.map((m) => [m.content, m.error])).toEqual([
+        ['first', 'Attachments are too large to send'],
+        ['second', undefined],
+      ])
+      expect(cs.isStreaming).toBe(false)
+      expect(cs.isWaitingForAI).toBe(false)
+      expect(cs.messages).toEqual([])
+    })
+
+    it('a failed queued message pauses the queue', () => {
+      patchConv('conv-q', { pendingMessages: [queued('first', { error: 'boom' }), queued('b')] })
+
+      useMessageStore.getState().processNextPendingMessage('conv-q')
+
+      expect(invokeMock).not.toHaveBeenCalledWith('send_message', expect.anything())
+      expect(
+        useMessageStore.getState().getConversationState('conv-q').pendingMessages
+      ).toHaveLength(2)
+    })
+
+    it('retrying a failed queued message sends it when idle', async () => {
+      patchConv('conv-q', { pendingMessages: [queued('first', { error: 'boom' })] })
+      invokeMock.mockResolvedValue({
+        ...createMockMessage('m-r', 'first'),
+        conversation_id: 'conv-q',
+      })
+
+      useMessageStore.getState().retryPendingMessage('conv-q')
+
+      await vi.waitFor(() => {
+        expect(invokeMock).toHaveBeenCalledWith(
+          'send_message',
+          expect.objectContaining({ conversationId: 'conv-q', content: 'first' })
+        )
+      })
+      expect(useMessageStore.getState().getConversationState('conv-q').pendingMessages).toEqual([])
+    })
+
+    it('retrying during a running turn only unpauses the queue', () => {
+      patchConv('conv-q', {
+        isStreaming: true,
+        pendingMessages: [queued('first', { error: 'boom' })],
+      })
+
+      useMessageStore.getState().retryPendingMessage('conv-q')
+
+      expect(invokeMock).not.toHaveBeenCalledWith('send_message', expect.anything())
+      const [pending] = useMessageStore.getState().getConversationState('conv-q').pendingMessages
+      expect(pending.content).toBe('first')
+      expect(pending.error).toBeUndefined()
+    })
+
+    it('removing the failed queued message lets the rest of the queue go out', async () => {
+      patchConv('conv-q', {
+        pendingMessages: [queued('first', { error: 'boom' }), queued('second')],
+      })
+      invokeMock.mockResolvedValue({
+        ...createMockMessage('m-2', 'second'),
+        conversation_id: 'conv-q',
+      })
+
+      useMessageStore.getState().removePendingMessage('conv-q', 0)
+
+      await vi.waitFor(() => {
+        expect(invokeMock).toHaveBeenCalledWith(
+          'send_message',
+          expect.objectContaining({ conversationId: 'conv-q', content: 'second' })
+        )
+      })
+    })
+
+    it('sendPendingMessageNow sends the chosen message first when idle', async () => {
+      // Queued messages wait while a failed queued send pauses the queue
+      patchConv('conv-q', {
+        pendingMessages: [queued('first', { error: 'boom' }), queued('second'), queued('third')],
+      })
+      invokeMock.mockResolvedValue({
+        ...createMockMessage('m-3', 'third'),
+        conversation_id: 'conv-q',
+      })
+
+      await useMessageStore.getState().sendPendingMessageNow('conv-q', 2)
+
+      await vi.waitFor(() => {
+        expect(invokeMock).toHaveBeenCalledWith(
+          'send_message',
+          expect.objectContaining({ conversationId: 'conv-q', content: 'third' })
+        )
+      })
+      expect(
+        useMessageStore
+          .getState()
+          .getConversationState('conv-q')
+          .pendingMessages.map((m) => [m.content, m.error])
+      ).toEqual([
+        ['first', 'boom'],
+        ['second', undefined],
+      ])
+    })
+
+    it('sendPendingMessageNow stops a running turn and moves the message to the head', async () => {
+      patchConv('conv-q', {
+        isStreaming: true,
+        pendingMessages: [queued('first'), queued('second')],
+      })
+      invokeMock.mockResolvedValue(true as never)
+
+      await useMessageStore.getState().sendPendingMessageNow('conv-q', 1)
+
+      expect(invokeMock).toHaveBeenCalledWith('stop_generation', { conversationId: 'conv-q' })
+      expect(invokeMock).not.toHaveBeenCalledWith('send_message', expect.anything())
+      const cs = useMessageStore.getState().getConversationState('conv-q')
+      expect(cs.stopRequested).toBe(true)
+      expect(cs.pendingMessages.map((m) => m.content)).toEqual(['second', 'first'])
+    })
+
+    it('sendPendingMessageNow does not stop twice while a stop is in flight', async () => {
+      patchConv('conv-q', {
+        isStreaming: true,
+        stopRequested: true,
+        pendingMessages: [queued('first'), queued('second')],
+      })
+
+      await useMessageStore.getState().sendPendingMessageNow('conv-q', 1)
+
+      expect(invokeMock).not.toHaveBeenCalledWith('stop_generation', expect.anything())
+      expect(
+        useMessageStore
+          .getState()
+          .getConversationState('conv-q')
+          .pendingMessages.map((m) => m.content)
+      ).toEqual(['second', 'first'])
+    })
+
+    it('sendPendingMessageNow moves past a failed turn', async () => {
+      patchConv('conv-q', {
+        failedTurn: { kind: 'failed', error: 'upstream 500', previousReplyId: null },
+        pendingMessages: [queued('first')],
+      })
+      invokeMock.mockResolvedValue({
+        ...createMockMessage('m-1', 'first'),
+        conversation_id: 'conv-q',
+      })
+
+      await useMessageStore.getState().sendPendingMessageNow('conv-q', 0)
+
+      await vi.waitFor(() => {
+        expect(invokeMock).toHaveBeenCalledWith(
+          'send_message',
+          expect.objectContaining({ conversationId: 'conv-q', content: 'first' })
+        )
+      })
+    })
+
+    it('sendPendingMessageNow ignores invalid indices', async () => {
+      patchConv('conv-q', { isStreaming: true, pendingMessages: [queued('first')] })
+
+      await useMessageStore.getState().sendPendingMessageNow('conv-q', 3)
+
+      expect(invokeMock).not.toHaveBeenCalled()
+    })
+
+    it('processNextPendingMessage dequeues and dispatches via sendMessage', async () => {
+      useMessageStore.getState().enqueueMessage('conv-q', {
+        content: 'queued hello',
+        conversationId: 'conv-q',
+        provider: 'openai',
+        model: 'gpt-4o',
+        apiKey: 'sk-queue',
+        searchEnabled: true,
+        parameterOverrides: { temperature: 0.5 },
+      })
+      invokeMock.mockResolvedValue({
+        ...createMockMessage('msg-q', 'queued hello'),
+        conversation_id: 'conv-q',
+      })
+
+      useMessageStore.getState().processNextPendingMessage('conv-q')
+
+      // The optimistic message lands first; wait for the stored row
+      await vi.waitFor(() => {
+        const messages = useMessageStore.getState().getConversationState('conv-q').messages
+        expect(messages.map((m) => m.id)).toEqual(['msg-q'])
+      })
+      const cs = useMessageStore.getState().getConversationState('conv-q')
+      expect(cs.pendingMessages).toHaveLength(0)
+      expect(invokeMock).toHaveBeenCalledWith(
+        'send_message',
+        expect.objectContaining({
+          conversationId: 'conv-q',
+          content: 'queued hello',
+          provider: 'openai',
+          model: 'gpt-4o',
+          apiKey: 'sk-queue',
+          searchEnabled: true,
+          parameterOverrides: { temperature: 0.5 },
+        })
+      )
+      expect(conversationMocks.bumpConversation).toHaveBeenCalledWith('conv-q', 'queued hello')
+      expect(sending('conv-q')).toBe(false)
+    })
+  })
+
+  describe('window pagination error paths', () => {
+    it('loadMessages records the error and stops loading when the query fails', async () => {
+      invokeMock.mockRejectedValue(new Error('db down'))
+
+      await useMessageStore.getState().loadMessages('conv-e')
+
+      const state = useMessageStore.getState()
+      expect(state.error).toBe('Error: db down')
+      const cs = state.getConversationState('conv-e')
+      expect(cs.isLoading).toBe(false)
+      expect(cs.messages).toHaveLength(0)
+      expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
+        'Failed to load messages:',
+        expect.any(Error)
+      )
+    })
+
+    it('loadOlderMessages reports failure without breaking the window', async () => {
+      invokeMock.mockResolvedValueOnce(page(101, 'm'))
+      await useMessageStore.getState().loadMessages('conv-p')
+      invokeMock.mockRejectedValueOnce(new Error('older query failed'))
+
+      const loaded = await useMessageStore.getState().loadOlderMessages('conv-p')
+
+      const cs = useMessageStore.getState().getConversationState('conv-p')
+      expect(loaded).toBe(false)
+      expect(cs.isLoadingOlder).toBe(false)
+      expect(cs.messages).toHaveLength(100)
+      expect(cs.hasOlderMessages).toBe(true)
+      expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
+        'Failed to load older messages:',
+        expect.any(Error)
+      )
+    })
+
+    it('loadOlderMessages bails out when the window is empty even if older history is flagged', async () => {
+      useMessageStore.setState({
+        conversationStates: {
+          'conv-e': { ...createDefaultConversationState(), hasOlderMessages: true },
+        },
+      })
+
+      const loaded = await useMessageStore.getState().loadOlderMessages('conv-e')
+
+      expect(loaded).toBe(false)
+      expect(invokeMock).not.toHaveBeenCalled()
+    })
+
+    it('loadAllMessages waits for an in-flight page instead of treating it as exhausted', async () => {
+      invokeMock.mockResolvedValueOnce(page(101, 'm'))
+      await useMessageStore.getState().loadMessages('conv-p')
+
+      // Simulate a scroll-triggered page already in flight
+      patchConv('conv-p', { isLoadingOlder: true })
+      invokeMock.mockResolvedValueOnce(page(50, 'old'))
+
+      const allLoaded = useMessageStore.getState().loadAllMessages('conv-p')
+      // Release the in-flight flag while loadAllMessages waits on its timer
+      patchConv('conv-p', { isLoadingOlder: false })
+      await allLoaded
+
+      const cs = useMessageStore.getState().getConversationState('conv-p')
+      expect(cs.messages).toHaveLength(150)
+      expect(cs.messages[0].id).toBe('old0')
+      expect(cs.hasOlderMessages).toBe(false)
+      expect(cs.isLoadingOlder).toBe(false)
+      // Initial window (path + sibling groups) plus exactly one waited-for
+      // older page
+      expect(invokeMock).toHaveBeenCalledTimes(3)
+    })
+  })
+})

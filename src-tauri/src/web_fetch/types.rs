@@ -1,0 +1,174 @@
+use chrono::Utc;
+use lazy_static::lazy_static;
+use regex::Regex;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
+
+/// Metadata for web fetch results
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebFetchMetadata {
+    pub keywords: Option<String>,
+    pub headings: Vec<String>,
+    pub fetched_at: String,
+    pub original_length: Option<usize>,
+    pub truncated: bool,
+    pub favicon_url: Option<String>,
+    /// Which fetch tier produced the content: `http`, `obscura`, `webview`,
+    /// `chrome`, or `jina`. `None` for restored rows and errors.
+    pub tier: Option<String>,
+    /// The plain-HTTP result was escalated to a browser tier.
+    pub escalated: bool,
+    /// Escalation was attempted but every browser tier failed, so the
+    /// plain-HTTP content was kept. The model must treat it as incomplete.
+    pub partial: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FetchedWebResource {
+    pub url: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub mime_type: String,
+    pub content_format: String, // MIME type of converted content (e.g., "text/markdown")
+    pub content: String,
+    pub extraction_error: Option<String>,
+    pub metadata: WebFetchMetadata,
+}
+
+impl FetchedWebResource {
+    /// Tag which fetch tier produced this resource.
+    pub fn with_tier(mut self, tier: &str) -> Self {
+        self.metadata.tier = Some(tier.to_string());
+        self
+    }
+
+    /// Mark that a browser tier was used after plain HTTP.
+    pub fn mark_escalated(mut self) -> Self {
+        self.metadata.escalated = true;
+        self
+    }
+
+    /// Mark content as incomplete: escalation was attempted, every browser
+    /// tier failed, and the plain-HTTP result was kept.
+    pub fn mark_partial(mut self) -> Self {
+        self.metadata.partial = true;
+        self
+    }
+
+    /// Create an error response with default metadata
+    pub fn error(url: &str, mime_type: String, error: String, favicon_url: Option<String>) -> Self {
+        FetchedWebResource {
+            url: url.to_string(),
+            title: None,
+            description: None,
+            mime_type: mime_type.clone(),
+            content_format: mime_type,
+            content: String::new(),
+            extraction_error: Some(error),
+            metadata: WebFetchMetadata {
+                keywords: None,
+                headings: vec![],
+                fetched_at: Utc::now().to_rfc3339(),
+                original_length: None,
+                truncated: false,
+                favicon_url,
+                tier: None,
+                escalated: false,
+                partial: false,
+            },
+        }
+    }
+
+    /// Create a direct-image response. Image bytes are not downloaded or
+    /// stored by the fetch pipeline anymore; the content carries guidance
+    /// steering the model to the `read` tool, which fetches image URLs
+    /// through its own in-memory URL path.
+    pub fn image(url: &str, mime_type: String) -> Self {
+        FetchedWebResource {
+            url: url.to_string(),
+            title: None,
+            description: None,
+            content_format: mime_type.clone(),
+            mime_type,
+            content: "This URL is a direct image. Use the read tool on the URL to \
+                      fetch and inspect it (inline pixels for vision-capable models, \
+                      or with a \"question\" for a vision-model answer)."
+                .to_string(),
+            extraction_error: None,
+            metadata: WebFetchMetadata {
+                keywords: None,
+                headings: vec![],
+                fetched_at: Utc::now().to_rfc3339(),
+                original_length: None,
+                truncated: false,
+                favicon_url: None,
+                tier: None,
+                escalated: false,
+                partial: false,
+            },
+        }
+    }
+}
+
+lazy_static! {
+    /// Shared HTTP client with connection pooling
+    pub static ref HTTP_CLIENT: Client = Client::builder()
+        .timeout(Duration::from_secs(30))
+        .connect_timeout(Duration::from_secs(10))
+        .user_agent("Mozilla/5.0 (compatible; Ghost AI/1.0)")
+        .build()
+        .expect("Failed to create HTTP client");
+
+    pub static ref URL_REGEX: Regex = Regex::new(
+        r"https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&/=]*)"
+    ).expect("Invalid URL regex pattern");
+
+    /// Regex to match complete img tags
+    pub static ref IMG_TAG_REGEX: Regex = Regex::new(
+        r#"(?i)<img\s[^>]*?/?>"#
+    ).expect("Invalid img tag regex");
+
+    /// Regex to extract src attribute from img tag
+    pub static ref IMG_SRC_REGEX: Regex = Regex::new(
+        r#"(?i)src\s*=\s*["']([^"']+)["']"#
+    ).expect("Invalid src regex");
+
+    /// Regex to extract alt attribute from img tag
+    pub static ref IMG_ALT_REGEX: Regex = Regex::new(
+        r#"(?i)alt\s*=\s*["']([^"']*)["']"#
+    ).expect("Invalid alt regex");
+
+    /// Stealth JavaScript to hide headless browser detection
+    pub static ref STEALTH_JS: String = r#"
+        // Override webdriver property
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined,
+        });
+        
+        // Override plugins to look like a real browser
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [1, 2, 3, 4, 5],
+        });
+        
+        // Override languages
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en'],
+        });
+        
+        // Add chrome runtime (missing in headless)
+        window.chrome = {
+            runtime: {},
+        };
+        
+        // Override permissions query
+        if (window.navigator.permissions) {
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+        }
+    "#.to_string();
+}

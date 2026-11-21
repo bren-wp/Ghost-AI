@@ -1,0 +1,660 @@
+import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
+import { invoke } from '@tauri-apps/api/core'
+import type {
+  ConversationSettings,
+  ConversationSettingsResponse,
+  PermissionMode,
+  PromptMode,
+  ModelParameterOverrides,
+  UpdateConversationSettingsRequest,
+} from '@/types'
+import type { Assistant } from '@/types'
+import { defaultPermissionMode } from '@/lib/permission-mode'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { fromBackendSettings, toBackendRequest, createDefaultConversationSettings } from '@/types'
+import { useMcpStore } from './mcpStore'
+import { useSkillStore } from './skillStore'
+import { logger } from '@/lib/logger'
+
+/** The assistant fields that seed a conversation's settings */
+export type AssistantSettingsSource = Pick<
+  Assistant,
+  'tool_ids' | 'skill_ids' | 'model_parameter_preset_id'
+>
+
+interface ConversationSettingsState {
+  // Cached settings per conversation (conversationId -> settings)
+  settings: Record<string, ConversationSettings>
+  // Loading state per conversation
+  loading: Record<string, boolean>
+  // Error state
+  error: string | null
+  // Conversations drafted in the UI but not yet in the database; their
+  // settings live only in `settings` until persistDraft writes them out
+  drafts: Record<string, true>
+}
+
+interface ConversationSettingsActions {
+  // Load settings for a conversation from database
+  loadSettings: (conversationId: string) => Promise<ConversationSettings>
+
+  // Get cached settings for a conversation (returns undefined until loaded)
+  getSettings: (conversationId: string) => ConversationSettings | undefined
+
+  // Generic update method for atomic updates of multiple fields
+  updateSettings: (
+    conversationId: string,
+    updates: UpdateConversationSettingsRequest
+  ) => Promise<void>
+
+  // Use provider defaults (no parameters sent)
+  setUseProviderDefaults: (conversationId: string, useDefaults: boolean) => Promise<void>
+
+  // Update parameter overrides
+  setParameterOverrides: (
+    conversationId: string,
+    overrides: ModelParameterOverrides
+  ) => Promise<void>
+
+  // Toggle between custom and preset parameters
+  setUseCustomParameters: (conversationId: string, useCustom: boolean) => Promise<void>
+
+  // Set selected preset ID
+  setSelectedPresetId: (conversationId: string, presetId: string | null) => Promise<void>
+
+  // Set context message count
+  setContextMessageCount: (conversationId: string, count: number | null) => Promise<void>
+
+  // System prompt settings
+  setSystemPromptMode: (conversationId: string, mode: PromptMode) => Promise<void>
+  setSelectedSystemPromptId: (conversationId: string, promptId: string | null) => Promise<void>
+  setCustomSystemPrompt: (conversationId: string, content: string) => Promise<void>
+
+  // Atomic system prompt update (mode + id/content together)
+  setSystemPrompt: (
+    conversationId: string,
+    mode: PromptMode,
+    promptId?: string | null,
+    customContent?: string | null
+  ) => Promise<void>
+
+  // User prompt settings
+  setUserPromptMode: (conversationId: string, mode: PromptMode) => Promise<void>
+  setSelectedUserPromptId: (conversationId: string, promptId: string | null) => Promise<void>
+  setCustomUserPrompt: (conversationId: string, content: string) => Promise<void>
+
+  // Atomic user prompt update (mode + id/content together)
+  setUserPrompt: (
+    conversationId: string,
+    mode: PromptMode,
+    promptId?: string | null,
+    customContent?: string | null
+  ) => Promise<void>
+
+  // Reset settings to default
+  resetSettings: (conversationId: string) => Promise<void>
+
+  // Remove settings from cache when conversation is deleted or a draft is dropped
+  removeSettings: (conversationId: string) => void
+
+  // Keep a draft conversation's settings in memory, seeded with the defaults
+  startDraft: (conversationId: string) => Promise<void>
+
+  // Write a draft's settings to the database once its conversation row exists
+  persistDraft: (conversationId: string) => Promise<void>
+
+  // MCP server settings
+  setEnabledMcpServerIds: (conversationId: string, serverIds: string[]) => Promise<void>
+
+  // Skill settings
+  setEnabledSkillIds: (conversationId: string, skillIds: string[]) => Promise<void>
+
+  // Initialize settings from an assistant's tools, skills and parameter
+  // preset; the preset becomes the conversation's parameter source
+  initSettingsFromAssistant: (
+    conversationId: string,
+    assistant: AssistantSettingsSource
+  ) => Promise<void>
+
+  // When switching away from an assistant, drop the preset it put in place
+  // so the conversation returns to provider defaults. A preset the user
+  // picked themselves (a different one, or custom values) is kept.
+  clearInheritedPreset: (
+    conversationId: string,
+    assistant: AssistantSettingsSource
+  ) => Promise<void>
+
+  // Reset tools and skills to global defaults (when switching away from an assistant)
+  resetToolsAndSkillsToGlobal: (conversationId: string) => Promise<void>
+
+  // Working directory for bash tool
+  setWorkingDirectory: (conversationId: string, directory: string | null) => Promise<void>
+
+  // Tool permission mode (ask / yolo)
+  setPermissionMode: (conversationId: string, mode: PermissionMode) => Promise<void>
+}
+
+type ConversationSettingsStore = ConversationSettingsState & ConversationSettingsActions
+
+// Helper to get globally enabled MCP server IDs
+function getGlobalEnabledMcpServerIds(): string[] {
+  const mcpStore = useMcpStore.getState()
+  return mcpStore.servers.filter((server) => server.is_enabled).map((server) => server.id)
+}
+
+// Helper to get globally enabled skill IDs
+function getGlobalEnabledSkillIds(): string[] {
+  const skillStore = useSkillStore.getState()
+  return skillStore.skills.filter((skill) => skill.is_enabled).map((skill) => skill.id)
+}
+
+// Helper to create default settings with inherited global MCP servers and skills
+function createDefaultSettings(conversationId: string): ConversationSettings {
+  return createDefaultConversationSettings(
+    conversationId,
+    getGlobalEnabledMcpServerIds(),
+    getGlobalEnabledSkillIds(),
+    defaultPermissionMode(useSettingsStore.getState().settings)
+  )
+}
+
+// Helper to update settings in the backend
+async function updateSettingsInBackend(
+  conversationId: string,
+  req: UpdateConversationSettingsRequest
+): Promise<ConversationSettingsResponse> {
+  return await invoke<ConversationSettingsResponse>('update_conversation_settings', {
+    conversationId,
+    req: toBackendRequest(req),
+  })
+}
+
+// Save a settings change and return the resulting settings. A draft has no
+// database row yet, so its changes are merged in memory instead.
+async function saveSettings(
+  conversationId: string,
+  req: UpdateConversationSettingsRequest
+): Promise<ConversationSettings> {
+  const { drafts, settings } = useConversationSettingsStore.getState()
+  if (drafts[conversationId]) {
+    const changes = Object.fromEntries(
+      Object.entries(req).filter(([, value]) => value !== undefined)
+    ) as Partial<ConversationSettings>
+    return { ...(settings[conversationId] ?? createDefaultSettings(conversationId)), ...changes }
+  }
+  return fromBackendSettings(await updateSettingsInBackend(conversationId, req))
+}
+
+export const useConversationSettingsStore = create<ConversationSettingsStore>()(
+  immer((set, get) => ({
+    settings: {},
+    loading: {},
+    error: null,
+    drafts: {},
+
+    loadSettings: async (conversationId: string) => {
+      // A draft's edits exist only here; reloading would reset them to defaults
+      const cached = get().settings[conversationId]
+      if (get().drafts[conversationId] && cached) {
+        return cached
+      }
+
+      // Check if already loading
+      if (get().loading[conversationId]) {
+        // Return cached or default
+        return get().settings[conversationId] || createDefaultSettings(conversationId)
+      }
+
+      set((draft) => {
+        draft.loading[conversationId] = true
+        draft.error = null
+      })
+
+      try {
+        const response = await invoke<ConversationSettingsResponse>('get_conversation_settings', {
+          conversationId,
+        })
+        const settings = fromBackendSettings(response)
+
+        set((draft) => {
+          draft.settings[conversationId] = settings
+          draft.loading[conversationId] = false
+        })
+
+        return settings
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to load settings:', error)
+        // Store default settings on error so UI still works
+        const defaultSettings = createDefaultSettings(conversationId)
+        set((draft) => {
+          draft.settings[conversationId] = defaultSettings
+          draft.error = String(error)
+          draft.loading[conversationId] = false
+        })
+        return defaultSettings
+      }
+    },
+
+    getSettings: (conversationId: string) => {
+      return get().settings[conversationId]
+    },
+
+    updateSettings: async (conversationId: string, updates: UpdateConversationSettingsRequest) => {
+      try {
+        const next = await saveSettings(conversationId, updates)
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update settings:', error)
+      }
+    },
+
+    setUseProviderDefaults: async (conversationId: string, useDefaults: boolean) => {
+      try {
+        const req: UpdateConversationSettingsRequest = {
+          useProviderDefaults: useDefaults,
+        }
+        if (useDefaults) {
+          // Clear other parameter settings
+          req.useCustomParameters = false
+          req.selectedPresetId = null
+        }
+        const next = await saveSettings(conversationId, req)
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update useProviderDefaults:', error)
+      }
+    },
+
+    setParameterOverrides: async (conversationId: string, overrides: ModelParameterOverrides) => {
+      try {
+        const existing = get().settings[conversationId]
+        const merged = {
+          ...existing?.parameterOverrides,
+          ...overrides,
+        }
+        const next = await saveSettings(conversationId, {
+          parameterOverrides: merged,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update parameterOverrides:', error)
+      }
+    },
+
+    setUseCustomParameters: async (conversationId: string, useCustom: boolean) => {
+      try {
+        const req: UpdateConversationSettingsRequest = {
+          useCustomParameters: useCustom,
+        }
+        if (useCustom) {
+          req.selectedPresetId = null
+          req.useProviderDefaults = false
+        }
+        const next = await saveSettings(conversationId, req)
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update useCustomParameters:', error)
+      }
+    },
+
+    setSelectedPresetId: async (conversationId: string, presetId: string | null) => {
+      try {
+        const req: UpdateConversationSettingsRequest = {
+          selectedPresetId: presetId,
+        }
+        if (presetId !== null) {
+          req.useCustomParameters = false
+          req.useProviderDefaults = false
+        }
+        const next = await saveSettings(conversationId, req)
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update selectedPresetId:', error)
+      }
+    },
+
+    setContextMessageCount: async (conversationId: string, count: number | null) => {
+      try {
+        const next = await saveSettings(conversationId, {
+          contextMessageCount: count,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update contextMessageCount:', error)
+      }
+    },
+
+    setSystemPromptMode: async (conversationId: string, mode: PromptMode) => {
+      try {
+        const req: UpdateConversationSettingsRequest = {
+          systemPromptMode: mode,
+        }
+        // Clear selection when switching to 'none' or 'custom'
+        if (mode === 'none' || mode === 'custom') {
+          req.selectedSystemPromptId = null
+        }
+        if (mode === 'none') {
+          req.customSystemPrompt = null
+        }
+        const next = await saveSettings(conversationId, req)
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update systemPromptMode:', error)
+      }
+    },
+
+    setSelectedSystemPromptId: async (conversationId: string, promptId: string | null) => {
+      try {
+        const next = await saveSettings(conversationId, {
+          selectedSystemPromptId: promptId,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update selectedSystemPromptId:', error)
+      }
+    },
+
+    setCustomSystemPrompt: async (conversationId: string, content: string) => {
+      try {
+        const next = await saveSettings(conversationId, {
+          customSystemPrompt: content,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update customSystemPrompt:', error)
+      }
+    },
+
+    setSystemPrompt: async (
+      conversationId: string,
+      mode: PromptMode,
+      promptId?: string | null,
+      customContent?: string | null
+    ) => {
+      try {
+        const req: UpdateConversationSettingsRequest = {
+          systemPromptMode: mode,
+        }
+        // Set appropriate fields based on mode
+        if (mode === 'none') {
+          req.selectedSystemPromptId = null
+          req.customSystemPrompt = null
+        } else if (mode === 'existing') {
+          req.selectedSystemPromptId = promptId ?? null
+          req.customSystemPrompt = null
+        } else if (mode === 'custom') {
+          req.selectedSystemPromptId = null
+          req.customSystemPrompt = customContent ?? null
+        }
+        const next = await saveSettings(conversationId, req)
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update system prompt:', error)
+      }
+    },
+
+    setUserPromptMode: async (conversationId: string, mode: PromptMode) => {
+      try {
+        const req: UpdateConversationSettingsRequest = {
+          userPromptMode: mode,
+        }
+        // Clear selection when switching to 'none' or 'custom'
+        if (mode === 'none' || mode === 'custom') {
+          req.selectedUserPromptId = null
+        }
+        if (mode === 'none') {
+          req.customUserPrompt = null
+        }
+        const next = await saveSettings(conversationId, req)
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update userPromptMode:', error)
+      }
+    },
+
+    setSelectedUserPromptId: async (conversationId: string, promptId: string | null) => {
+      try {
+        const next = await saveSettings(conversationId, {
+          selectedUserPromptId: promptId,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update selectedUserPromptId:', error)
+      }
+    },
+
+    setCustomUserPrompt: async (conversationId: string, content: string) => {
+      try {
+        const next = await saveSettings(conversationId, {
+          customUserPrompt: content,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update customUserPrompt:', error)
+      }
+    },
+
+    setUserPrompt: async (
+      conversationId: string,
+      mode: PromptMode,
+      promptId?: string | null,
+      customContent?: string | null
+    ) => {
+      try {
+        const req: UpdateConversationSettingsRequest = {
+          userPromptMode: mode,
+        }
+        // Set appropriate fields based on mode
+        if (mode === 'none') {
+          req.selectedUserPromptId = null
+          req.customUserPrompt = null
+        } else if (mode === 'existing') {
+          req.selectedUserPromptId = promptId ?? null
+          req.customUserPrompt = null
+        } else if (mode === 'custom') {
+          req.selectedUserPromptId = null
+          req.customUserPrompt = customContent ?? null
+        }
+        const next = await saveSettings(conversationId, req)
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update user prompt:', error)
+      }
+    },
+
+    resetSettings: async (conversationId: string) => {
+      try {
+        if (!get().drafts[conversationId]) {
+          await invoke('delete_conversation_settings', { conversationId })
+        }
+        set((draft) => {
+          draft.settings[conversationId] = createDefaultSettings(conversationId)
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to reset settings:', error)
+      }
+    },
+
+    removeSettings: (conversationId: string) => {
+      set((draft) => {
+        delete draft.settings[conversationId]
+        delete draft.loading[conversationId]
+        delete draft.drafts[conversationId]
+      })
+    },
+
+    startDraft: async (conversationId: string) => {
+      set((draft) => {
+        draft.drafts[conversationId] = true
+      })
+      await get().loadSettings(conversationId)
+    },
+
+    persistDraft: async (conversationId: string) => {
+      if (!get().drafts[conversationId]) return
+      const current = get().settings[conversationId] ?? (await get().loadSettings(conversationId))
+      // Every settings field doubles as an update field, so this writes them all
+      const response = await updateSettingsInBackend(conversationId, current)
+      set((draft) => {
+        draft.settings[conversationId] = fromBackendSettings(response)
+        delete draft.drafts[conversationId]
+      })
+    },
+
+    setEnabledMcpServerIds: async (conversationId: string, serverIds: string[]) => {
+      try {
+        const next = await saveSettings(conversationId, {
+          enabledMcpServerIds: serverIds,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update enabledMcpServerIds:', error)
+      }
+    },
+
+    setEnabledSkillIds: async (conversationId: string, skillIds: string[]) => {
+      try {
+        const next = await saveSettings(conversationId, {
+          enabledSkillIds: skillIds,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update enabledSkillIds:', error)
+      }
+    },
+
+    initSettingsFromAssistant: async (conversationId, assistant) => {
+      try {
+        const req: UpdateConversationSettingsRequest = {
+          enabledMcpServerIds: assistant.tool_ids,
+          enabledSkillIds: assistant.skill_ids,
+        }
+        if (assistant.model_parameter_preset_id) {
+          req.selectedPresetId = assistant.model_parameter_preset_id
+          req.useProviderDefaults = false
+          req.useCustomParameters = false
+        }
+        const next = await saveSettings(conversationId, req)
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to init settings from assistant:', error)
+      }
+    },
+
+    clearInheritedPreset: async (conversationId, assistant) => {
+      const current = get().settings[conversationId]
+      if (
+        !current ||
+        !assistant.model_parameter_preset_id ||
+        current.useCustomParameters ||
+        current.selectedPresetId !== assistant.model_parameter_preset_id
+      ) {
+        return
+      }
+      try {
+        const next = await saveSettings(conversationId, {
+          useProviderDefaults: true,
+          useCustomParameters: false,
+          selectedPresetId: null,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to clear inherited preset:', error)
+      }
+    },
+
+    resetToolsAndSkillsToGlobal: async (conversationId: string) => {
+      try {
+        let next: ConversationSettings
+        if (get().drafts[conversationId]) {
+          // Reading settings of a conversation without a row returns the
+          // global defaults without writing anything
+          const defaults = fromBackendSettings(
+            await invoke<ConversationSettingsResponse>('get_conversation_settings', {
+              conversationId,
+            })
+          )
+          next = {
+            ...(get().settings[conversationId] ?? defaults),
+            enabledMcpServerIds: defaults.enabledMcpServerIds,
+            enabledSkillIds: defaults.enabledSkillIds,
+          }
+        } else {
+          next = fromBackendSettings(
+            await invoke<ConversationSettingsResponse>('reset_conversation_tools_to_global', {
+              conversationId,
+            })
+          )
+        }
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to reset tools/skills to global:', error)
+      }
+    },
+
+    setWorkingDirectory: async (conversationId, directory) => {
+      try {
+        const next = await saveSettings(conversationId, {
+          workingDirectory: directory,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update workingDirectory:', error)
+      }
+    },
+
+    setPermissionMode: async (conversationId, mode) => {
+      try {
+        const next = await saveSettings(conversationId, {
+          permissionMode: mode,
+        })
+        set((draft) => {
+          draft.settings[conversationId] = next
+        })
+      } catch (error) {
+        logger.error('[conversationSettingsStore] Failed to update permissionMode:', error)
+      }
+    },
+  }))
+)

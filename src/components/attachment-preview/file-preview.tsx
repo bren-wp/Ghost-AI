@@ -1,0 +1,279 @@
+import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { CloudOff, FileText, Image, FileIcon as FileIconLucide, Loader2 } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { MarkdownContent } from '@/components/markdown-content'
+import { useAttachmentBlobStore } from '@/stores/attachmentBlobStore'
+import type { FileAttachment } from '@/types'
+import type { FilePreviewDialogProps, AttachmentLocalData, ImageAttachmentData } from './types'
+import { formatFileSize, isMarkdownFile } from './utils'
+import { ImageLightbox } from './image-lightbox'
+import { isBinaryDocument, isVideoFile } from '@/lib/document-files'
+import { logger } from '@/lib/logger'
+
+// File preview dialog component - supports both storage paths and in-memory content
+// Exported for reuse in other components (e.g., chat-input)
+export function FilePreviewDialog({
+  isOpen,
+  onClose,
+  fileName,
+  content: inMemoryContent,
+  base64,
+  storagePath,
+  mimeType,
+  size,
+}: FilePreviewDialogProps) {
+  const { t } = useTranslation(['common', 'attachments'])
+  const [loadedContent, setLoadedContent] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [noPreview, setNoPreview] = useState(false)
+
+  const isMarkdown = isMarkdownFile(fileName, mimeType)
+  // OOXML attachments are ZIP containers: never decode them as UTF-8.
+  const isBinaryDoc = isBinaryDocument(fileName)
+
+  // Determine content source (binary documents carry an empty string until
+  // extraction succeeds)
+  const content = inMemoryContent || loadedContent
+
+  // Load content when the dialog opens (only if no in-memory content)
+  useEffect(() => {
+    if (!isOpen || inMemoryContent || loadedContent !== null || noPreview || loading) {
+      return
+    }
+
+    if (isBinaryDoc && isVideoFile(fileName)) {
+      // Videos have no text preview.
+      setNoPreview(true)
+      return
+    }
+
+    if (isBinaryDoc) {
+      const request = storagePath
+        ? invoke<string>('extract_office_text_from_storage', { storagePath })
+        : base64
+          ? invoke<string>('extract_office_text_from_base64', { base64, fileName })
+          : Promise.resolve('')
+      setLoading(true)
+      request
+        .then((text) => {
+          if (text.trim().length > 0) {
+            setLoadedContent(text)
+          } else {
+            setNoPreview(true)
+          }
+        })
+        .catch((err) => {
+          logger.error('Failed to extract document text:', err)
+          setNoPreview(true)
+        })
+        .finally(() => setLoading(false))
+      return
+    }
+
+    if (storagePath) {
+      setLoading(true)
+      invoke<string>('read_file_content', { storagePath })
+        .then(setLoadedContent)
+        .catch((err) => {
+          logger.error('Failed to load file content:', err)
+          setLoadedContent(null)
+        })
+        .finally(() => setLoading(false))
+    }
+  }, [
+    isOpen,
+    inMemoryContent,
+    storagePath,
+    loadedContent,
+    noPreview,
+    loading,
+    isBinaryDoc,
+    base64,
+    fileName,
+  ])
+
+  // Reset loaded content when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      setLoadedContent(null)
+      setNoPreview(false)
+    }
+  }, [isOpen])
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            {fileName}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          {size !== undefined && <span>{formatFileSize(size)}</span>}
+          {mimeType && <span>{mimeType}</span>}
+        </div>
+
+        {/* Content preview area */}
+        <div className="flex-1 overflow-auto border rounded-md p-4 min-h-[200px]">
+          {loading ? (
+            <p className="text-sm text-muted-foreground">{t('loading')}</p>
+          ) : noPreview ? (
+            <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-center">
+              <FileIconLucide className="h-6 w-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                {t('attachments:binaryDocumentNoPreview')}
+              </p>
+              <p className="text-xs text-muted-foreground">{t('attachments:binaryDocumentHint')}</p>
+            </div>
+          ) : content ? (
+            isMarkdown ? (
+              <MarkdownContent content={content} className="text-sm" />
+            ) : (
+              <pre className="text-sm whitespace-pre-wrap font-mono">{content}</pre>
+            )
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('attachments:noContent')}</p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// FileAttachment preview component - handles both text files and images
+export function FileAttachmentPreview({
+  fileAttachment,
+  allImages,
+  currentImageIndex,
+  localData,
+}: {
+  fileAttachment: FileAttachment
+  allImages?: ImageAttachmentData[]
+  currentImageIndex?: number
+  // In-memory bytes of an attachment not stored yet (just sent)
+  localData?: AttachmentLocalData
+}) {
+  const { t } = useTranslation(['attachments'])
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+
+  const isImage = fileAttachment.mime_type.startsWith('image/')
+  const IconComponent = isImage
+    ? Image
+    : fileAttachment.mime_type.startsWith('text/')
+      ? FileText
+      : FileIconLucide
+
+  // Blob fetch state for this attachment's bytes (plan §5 tri-state).
+  // Rows without a content hash predate the sidecar and are local by
+  // construction; absent from the store also reads as available.
+  const hash = fileAttachment.content_hash ?? ''
+  const blobState = useAttachmentBlobStore((s) => (hash ? s.states[hash] : undefined))
+  const isGone = blobState === 'gone'
+  const isDownloading = blobState === 'downloading'
+
+  // For images, use lightbox; for other files, use dialog
+  const handleClick = () => {
+    if (isGone || isDownloading) return
+    if (isImage) {
+      setIsLightboxOpen(true)
+    } else {
+      setIsDialogOpen(true)
+    }
+  }
+
+  // Prepare images array for lightbox
+  const lightboxImages: ImageAttachmentData[] = useMemo(() => {
+    if (allImages && allImages.length > 0) {
+      return allImages
+    }
+    // Fallback to single image if no allImages provided
+    return [
+      {
+        id: fileAttachment.id,
+        fileName: fileAttachment.file_name,
+        storagePath: localData ? undefined : fileAttachment.storage_path,
+        base64: localData?.dataUrl,
+      },
+    ]
+  }, [allImages, fileAttachment, localData])
+
+  const lightboxIndex = currentImageIndex ?? 0
+
+  return (
+    <>
+      <button
+        onClick={handleClick}
+        disabled={isGone || isDownloading}
+        className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg border border-muted text-left transition-colors ${
+          isGone || isDownloading
+            ? 'opacity-60 cursor-not-allowed'
+            : 'hover:border-muted-foreground/50 cursor-pointer'
+        }`}
+      >
+        {isDownloading ? (
+          <Loader2 className="h-4 w-4 text-muted-foreground flex-shrink-0 animate-spin" />
+        ) : isGone ? (
+          <CloudOff className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        ) : (
+          <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        )}
+
+        <span className="flex-1 text-sm truncate">
+          <span>{fileAttachment.file_name}</span>
+          {(isGone || isDownloading) && (
+            <span className="ml-1.5 text-muted-foreground">
+              ({t(isGone ? 'attachmentUnavailable' : 'downloadingAttachment')})
+            </span>
+          )}
+        </span>
+
+        {!isGone && !isDownloading && (
+          <span className="text-sm text-muted-foreground flex-shrink-0">
+            {formatFileSize(fileAttachment.file_size)}
+          </span>
+        )}
+      </button>
+
+      {/* Lightbox for images */}
+      {isImage && isLightboxOpen && (
+        <ImageLightbox
+          images={lightboxImages}
+          initialIndex={lightboxIndex}
+          onClose={() => setIsLightboxOpen(false)}
+        />
+      )}
+
+      {/* Dialog for non-image files - uses reusable FilePreviewDialog */}
+      {!isImage && (
+        <FilePreviewDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          fileName={fileAttachment.file_name}
+          storagePath={localData ? undefined : fileAttachment.storage_path}
+          content={localData?.content}
+          base64={localData?.base64}
+          mimeType={fileAttachment.mime_type}
+          size={fileAttachment.file_size}
+        />
+      )}
+    </>
+  )
+}

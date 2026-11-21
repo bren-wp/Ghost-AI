@@ -1,0 +1,341 @@
+import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import {
+  Search,
+  ChevronDown,
+  ChevronUp,
+  XCircle,
+  CircleQuestionMark,
+  CheckCircle2,
+} from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import type { SearchResult, FetchResult, SearchDecision, SearchResultItem } from '@/types'
+import { SearchResultFetchItem, ProcessingUrlItem } from './fetch-result-preview'
+import { logger } from '@/lib/logger'
+
+// Map search engine IDs to display names
+const SEARCH_ENGINE_NAMES: Record<string, string> = {
+  duckduckgo: 'DuckDuckGo',
+  yahoo: 'Yahoo',
+  baidu: 'Baidu',
+}
+
+function getSearchEngineName(engineId: string): string {
+  return SEARCH_ENGINE_NAMES[engineId.toLowerCase()] || engineId
+}
+
+type CollapseState = 'initial' | 'processing' | 'collapsed'
+const collapseStateMap = new Map<string, CollapseState>()
+
+// SearchResult preview component - expandable inline list
+export function SearchResultPreview({
+  searchResult,
+  urlStatuses,
+  messageId,
+}: {
+  searchResult: SearchResult
+  urlStatuses?: Record<string, 'fetching' | 'fetched'>
+  messageId?: string
+}) {
+  const { t } = useTranslation(['attachments', 'common'])
+
+  // Use module-level state to check if already auto-collapsed (survives remounts)
+  const searchId = searchResult.id
+  const collapseState = collapseStateMap.get(searchId) || 'initial'
+  const alreadyCollapsed = collapseState === 'collapsed'
+
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [fetchResults, setFetchResults] = useState<FetchResult[]>([])
+  const [serpItems, setSerpItems] = useState<SearchResultItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+
+  // Track processing state - check if any URL is still fetching
+  const hasUrlStatuses = urlStatuses && Object.keys(urlStatuses).length > 0
+  const isProcessing = hasUrlStatuses && Object.values(urlStatuses).some((s) => s === 'fetching')
+
+  // State machine effect: track collapse state and auto-collapse when processing completes
+  useEffect(() => {
+    const currentState = collapseStateMap.get(searchId) || 'initial'
+
+    if (currentState === 'initial' && hasUrlStatuses) {
+      // Start processing → enter processing state
+      collapseStateMap.set(searchId, 'processing')
+    } else if (currentState === 'processing' && !isProcessing) {
+      // All fetches complete → collapse and enter collapsed state
+      collapseStateMap.set(searchId, 'collapsed')
+      setIsExpanded(false)
+    }
+  }, [searchId, hasUrlStatuses, isProcessing])
+
+  // Check if search is still in progress (no total_results yet)
+  const isSearching =
+    searchResult.total_results === null || searchResult.total_results === undefined
+
+  // Auto-expand when search results arrive (only if not already collapsed)
+  useEffect(() => {
+    if (
+      !alreadyCollapsed &&
+      !isSearching &&
+      searchResult.total_results &&
+      searchResult.total_results > 0
+    ) {
+      setIsExpanded(true)
+    }
+  }, [alreadyCollapsed, isSearching, searchResult.total_results])
+
+  // Count of fetched URLs - triggers reload when each one completes
+  const fetchedCount = urlStatuses
+    ? Object.values(urlStatuses).filter((s) => s === 'fetched').length
+    : 0
+
+  // Load linked fetch results - reload when any URL status changes to 'fetched'
+  useEffect(() => {
+    // Skip loading while still searching (no results yet) or no message ID
+    if (isSearching || !messageId) {
+      return
+    }
+
+    const loadResults = async () => {
+      setLoading(true)
+      try {
+        // Query via message_contexts to correctly get deduplicated fetch results
+        const results = await invoke<FetchResult[]>('get_fetch_results_by_message', {
+          messageId: messageId,
+        })
+        setFetchResults(results)
+
+        // If we expect results but got none and not processing, schedule a retry (up to 5 times)
+        if (
+          results.length === 0 &&
+          searchResult.total_results &&
+          searchResult.total_results > 0 &&
+          retryCount < 5 &&
+          !isProcessing
+        ) {
+          setTimeout(() => setRetryCount((c) => c + 1), 1000)
+        }
+      } catch (err) {
+        logger.error('Failed to load fetch results:', err)
+        setFetchResults([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadResults()
+  }, [messageId, searchResult.total_results, retryCount, isProcessing, isSearching, fetchedCount])
+
+  // Load the persisted SERP entries. With lazy search the model reads pages
+  // on demand, so result-page entries may be the only list available.
+  useEffect(() => {
+    if (isSearching || !searchId) {
+      return
+    }
+    let cancelled = false
+    const loadItems = async () => {
+      try {
+        const items = await invoke<SearchResultItem[]>('get_search_result_items', {
+          searchResultId: searchId,
+        })
+        if (!cancelled) {
+          setSerpItems(items)
+        }
+      } catch (err) {
+        logger.error('Failed to load search result items:', err)
+      }
+    }
+    loadItems()
+    return () => {
+      cancelled = true
+    }
+  }, [isSearching, searchId, searchResult.total_results])
+
+  const urlCount = urlStatuses ? Object.keys(urlStatuses).length : 0
+  const resultCount =
+    urlCount || serpItems.length || fetchResults.length || searchResult.total_results || 0
+
+  // Determine if expandable (has URL statuses or results)
+  const canExpand = !isSearching && (resultCount > 0 || hasUrlStatuses)
+
+  // Dynamic container styles based on state
+  const containerClass = isExpanded
+    ? 'w-full rounded border border-muted/50 bg-muted/20 overflow-hidden'
+    : isSearching
+      ? 'w-fit rounded border border-muted/40 bg-muted/30 overflow-hidden'
+      : 'w-fit rounded border border-transparent bg-muted/20 overflow-hidden'
+
+  return (
+    <div className={containerClass}>
+      {/* Header row */}
+      <button
+        onClick={() => canExpand && setIsExpanded(!isExpanded)}
+        className={`flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors ${canExpand ? 'hover:bg-muted/30 cursor-pointer' : 'cursor-default'}`}
+      >
+        <Search
+          className={`h-3.5 w-3.5 text-muted-foreground/70 flex-shrink-0 ${isSearching ? 'animate-pulse' : ''}`}
+        />
+
+        {isSearching ? (
+          <span className="text-xs text-muted-foreground">
+            Searching {getSearchEngineName(searchResult.engine)}...
+          </span>
+        ) : (
+          <>
+            <span className="text-xs text-muted-foreground truncate max-w-xs">
+              {searchResult.query}
+            </span>
+
+            <span className="text-xs text-muted-foreground/60 flex-shrink-0">
+              {getSearchEngineName(searchResult.engine)}
+            </span>
+
+            <span className="text-xs text-muted-foreground/60 flex-shrink-0 flex items-center gap-1">
+              {loading ? (
+                t('common:loading')
+              ) : (
+                <>
+                  {`${resultCount} results`}
+                  {isExpanded ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  )}
+                </>
+              )}
+            </span>
+          </>
+        )}
+      </button>
+
+      {/* Expandable results list */}
+      {isExpanded && canExpand && (
+        <div className="border-t border-muted/50 divide-y divide-muted/50">
+          {/* Show URLs with their status (during processing) */}
+          {hasUrlStatuses &&
+            Object.entries(urlStatuses).map(([url, status]) => {
+              if (status === 'fetching') {
+                return <ProcessingUrlItem key={url} url={url} />
+              }
+              // For fetched URLs, find and show the actual fetch result
+              const fetchResult = fetchResults.find((r) => r.url === url)
+              if (fetchResult) {
+                return <SearchResultFetchItem key={fetchResult.id} fetchResult={fetchResult} />
+              }
+              // Fallback if result not yet loaded (brief transition state)
+              return <ProcessingUrlItem key={url} url={url} />
+            })}
+          {/* Show fetch results after processing is complete (no URL statuses) */}
+          {!hasUrlStatuses &&
+            fetchResults.map((result) => (
+              <SearchResultFetchItem key={result.id} fetchResult={result} />
+            ))}
+          {/* SERP entries when no page bodies were fetched (lazy search) */}
+          {!hasUrlStatuses &&
+            fetchResults.length === 0 &&
+            serpItems.map((item) => (
+              <button
+                key={item.url}
+                onClick={() => openUrl(item.url)}
+                className="w-full px-2.5 py-1.5 text-left transition-colors hover:bg-muted/30"
+              >
+                <p className="text-xs text-foreground truncate">{item.title}</p>
+                <p className="text-2xs text-muted-foreground/70 truncate">{item.url}</p>
+                {item.snippet && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                    {item.snippet}
+                  </p>
+                )}
+              </button>
+            ))}
+          {/* Loading state when no URL statuses and no results */}
+          {!hasUrlStatuses && fetchResults.length === 0 && serpItems.length === 0 && loading && (
+            <p className="text-xs text-muted-foreground/70 px-2.5 py-1.5">
+              {t('loadingSearchResults')}
+            </p>
+          )}
+          {/* Empty state */}
+          {!hasUrlStatuses && fetchResults.length === 0 && serpItems.length === 0 && !loading && (
+            <p className="text-xs text-muted-foreground/70 px-2.5 py-1.5">{t('noResults')}</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// SearchDecision preview component - shows AI reasoning for search decision
+export function SearchDecisionPreview({ decision }: { decision: SearchDecision }) {
+  const { t } = useTranslation(['attachments', 'common'])
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  // Dynamic container styles based on state
+  const containerClass = isExpanded
+    ? 'w-full rounded border border-muted/50 bg-muted/20 overflow-hidden'
+    : 'w-fit rounded border border-transparent bg-muted/20 overflow-hidden'
+
+  return (
+    <div className={containerClass}>
+      {/* Header row */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/30 transition-colors cursor-pointer"
+      >
+        {decision.search_needed ? (
+          <CheckCircle2 className="h-3.5 w-3.5 text-success flex-shrink-0" />
+        ) : (
+          <XCircle className="h-3.5 w-3.5 text-warning flex-shrink-0" />
+        )}
+
+        <span className="text-xs text-muted-foreground truncate">
+          {decision.search_needed ? 'Search needed' : 'No search needed'}
+        </span>
+
+        <span className="flex items-center text-muted-foreground/60 flex-shrink-0">
+          {isExpanded ? (
+            <ChevronUp className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" />
+          )}
+        </span>
+      </button>
+
+      {/* Expandable reasoning */}
+      {isExpanded && (
+        <div className="border-t border-muted/50 px-2.5 py-2.5 space-y-2.5">
+          {/* Reasoning */}
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground/70 uppercase tracking-wider">
+              {t('reasoning')}
+            </p>
+            <p className="text-xs text-foreground/70 leading-relaxed">{decision.reasoning}</p>
+          </div>
+
+          {/* Search query if search was needed */}
+          {decision.search_needed && decision.search_query && (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground/70 uppercase tracking-wider">
+                Search Query
+              </p>
+              <p className="text-xs text-foreground/70 leading-relaxed">{decision.search_query}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Pending SearchDecision preview - shown while AI is deciding
+export function PendingSearchDecisionPreview() {
+  const { t } = useTranslation(['attachments', 'common'])
+  return (
+    <div className="w-fit rounded bg-muted/30 border border-muted/40 overflow-hidden">
+      <div className="flex items-center gap-2 px-2.5 py-1.5">
+        <CircleQuestionMark className="h-3.5 w-3.5 text-muted-foreground/70 flex-shrink-0 animate-pulse" />
+        <span className="text-xs text-muted-foreground">{t('decidingSearch')}</span>
+      </div>
+    </div>
+  )
+}
