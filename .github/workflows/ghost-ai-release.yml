@@ -119,7 +119,7 @@ jobs:
             (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLower() + '  ' + $_.Name
           } | Set-Content -Encoding utf8 'release/SHA256SUMS.txt'
       - name: Publish Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Windows
           path: release/*
@@ -162,7 +162,7 @@ jobs:
           cp src-tauri/target/release/bundle/appimage/*.AppImage release/
           cp src-tauri/target/release/bundle/deb/*.deb release/
           find src-tauri/target/release/bundle -type f \( -name '*.AppImage.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Linux
           path: release/*
@@ -200,7 +200,7 @@ jobs:
           mkdir -p release
           cp src-tauri/target/release/bundle/dmg/*.dmg release/
           find src-tauri/target/release/bundle -type f \( -name '*.app.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-macOS
           path: release/*

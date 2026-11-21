@@ -117,7 +117,7 @@ jobs:
           Compress-Archive -Path "release/Portable/*" -DestinationPath "release/Ghost-AI-v0.1.0-Portable.zip"
           if ((Get-Item "release/Ghost-AI-v0.1.0-Setup.exe").Length -lt 50000) { throw 'Installer is too small' }
       - name: Upload Windows packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-v0.1.0-Windows
           path: release/Ghost-AI-*
