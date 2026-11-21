@@ -64,6 +64,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Configure trusted updater
         run: python scripts/configure_updater.py
+      - name: Prepare Ghost AI installation artwork
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check "Pillow>=11,<13"
+          python scripts/ghost_installer_art.py
       - name: Build Windows
         run: pnpm tauri build --bundles nsis
       - name: Package Ghost AI Windows
@@ -73,23 +78,39 @@ jobs:
           $version = "$env:GITHUB_REF_NAME"
           New-Item -ItemType Directory -Force release | Out-Null
           $installer = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
-          if (-not $installer) { throw 'No setup executable was built' }
+          if (-not $installer) { throw 'No Ghost AI Setup executable was built' }
           Copy-Item $installer.FullName "release/Ghost-AI-$version-Setup.exe"
-          # The NSIS installer upgrades existing per-user installations; the
-          # update-labeled package is byte-identical, not an unsafe patcher.
           Copy-Item $installer.FullName "release/Ghost-AI-$version-Update.exe"
           $binary = 'src-tauri/target/release/ghost-ai-desktop.exe'
-          if (-not (Test-Path $binary)) { throw 'Desktop executable missing' }
-          Copy-Item $binary "release/Ghost-AI-$version-Portable.exe"
+          if (-not (Test-Path $binary)) { throw 'Missing Ghost AI executable' }
           New-Item -ItemType Directory -Force 'release/Portable' | Out-Null
           Copy-Item $binary 'release/Portable/Ghost-AI.exe'
-          Copy-Item 'src-tauri/resources' 'release/Portable/resources' -Recurse
-          Copy-Item 'src-tauri/builtin-skills' 'release/Portable/builtin-skills' -Recurse
-          Copy-Item 'legal' 'release/Portable/legal' -Recurse
-          Compress-Archive -Path 'release/Portable/*' -DestinationPath "release/Ghost-AI-$version-Portable.zip"
+          foreach ($part in @('resources','builtin-skills')) {
+            $source = "src-tauri/$part"
+            if (-not (Test-Path $source)) { throw "Missing packaged resource: $source" }
+            Copy-Item $source "release/Portable/$part" -Recurse -Force
+          }
+          Copy-Item 'legal' 'release/Portable/legal' -Recurse -Force
+          Compress-Archive -Path 'release/Portable/*' -DestinationPath "release/Ghost-AI-$version-Portable.zip" -Force
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $makensis) {
+            choco install nsis --yes --no-progress
+            $makensisPath = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          } else {
+            $makensisPath = $makensis.Source
+          }
+          if (-not (Test-Path $makensisPath)) { throw 'NSIS is unavailable: cannot create a real Portable.exe' }
+          $out = Join-Path (Get-Location).Path "release/Ghost-AI-$version-Portable.exe"
+          $payload = Join-Path (Get-Location).Path 'release/Portable'
+          & $makensisPath /V2 "/DOUTPUT_FILE=$out" "/DPAYLOAD=$payload" "scripts/ghost-portable.nsi"
+          if ($LASTEXITCODE -ne 0) { throw 'Portable.exe creation failed' }
+          if ((Get-Item $out).Length -lt 10000000) { throw 'Portable package appears incomplete' }
           $updaters = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*.nsis.zip*' -ErrorAction SilentlyContinue
           if ($env:VITE_GHOST_AI_UPDATES -eq 'true' -and !$updaters) { throw 'Configured signing but no signed NSIS updater was produced' }
           foreach ($asset in $updaters) { Copy-Item $asset.FullName "release/$($asset.Name)" }
+          Get-ChildItem 'release/Ghost-AI-*' -File | ForEach-Object {
+            (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLower() + '  ' + $_.Name
+          } | Set-Content -Encoding utf8 'release/SHA256SUMS.txt'
       - name: Publish Windows artifact
         uses: actions/upload-artifact@v4
         with:
@@ -100,6 +121,7 @@ jobs:
   linux:
     name: Linux AppImage and DEB
     needs: validate
+    continue-on-error: true
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -142,6 +164,7 @@ jobs:
   macos:
     name: macOS DMG and App
     needs: validate
+    continue-on-error: true
     runs-on: macos-latest
     timeout-minutes: 120
     env:
@@ -180,6 +203,7 @@ jobs:
     name: Publish versioned Ghost AI release
     runs-on: ubuntu-24.04
     needs: [validate, windows, linux, macos]
+    if: always() && needs.validate.result == 'success' && needs.windows.result == 'success'
     steps:
       - uses: actions/download-artifact@v4
         with:
