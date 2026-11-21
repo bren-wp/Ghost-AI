@@ -103,4 +103,5 @@ jobs:
       - name: Block merge when the application does not open
         if: steps.startup.outcome != 'success'
         shell: pwsh
-        run: throw 'Ghost AI Windows startup smoke test failed: no stable main window'
+        run: |
+          throw 'Ghost AI Windows startup smoke test failed: no stable main window'
