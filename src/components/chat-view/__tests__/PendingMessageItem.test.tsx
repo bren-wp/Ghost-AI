@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { PendingMessageItem } from '../PendingMessageItem'

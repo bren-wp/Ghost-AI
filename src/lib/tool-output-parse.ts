@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 /**
  * Parsers for built-in tool output text (see src-tauri/src/llm/tools/*).
  * Kept pure so both collapsed-header summaries and expanded renderers

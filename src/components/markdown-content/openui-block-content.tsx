@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Renders a ```openui-lang fence as a static OpenUI block: a chart or KPI
 // cards drawn with shadcn components, which take their colors from the app's
 // CSS variables in light and dark mode. Nothing in a block acts: no

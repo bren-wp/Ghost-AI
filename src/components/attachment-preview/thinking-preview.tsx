@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Lightbulb, ChevronDown, ChevronUp } from 'lucide-react'

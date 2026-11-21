@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Obscura headless-browser integration (desktop tiers for fetch and search).
 //!
 //! Obscura (https://github.com/h4ckf0r0day/obscura) is a Rust headless browser

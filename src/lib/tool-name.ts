@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 export interface ParsedToolName {
   type: 'builtin' | 'mcp'
   serverName?: string

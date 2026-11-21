@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { Message } from '@/types'
 import {

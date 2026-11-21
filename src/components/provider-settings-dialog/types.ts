@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { Provider } from '@/types'
 
 export interface ProviderSettingsDialogProps {

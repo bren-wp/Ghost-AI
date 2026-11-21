@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Tool types are generated from Rust models (src-tauri/src/models/tool.rs)
 // via ts-rs. Run `pnpm types:generate` in src-tauri to regenerate.
 

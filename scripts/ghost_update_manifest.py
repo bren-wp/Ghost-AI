@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Ghost AI by Brendigo
 """Build a strictly static, signed Tauri 2 update feed for brendigo.com."""
 from __future__ import annotations
 import argparse

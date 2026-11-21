@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Ghost AI by Brendigo
 """Render the vector Ghost AI identity into app icons and splash assets."""
 from pathlib import Path
 import shutil

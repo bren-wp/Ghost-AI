@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { create } from 'zustand'
 
 export type ContactKind = 'model' | 'assistant'

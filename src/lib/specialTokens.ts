@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 /**
  * Neutralize model control tokens that appear literally in user text.
  *

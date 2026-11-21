@@ -1,80 +1,232 @@
-name: Ghost AI Release
+name: Ghost AI — Release Packages
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
+    branches: ['release/v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  release-windows:
-    name: Windows release packages
-    runs-on: windows-2022
-    timeout-minutes: 100
+  validate:
+    name: Validate source and legal assets
+    runs-on: ubuntu-24.04
+    outputs:
+      release_tag: ${{ steps.version.outputs.tag }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: '10'
-      - name: Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-      - name: Verify version matches release
-        shell: pwsh
+      - name: Verify matching release versions
+        id: version
+        shell: bash
         run: |
-          $expected = "$env:GITHUB_REF_NAME".TrimStart("v")
-          $npmVersion = (Get-Content package.json | ConvertFrom-Json).version
-          $tauriVersion = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
-          if ($expected -ne $npmVersion -or $expected -ne $tauriVersion) {
-            throw "Release version mismatch: tag=$expected, package=$npmVersion, Tauri=$tauriVersion"
-          }
+          tag="${GITHUB_REF_NAME#release/}"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid release reference: $tag"; exit 1; }
+          version="${tag#v}"
+          python3 -c 'import json,sys; v=sys.argv[1]; assert json.load(open("package.json"))["version"] == v; assert json.load(open("src-tauri/tauri.conf.json"))["version"] == v' "$version"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Verify legal and brand files
+        run: |
+          for f in legal/EULA-EN.txt legal/EULA-HR.md legal/COMMERCIAL-LICENSE-HR.md legal/THIRD_PARTY_NOTICES.md brand/logo.svg brand/banner.svg; do test -s "$f"; done
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check TypeScript and bundle
+      - name: TypeScript bundle
         run: pnpm build
-      - name: Create Windows setup
-        run: pnpm tauri build --bundles nsis
-      - name: Prepare packages
+      - name: Test
+        run: pnpm test
+      - name: Manifest security tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+
+  windows:
+    name: Windows setup, portable, update
+    runs-on: windows-2022
+    needs: validate
+    timeout-minutes: 120
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      GHOST_AI_UPDATER_PUBLIC_KEY: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY }}
+      VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+      - name: Configure trusted updater
+        run: python scripts/configure_updater.py
+      - name: Prepare Ghost AI installation artwork
         shell: pwsh
         run: |
-          $ErrorActionPreference = "Stop"
-          $v = "$env:GITHUB_REF_NAME"
+          python -m pip install --disable-pip-version-check "Pillow>=11,<13"
+          python scripts/ghost_installer_art.py
+      - name: Build Windows
+        run: pnpm tauri build --bundles nsis
+      - name: Package Ghost AI Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "${{ needs.validate.outputs.release_tag }}"
           New-Item -ItemType Directory -Force release | Out-Null
-          $setup = Get-ChildItem "src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
-          if (-not $setup) { throw "Missing NSIS setup" }
-          Copy-Item $setup.FullName "release/Ghost-AI-$v-Setup.exe"
-          $exe = "src-tauri/target/release/ghost-ai-desktop.exe"
-          if (-not (Test-Path $exe)) { throw "Missing desktop executable" }
-          Copy-Item $exe "release/Ghost-AI-$v-Portable.exe"
-          New-Item -ItemType Directory -Force "release/Portable" | Out-Null
-          Copy-Item $exe "release/Portable/Ghost-AI.exe"
-          Copy-Item "src-tauri/resources" "release/Portable/resources" -Recurse
-          Copy-Item "src-tauri/builtin-skills" "release/Portable/builtin-skills" -Recurse
-          Compress-Archive -Path "release/Portable/*" -DestinationPath "release/Ghost-AI-$v-Portable.zip"
-      - name: Upload verified Windows packages
+          $installer = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'No Ghost AI Setup executable was built' }
+          Copy-Item $installer.FullName "release/Ghost-AI-$version-Setup.exe"
+          Copy-Item $installer.FullName "release/Ghost-AI-$version-Update.exe"
+          $binary = 'src-tauri/target/release/ghost-ai-desktop.exe'
+          if (-not (Test-Path $binary)) { throw 'Missing Ghost AI executable' }
+          New-Item -ItemType Directory -Force 'release/Portable' | Out-Null
+          Copy-Item $binary 'release/Portable/Ghost-AI.exe'
+          foreach ($part in @('resources','builtin-skills')) {
+            $source = "src-tauri/$part"
+            if (-not (Test-Path $source)) { throw "Missing packaged resource: $source" }
+            Copy-Item $source "release/Portable/$part" -Recurse -Force
+          }
+          Copy-Item 'legal' 'release/Portable/legal' -Recurse -Force
+          Compress-Archive -Path 'release/Portable/*' -DestinationPath "release/Ghost-AI-$version-Portable.zip" -Force
+          $makensis = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $makensis) {
+            choco install nsis --yes --no-progress
+            $makensisPath = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          } else {
+            $makensisPath = $makensis.Source
+          }
+          if (-not (Test-Path $makensisPath)) { throw 'NSIS is unavailable: cannot create a real Portable.exe' }
+          $out = Join-Path (Get-Location).Path "release/Ghost-AI-$version-Portable.exe"
+          $payload = Join-Path (Get-Location).Path 'release/Portable'
+          & $makensisPath /V2 "/DOUTPUT_FILE=$out" "/DPAYLOAD=$payload" "scripts/ghost-portable.nsi"
+          if ($LASTEXITCODE -ne 0) { throw 'Portable.exe creation failed' }
+          if ((Get-Item $out).Length -lt 10000000) { throw 'Portable package appears incomplete' }
+          $updaters = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*.nsis.zip*' -ErrorAction SilentlyContinue
+          if ($env:VITE_GHOST_AI_UPDATES -eq 'true' -and !$updaters) { throw 'Configured signing but no signed NSIS updater was produced' }
+          foreach ($asset in $updaters) { Copy-Item $asset.FullName "release/$($asset.Name)" }
+          Get-ChildItem 'release/Ghost-AI-*' -File | ForEach-Object {
+            (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLower() + '  ' + $_.Name
+          } | Set-Content -Encoding utf8 'release/SHA256SUMS.txt'
+      - name: Publish Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ghost-ai-windows
-          path: release/Ghost-AI-*
+          name: Ghost-AI-Windows
+          path: release/*
           if-no-files-found: error
+
+  linux:
+    name: Linux AppImage and DEB
+    needs: validate
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      GHOST_AI_UPDATER_PUBLIC_KEY: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY }}
+      VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+      - run: python3 scripts/configure_updater.py
+      - name: Build Linux
+        run: pnpm tauri build --bundles appimage,deb
+      - name: Package Linux
+        run: |
+          mkdir -p release
+          cp src-tauri/target/release/bundle/appimage/*.AppImage release/
+          cp src-tauri/target/release/bundle/deb/*.deb release/
+          find src-tauri/target/release/bundle -type f \( -name '*.AppImage.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-Linux
+          path: release/*
+          if-no-files-found: error
+
+  macos:
+    name: macOS DMG and App
+    needs: validate
+    continue-on-error: true
+    runs-on: macos-latest
+    timeout-minutes: 120
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      GHOST_AI_UPDATER_PUBLIC_KEY: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY }}
+      VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+      - run: python3 scripts/configure_updater.py
+      - name: Build macOS
+        run: pnpm tauri build --bundles app,dmg
+      - name: Package macOS
+        run: |
+          mkdir -p release
+          cp src-tauri/target/release/bundle/dmg/*.dmg release/
+          find src-tauri/target/release/bundle -type f \( -name '*.app.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-macOS
+          path: release/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish versioned Ghost AI release
+    runs-on: ubuntu-24.04
+    needs: [validate, windows, linux, macos]
+    if: always() && needs.validate.result == 'success' && needs.windows.result == 'success'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Ghost-AI-*
+          path: release
+          merge-multiple: true
+      - name: Verify release assets
+        run: |
+          test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Setup.exe"
+          test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Portable.exe"
+          test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Update.exe"
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release/Ghost-AI-*-Setup.exe
-            release/Ghost-AI-*-Portable.exe
-            release/Ghost-AI-*-Portable.zip
+          tag_name: ${{ needs.validate.outputs.release_tag }}
+          target_commitish: ${{ github.sha }}
+          prerelease: true
           generate_release_notes: true
+          files: release/*

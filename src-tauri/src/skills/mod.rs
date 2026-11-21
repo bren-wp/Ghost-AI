@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 mod manifest;
 mod reconcile;
 mod roots;

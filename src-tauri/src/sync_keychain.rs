@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! macOS-only: write the master encryption key to iCloud Keychain with
 //! `kSecAttrSynchronizable = true` so it propagates to all devices under
 //! the same Apple ID. The iOS peer reads the same keychain item to decrypt

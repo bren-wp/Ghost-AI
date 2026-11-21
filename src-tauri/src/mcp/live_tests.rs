@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Live end-to-end check of MCP OAuth refresh against the public MCP example
 //! server (its mock identity provider approves without a browser). Ignored
 //! by default because it needs the network:

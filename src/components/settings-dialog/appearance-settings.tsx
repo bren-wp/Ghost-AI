@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Settings > Appearance: Light, Dark, or System theme. The choice is stored
 // per device and applied immediately (see `lib/theme`).
 

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 use super::AppState;
 use crate::models::{CreateProviderRequest, Provider};
 use tauri::State;

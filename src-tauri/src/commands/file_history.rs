@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Undo for file changes made by the write and edit tools.
 //!
 //! Each turn's backups live under `<app_data>/file-history/<conversation>/

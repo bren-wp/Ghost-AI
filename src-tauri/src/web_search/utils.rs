@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Utility functions for web search
 
 use std::time::Duration;

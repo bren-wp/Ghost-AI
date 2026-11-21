@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { uuidv7 } from '../uuid'
 

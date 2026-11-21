@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 /**
  * Explicit scroll intents for the conversation transcript.
  *

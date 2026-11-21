@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // The `Stats` component of Ghost AI's OpenUI library: a row of KPI cards
 // in the style of shadcn's dashboard section cards, minus their gradient:
 // plain cards, like the chart blocks. The trend arrow follows

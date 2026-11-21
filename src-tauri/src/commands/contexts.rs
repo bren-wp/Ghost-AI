@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 use super::AppState;
 use crate::models::{ContextEnrichment, FetchResult, SearchResult, SearchResultItem};
 use tauri::State;

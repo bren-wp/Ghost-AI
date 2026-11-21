@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'

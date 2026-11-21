@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // ==========================================================================
 // ASSISTANT - Model + System Prompt + Parameter Preset + Tools packaged together
 // ==========================================================================

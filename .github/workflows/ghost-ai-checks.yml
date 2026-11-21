@@ -1,0 +1,45 @@
+name: Ghost AI Quality Gates
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ghost-ai-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: App quality and legal checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+      - name: Test
+        run: pnpm test
+      - name: Signed manifest tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Verify legal notices and brand assets
+        shell: bash
+        run: |
+          test -s legal/EULA-EN.txt
+          test -s legal/EULA-HR.md
+          test -s legal/COMMERCIAL-LICENSE-HR.md
+          test -s legal/DESKTOP_APACHE_2.0.txt
+          test -s brand/logo.svg
+          test -s src-tauri/icons/icon.ico
+          ! grep -RIl --include='*.tsx' 'github.com/ghost_aiapp' src

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! MCP schema lookup tool with embedded catalog.
 //!
 //! Provides progressive disclosure for MCP tools: the tool description contains

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 /**
  * Language catalog and locale helpers for the translation page.
  *

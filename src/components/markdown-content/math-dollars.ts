@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Keep currency from turning into math. remark-math pairs any two single
 // dollar signs, so "$28,000-$216,856 (median $83,381)" renders "28,000-" and
 // "83,381), hourly " as KaTeX. Before parsing, every single `$` that cannot

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type {
   PermissionEscalation,
   PermissionEscape,

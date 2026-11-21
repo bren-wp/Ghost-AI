@@ -68,7 +68,10 @@
     "createUpdaterArtifacts": false,
     "resources": [
       "resources/models_dev.json",
-      "builtin-skills"
+      "builtin-skills",
+      "../legal/EULA-EN.txt",
+      "../legal/COMMERCIAL-LICENSE-HR.md",
+      "../legal/THIRD_PARTY_NOTICES.md"
     ],
     "icon": [
       "icons/32x32.png",
@@ -97,7 +100,8 @@
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico"
       }
-    }
+    },
+    "category": "Productivity"
   },
   "plugins": {}
 }

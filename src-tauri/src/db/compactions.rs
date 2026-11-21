@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Compaction persistence: one row per context-compaction event.
 
 use super::Database;

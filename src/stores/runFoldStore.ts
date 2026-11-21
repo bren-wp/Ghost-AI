@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { create } from 'zustand'
 
 /** Fold key of the live (streaming) run of a conversation. */

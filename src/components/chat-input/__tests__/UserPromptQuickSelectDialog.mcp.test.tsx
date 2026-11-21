@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, beforeEach, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { UserPromptQuickSelectDialog } from '../UserPromptQuickSelectDialog'

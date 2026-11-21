@@ -1,3 +1,4 @@
+; Ghost AI by Brendigo
 ; Ghost AI single-file, self-extracting portable launcher.
 ; No installation, registry changes, shortcuts or elevation.
 Unicode true

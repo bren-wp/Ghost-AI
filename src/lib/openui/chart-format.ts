@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Value and date formatting for OpenUI charts. The model sends only strings
 // and numbers, so the chart reads two hints from them: an optional `unit`
 // (an ISO currency code or a short suffix) and labels that are all ISO dates,

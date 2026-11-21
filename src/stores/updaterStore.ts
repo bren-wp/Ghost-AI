@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { getVersion } from '@tauri-apps/api/app'
@@ -8,7 +9,9 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { logger } from '@/lib/logger'
 
 // Preference keys persisted through the settings table.
-export const updateChannelAvailable = import.meta.env.VITE_GHOST_AI_UPDATES_ENABLED === 'true'
+export function updateChannelAvailable(): boolean {
+  return import.meta.env.VITE_GHOST_AI_UPDATES === 'true'
+}
 
 const AUTO_CHECK_KEY = 'updater.auto_check'
 const SKIPPED_VERSION_KEY = 'updater.skipped_version'
@@ -82,12 +85,12 @@ export const useUpdaterStore = create<UpdaterStore>()(
 
     runStartupCheck: async () => {
       await get().loadPreferences()
-      if (!updateChannelAvailable || !get().autoCheckEnabled) return
+      if (!updateChannelAvailable() || !get().autoCheckEnabled) return
       await get().checkForUpdates({ silent: true })
     },
 
     checkForUpdates: async ({ silent }) => {
-      if (!updateChannelAvailable) {
+      if (!updateChannelAvailable()) {
         set((draft) => {
           draft.status = 'idle'
           draft.error = silent ? null : 'Visit brendigo.com for the latest Ghost AI version.'

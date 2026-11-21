@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 mod extractors;
 mod fetcher;
 mod headless;

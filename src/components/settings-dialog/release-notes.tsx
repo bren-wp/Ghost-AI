@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'

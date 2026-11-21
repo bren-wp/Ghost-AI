@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemHeader } from '@/components/ui/item'

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import openaiLogo from '@/assets/avatars/providers/openai.png'
 import anthropicLogo from '@/assets/avatars/providers/anthropic.png'
 import googleLogo from '@/assets/avatars/providers/google.png'

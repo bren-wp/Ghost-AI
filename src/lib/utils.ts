@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import i18n from './i18n'

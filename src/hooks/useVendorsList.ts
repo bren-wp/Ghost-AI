@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useMemo } from 'react'
 import { useModelStore } from '@/stores/modelStore'
 import { getModelLogo } from '@/lib/model-logos'

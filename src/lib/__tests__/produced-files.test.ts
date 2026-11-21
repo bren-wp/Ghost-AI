@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect } from 'vitest'
 import { deriveProducedFiles, fileLabel } from '../produced-files'
 import type { ToolCall } from '@/types'

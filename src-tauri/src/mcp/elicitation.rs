@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Desktop dialog for MCP elicitation (`elicitation/create`, FR-12).
 //!
 //! The shared core decides the rules (never auto-approved, timeout and

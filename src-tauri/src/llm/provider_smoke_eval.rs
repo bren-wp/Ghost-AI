@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Provider smoke eval: prove the non-streaming provider chain (`call_provider`
 //! and the vision seam) against a live HTTP endpoint — either the local
 //! httpcan mock or a real provider.

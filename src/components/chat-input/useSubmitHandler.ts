@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { useConversationStore } from '@/stores/conversation'

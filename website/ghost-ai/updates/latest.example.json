@@ -1,0 +1,11 @@
+{
+  "version": "0.1.1",
+  "notes": "Ghost AI security and stability improvements.",
+  "pub_date": "2026-11-21T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "REPLACE_WITH_SIGNED_UPDATE_SIGNATURE",
+      "url": "https://brendigo.com/ghost-ai/updates/Ghost-AI-v0.1.1-x64-setup.nsis.zip"
+    }
+  }
+}

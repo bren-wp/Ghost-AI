@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Context enrichment types are generated from Rust models (src-tauri/src/models/context.rs)
 // via ts-rs. Run `pnpm types:generate` in src-tauri to regenerate.
 
