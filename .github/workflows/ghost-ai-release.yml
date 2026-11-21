@@ -223,7 +223,7 @@ jobs:
           test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Portable.exe"
           test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Update.exe"
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.validate.outputs.release_tag }}
           target_commitish: ${{ github.sha }}
