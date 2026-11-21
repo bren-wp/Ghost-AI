@@ -243,6 +243,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [logDiagnosing, setLogDiagnosing] = React.useState(false)
 
   // About section state (updater store also owns the app version)
+  const signedUpdaterEnabled = import.meta.env.VITE_GHOST_AI_UPDATES === 'true'
   const updaterStatus = useUpdaterStore((s) => s.status)
   const updaterUpdate = useUpdaterStore((s) => s.update)
   const updaterVersion = useUpdaterStore((s) => s.currentVersion)
@@ -1624,11 +1625,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
           <div className="grid gap-2">
             <Label>{t('updateSectionTitle')}</Label>
+            {!signedUpdaterEnabled && <p className="max-w-md text-xs text-muted-foreground">Verified in-app updates will be enabled when Ghost AI signing is configured. Downloads and support: brendigo.com.</p>}
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleManualUpdateCheck}
+                onClick={() => signedUpdaterEnabled ? handleManualUpdateCheck() : openExternal(OFFICIAL_SITE_URL)}
                 disabled={
                   updaterStatus === 'checking' ||
                   updaterStatus === 'downloading' ||
@@ -1640,7 +1642,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 ) : (
                   <RefreshCw className="mr-2 h-4 w-4" />
                 )}
-                {updaterStatus === 'checking' ? t('updateChecking') : t('updateCheckButton')}
+                {signedUpdaterEnabled ? (updaterStatus === 'checking' ? t('updateChecking') : t('updateCheckButton')) : 'Official downloads'}
               </Button>
               {updaterUpdate && updaterStatus === 'idle' && (
                 <>
@@ -1702,7 +1704,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
             {updaterError && <p className="text-xs text-destructive max-w-md">{updaterError}</p>}
 
-            <div className="flex items-center justify-between gap-4 max-w-md pt-2">
+            {signedUpdaterEnabled && <div className="flex items-center justify-between gap-4 max-w-md pt-2">
               <div className="grid gap-1">
                 <Label htmlFor="update-auto-check">{t('updateAutoCheckLabel')}</Label>
                 <p className="text-xs text-muted-foreground">{t('updateAutoCheckDescription')}</p>
@@ -1712,7 +1714,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 checked={autoCheckEnabled}
                 onCheckedChange={(checked) => void setAutoCheck(checked)}
               />
-            </div>
+            </div>}
           </div>
 
           {updaterVersion !== null && (
