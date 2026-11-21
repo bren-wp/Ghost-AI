@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Tauri commands for snapshot sync (Phase 3a).
 
 use super::AppState;

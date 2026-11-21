@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Provider image limits, applied at attach time so oversized images never
 // cross IPC or sit in React state. Mirrors the backend ladder in
 // ghost-ai-agent-core `image_fit.rs` (which stays the floor for every

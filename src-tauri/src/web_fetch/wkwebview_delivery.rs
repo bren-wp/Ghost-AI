@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! macOS delivery channel for the WebView fetch tier.
 //!
 //! WebKit refuses page-initiated `fetch`/`XMLHttpRequest` to custom URL

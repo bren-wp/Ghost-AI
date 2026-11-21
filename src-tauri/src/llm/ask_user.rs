@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Desktop question dialog for the `ask_user` tool.
 //!
 //! The shared core owns the contract (schema, validation, result text);

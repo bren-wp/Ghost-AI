@@ -1,4 +1,5 @@
 // Ghost AI by Brendigo
+// Ghost AI by Brendigo
 import { describe, expect, it, beforeEach } from 'vitest'
 import { LICENSE_ACCEPTANCE_KEY, hasAcceptedLicense, acceptLicense } from '../license-consent'
 

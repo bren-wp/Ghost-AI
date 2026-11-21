@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Answers to the model's `ask_user` questions.
 
 use std::sync::Arc;

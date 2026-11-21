@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'

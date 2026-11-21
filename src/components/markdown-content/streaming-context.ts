@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { createContext, useContext } from 'react'
 
 /**

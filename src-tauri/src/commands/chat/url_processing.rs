@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! URL fetching and storage logic
 
 use super::super::AppState;

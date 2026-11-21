@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Common types for web search functionality
 
 use serde::{Deserialize, Serialize};

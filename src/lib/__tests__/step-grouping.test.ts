@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect } from 'vitest'
 import { groupOrderedSteps, splitRunItems, countRunSteps } from '../step-grouping'
 import type { ProcessStep } from '@/types'

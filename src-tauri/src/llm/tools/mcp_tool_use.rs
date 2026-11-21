@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! MCP tool execution.
 //!
 //! Routes invocations to the correct MCP server. The model should read the

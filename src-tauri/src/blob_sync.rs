@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Blob sidecar transport (ADR 02; Tier 2 carrier is ciphertext per ADR 04
 //! §5).
 //!

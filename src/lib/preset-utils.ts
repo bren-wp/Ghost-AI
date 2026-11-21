@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { PARAMETER_LIMITS } from '@/types'
 import type {
   CreateModelParameterPresetRequest,

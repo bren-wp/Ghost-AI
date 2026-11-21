@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Context-compaction runner: threshold check after a completed turn,
 //! cut-point selection, and the capability-aware method chain — snapcompact
 //! for vision models, soft LLM summary as the always-available floor.

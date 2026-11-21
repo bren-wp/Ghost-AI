@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 use regex::Regex;
 
 const SNIPPET_CONTEXT_LINES: usize = 1;

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! MiniMax CN provider constants (China version)
 //!
 //! The actual client creation and streaming is handled by agent_builder.rs

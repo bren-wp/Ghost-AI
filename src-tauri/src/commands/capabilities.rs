@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 use super::AppState;
 use crate::llm::capabilities::{CapabilitiesCacheInfo, MODELS_DEV_URL, ModelCapabilities};
 use tauri::Manager as _;

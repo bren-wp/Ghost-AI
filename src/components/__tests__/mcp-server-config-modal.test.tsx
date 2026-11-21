@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, expect, it } from 'vitest'
 import { parseTimeoutSecs } from '../mcp-server-config-modal'
 

@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 use serde::Deserialize;
 
 /// File attachment data from frontend

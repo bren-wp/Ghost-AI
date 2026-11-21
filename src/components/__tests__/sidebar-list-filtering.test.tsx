@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ModelList, type ModelVendor } from '@/components/model-list'

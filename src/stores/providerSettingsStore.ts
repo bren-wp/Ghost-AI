@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { create } from 'zustand'
 
 interface ProviderSettingsState {

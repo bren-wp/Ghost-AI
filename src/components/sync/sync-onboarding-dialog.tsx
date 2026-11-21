@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useState } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { SyncOnboardingCard } from '@/components/sync/sync-onboarding-card'

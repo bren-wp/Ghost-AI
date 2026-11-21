@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { ImmerSet, StoreGet, MessageStoreUrlActions } from './types'
 
 export const createUrlActions = (set: ImmerSet, get: StoreGet): MessageStoreUrlActions => ({

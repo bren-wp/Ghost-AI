@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Ghost AI by Brendigo
 """Generate the official Ghost AI Windows installer artwork from original brand assets."""
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont

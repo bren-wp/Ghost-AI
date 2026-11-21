@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 pub use ghost_ai_agent_core::parse_thinking_content;
 
 #[cfg(test)]

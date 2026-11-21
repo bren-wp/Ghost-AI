@@ -1,4 +1,5 @@
 // Ghost AI by Brendigo
+// Ghost AI by Brendigo
 export const LICENSE_ACCEPTANCE_KEY = 'ghost_ai_terms_accepted_v1'
 
 export function hasAcceptedLicense(): boolean {

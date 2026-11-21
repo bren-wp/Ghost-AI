@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Chat message building for LLM requests
 //!
 //! Constructs the chat message array including system prompt, history, and current user message.

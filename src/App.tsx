@@ -1,4 +1,5 @@
 // Ghost AI by Brendigo
+// Ghost AI by Brendigo
 import { useState } from 'react'
 import { ChatPage } from './pages/chat-page'
 import { GhostLicenseScreen } from './components/license/ghost-license-screen'

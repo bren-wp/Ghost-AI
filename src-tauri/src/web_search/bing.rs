@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Bing search provider
 //!
 //! Scrapes result pages through the Obscura browser tier when configured,

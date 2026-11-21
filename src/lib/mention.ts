@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // @-mentions in the composer: find the mention being typed at the caret and
 // rank working-directory files against it.
 

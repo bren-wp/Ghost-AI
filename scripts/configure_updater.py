@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Ghost AI by Brendigo
 """Configure the Ghost AI signed-updater only with an independently provisioned public key."""
 from __future__ import annotations
 import json

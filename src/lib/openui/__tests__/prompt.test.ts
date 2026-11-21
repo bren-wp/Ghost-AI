@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 

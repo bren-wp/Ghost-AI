@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import type { ImmerSet, StoreGet, MessageStoreSelectors } from './types'
 import { createDefaultConversationState } from './types'
 

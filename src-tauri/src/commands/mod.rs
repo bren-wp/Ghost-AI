@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 mod ask_user;
 mod assistants;
 mod attachments;

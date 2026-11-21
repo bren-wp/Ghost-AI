@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Ghost AI by Brendigo
 """Create a static Tauri 2 update manifest from signed and verified release assets."""
 from __future__ import annotations
 import argparse

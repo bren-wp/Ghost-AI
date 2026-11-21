@@ -1,4 +1,5 @@
 // Ghost AI by Brendigo
+// Ghost AI by Brendigo
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'

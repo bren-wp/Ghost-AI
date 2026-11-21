@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import femaleNames from '@/assets/data/names/female_names.json'
 import maleNames from '@/assets/data/names/male_names.json'
 import type { Assistant } from '@/types/generated/Assistant'

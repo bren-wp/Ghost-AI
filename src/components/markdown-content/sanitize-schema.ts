@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { defaultSchema, type Options as SanitizeSchema } from 'rehype-sanitize'
 
 /**

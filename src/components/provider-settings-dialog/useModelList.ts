@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import * as React from 'react'
 import { useModelStore } from '@/stores/modelStore'
 import type { ModelItem, ModelInfo } from './types'

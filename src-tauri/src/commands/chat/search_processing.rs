@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Search decision and execution logic
 //!
 //! Two paths, chosen by capability:

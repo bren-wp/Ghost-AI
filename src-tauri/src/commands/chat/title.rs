@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 //! Conversation title generation
 
 use super::super::AppState;

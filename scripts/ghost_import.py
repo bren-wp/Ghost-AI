@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Ghost AI by Brendigo
 """Ghost AI: pinned-source importer and visual identity migration."""
 from __future__ import annotations
 import json, os, re, shutil

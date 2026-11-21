@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { SlidersHorizontal, Sparkles, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'

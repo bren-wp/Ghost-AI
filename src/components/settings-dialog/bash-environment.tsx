@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Bash environment settings (per device). Bash sessions start from an
 // empty environment holding a fixed allowlist plus the variables listed
 // here, so app secrets never leak into commands. Suggestions are common

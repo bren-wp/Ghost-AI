@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Helper function to format model name with provider
 export const formatModelDisplayName = (
   modelName: string,

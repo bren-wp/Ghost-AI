@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const setTheme = vi.fn(() => Promise.resolve())

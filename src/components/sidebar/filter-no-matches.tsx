@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 import { useTranslation } from 'react-i18next'
 
 /** Shown instead of a list when the sidebar filter matches nothing */

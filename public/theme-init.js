@@ -1,3 +1,4 @@
+// Ghost AI by Brendigo
 // Applies the saved theme before the first paint, so a dark-mode launch never
 // flashes the light canvas. Runs as a classic blocking script from index.html
 // (the CSP forbids inline scripts). Keep the storage key and resolution logic
