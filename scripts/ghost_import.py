@@ -38,7 +38,7 @@ def replace_names(s):
 
 def migrate():
     for current,dirs,files in os.walk(ROOT):
-        dirs[:]=[d for d in dirs if d not in (".git","target","node_modules","legal")]
+        dirs[:]=[d for d in dirs if d not in (".git",".github","target","node_modules","legal")]
         for filename in files:
             p=Path(current)/filename
             if p==ROOT/"scripts/ghost_import.py":
@@ -54,7 +54,7 @@ def migrate():
             if t!=s:
                 p.write_text(t,encoding="utf-8")
     for current,dirs,files in os.walk(ROOT,topdown=False):
-        if ".git" in Path(current).parts or "legal" in Path(current).parts:
+        if ".git" in Path(current).parts or ".github" in Path(current).parts or "legal" in Path(current).parts:
             continue
         for name in files+dirs:
             newer=name.replace("chatshell","ghost-ai").replace("ChatShell","Ghost-AI")
