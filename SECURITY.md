@@ -1,13 +1,28 @@
-# Security Policy
+# Ghost AI — Security & responsible disclosure
 
-## Supported Versions
+**Product:** Ghost AI by Brendigo  
+**Official website:** https://brendigo.com
 
-Security fixes are released for the latest version only. The in-app updater installs it from Settings → About.
+Please report vulnerabilities privately through the contact channel provided on Brendigo's official website. Do not publish API keys, user data, exploit details or private configuration in public reports.
 
-## Reporting a Vulnerability
+## Supported releases
 
-Please do not open a public issue for security problems.
+Security fixes target the newest supported release. Manual downloads can be obtained through the official website when published; automated upgrades require a configured signed channel. No unsupported release should claim to update securely.
 
-Report privately through [GitHub private vulnerability reporting](https://github.com/ghost_aiapp/ghost-ai-desktop/security/advisories/new). Include the Ghost AI version, your operating system, and steps to reproduce.
+## Security scope
 
-You will get a first response within a week. We will keep you updated while we work on a fix and credit you in the release notes unless you prefer otherwise.
+- Agent permissions, shell execution and filesystem access.
+- API credentials, local data and secrets in logs.
+- Cloud provider integrations and document transfers.
+- Digitally signed update packages and release provenance.
+- Open-source dependencies and third-party components.
+
+## Release acceptance
+
+Automated checks, dependency review, clean-install testing, upgrades from the last published version and platform-specific security verification must pass before an edition is called production-ready.
+
+## Source licenses
+
+Mandatory open-source copyright notices and license obligations must remain intact. These notices do not imply third-party endorsement of the Ghost AI product.
+
+**Publisher:** Brendigo · https://brendigo.com
