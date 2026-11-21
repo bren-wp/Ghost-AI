@@ -7,6 +7,8 @@ import type { Update } from '@tauri-apps/plugin-updater'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { logger } from '@/lib/logger'
 
+const UPDATE_CHANNEL_READY = import.meta.env.VITE_GHOST_AI_UPDATES === 'true'
+
 // Preference keys persisted through the settings table.
 const AUTO_CHECK_KEY = 'updater.auto_check'
 const SKIPPED_VERSION_KEY = 'updater.skipped_version'
@@ -56,7 +58,7 @@ export const useUpdaterStore = create<UpdaterStore>()(
     downloadedBytes: 0,
     totalBytes: 0,
     error: null,
-    autoCheckEnabled: true,
+    autoCheckEnabled: UPDATE_CHANNEL_READY,
     skippedVersion: null,
 
     loadPreferences: async () => {
@@ -69,7 +71,7 @@ export const useUpdaterStore = create<UpdaterStore>()(
         ])
         set((draft) => {
           // Absent setting means default-on (documented in Settings > About).
-          draft.autoCheckEnabled = autoCheck !== 'false'
+          draft.autoCheckEnabled = UPDATE_CHANNEL_READY && autoCheck !== 'false'
           draft.skippedVersion = skipped
           draft.currentVersion = version
         })
@@ -80,11 +82,15 @@ export const useUpdaterStore = create<UpdaterStore>()(
 
     runStartupCheck: async () => {
       await get().loadPreferences()
-      if (!get().autoCheckEnabled) return
+      if (!UPDATE_CHANNEL_READY || !get().autoCheckEnabled) return
       await get().checkForUpdates({ silent: true })
     },
 
     checkForUpdates: async ({ silent }) => {
+      if (!UPDATE_CHANNEL_READY) {
+        if (!silent) set((draft) => { draft.error = 'Verified in-app updates are not configured. Visit brendigo.com for available downloads.' })
+        return null
+      }
       if (get().status === 'checking' || get().status === 'downloading') return null
       set((draft) => {
         draft.status = 'checking'
@@ -185,6 +191,7 @@ export const useUpdaterStore = create<UpdaterStore>()(
     },
 
     setAutoCheck: async (enabled: boolean) => {
+      if (!UPDATE_CHANNEL_READY) return
       set((draft) => {
         draft.autoCheckEnabled = enabled
       })
