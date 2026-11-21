@@ -7,7 +7,7 @@
 <p align="center">One beautifully focused place to chat, create, research, analyze and get things done.</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Ghost_AI-v0.1.0-874CFF" alt="Ghost AI version">
+  <img src="https://img.shields.io/badge/Ghost_AI-v0.1.1-874CFF" alt="Ghost AI version">
   <img src="https://img.shields.io/badge/Windows-Desktop-00E5FF" alt="Windows">
   <img src="https://img.shields.io/badge/Local_%26_Cloud_AI-Multiple_models-1F2937" alt="AI models">
 </p>
