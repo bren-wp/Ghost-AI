@@ -1,0 +1,46 @@
+GHOST AI - END USER LICENSE AGREEMENT
+Publisher: Brendigo
+Official website: https://brendigo.com
+Version 1.0 - November 21, 2026
+
+1. LICENSE. Brendigo grants users of an official Ghost AI build a limited,
+non-exclusive right to install and use the software for lawful personal and
+business purposes in accordance with these terms and applicable law.
+
+2. THIRD-PARTY RIGHTS. Ghost AI contains open-source and separately licensed
+components. Their licenses and attribution notices remain applicable and are
+not replaced or restricted by this agreement.
+
+3. AI PROVIDERS. Some functions require separate accounts, API keys, internet
+access, subscriptions or usage-based fees. The user is responsible for
+configuring providers, approving tool actions and verifying model outputs.
+
+4. DATA AND SECURITY. Local conversations and settings may be stored on the
+device. Documents, prompts and related data submitted to cloud providers
+may be processed by them under their own policies. Review permissions for
+file access, shell commands and automated actions.
+
+5. RESTRICTIONS. You may not misrepresent modified builds as official Ghost AI
+releases or misuse the Ghost AI name, trade dress or logos. Mandatory legal
+rights, rights to interoperability and third-party open-source licenses
+remain unaffected.
+
+6. UPDATES. Security and feature updates may be available through Brendigo's
+official channels. Keep important backups before installing new versions.
+Support availability may vary by version.
+
+7. WARRANTY AND LIABILITY. To the extent permitted by law, no guarantee is
+made of error-free AI results or continuous availability of independent
+providers. No clause excludes mandatory consumer rights or liability that
+cannot lawfully be excluded.
+
+8. GOVERNING LAW. Croatian law applies, without limiting mandatory consumer
+protections in the consumer's home jurisdiction. Applicable mandatory court
+jurisdiction rules control.
+
+9. SUPPORT AND CONTACT. See https://brendigo.com.
+
+Full language versions and mandatory third-party notices are included in
+the Ghost AI legal documentation.
+
+These terms are a working draft pending review before commercial release.
