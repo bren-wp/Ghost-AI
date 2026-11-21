@@ -1,0 +1,80 @@
+name: Ghost AI Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    name: Windows release packages
+    runs-on: windows-2022
+    timeout-minutes: 100
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - name: Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Verify version matches release
+        shell: pwsh
+        run: |
+          $expected = "$env:GITHUB_REF_NAME".TrimStart("v")
+          $npmVersion = (Get-Content package.json | ConvertFrom-Json).version
+          $tauriVersion = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          if ($expected -ne $npmVersion -or $expected -ne $tauriVersion) {
+            throw "Release version mismatch: tag=$expected, package=$npmVersion, Tauri=$tauriVersion"
+          }
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check TypeScript and bundle
+        run: pnpm build
+      - name: Create Windows setup
+        run: pnpm tauri build --bundles nsis
+      - name: Prepare packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $v = "$env:GITHUB_REF_NAME"
+          New-Item -ItemType Directory -Force release | Out-Null
+          $setup = Get-ChildItem "src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Missing NSIS setup" }
+          Copy-Item $setup.FullName "release/Ghost-AI-$v-Setup.exe"
+          $exe = "src-tauri/target/release/ghost-ai-desktop.exe"
+          if (-not (Test-Path $exe)) { throw "Missing desktop executable" }
+          Copy-Item $exe "release/Ghost-AI-$v-Portable.exe"
+          New-Item -ItemType Directory -Force "release/Portable" | Out-Null
+          Copy-Item $exe "release/Portable/Ghost-AI.exe"
+          Copy-Item "src-tauri/resources" "release/Portable/resources" -Recurse
+          Copy-Item "src-tauri/builtin-skills" "release/Portable/builtin-skills" -Recurse
+          Compress-Archive -Path "release/Portable/*" -DestinationPath "release/Ghost-AI-$v-Portable.zip"
+      - name: Upload verified Windows packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghost-ai-windows
+          path: release/Ghost-AI-*
+          if-no-files-found: error
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/Ghost-AI-*-Setup.exe
+            release/Ghost-AI-*-Portable.exe
+            release/Ghost-AI-*-Portable.zip
+          generate_release_notes: true
