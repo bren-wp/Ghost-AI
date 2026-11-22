@@ -177,7 +177,8 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
           <Button
             onClick={handleSave}
             disabled={
-              isSaving || !hasChanges || (selectedProvider.id !== 'ollama' && !apiKey.trim())
+              isSaving || !hasChanges || (selectedProvider.id !== 'ollama' && !apiKey.trim()) ||
+              (isCustom && (!providerName.trim() || !apiBaseUrl.trim()))
             }
           >
             {isSaving ? (
