@@ -366,7 +366,8 @@ mod tests {
     fn test_working_directory_typescript_request_contract() {
         // Missing means keep the existing setting; null means clear it.
         // The exported request type must allow clients to omit this field.
-        let definition = <UpdateConversationSettingsRequest as ts_rs::TS>::decl();
+        let definition =
+            <UpdateConversationSettingsRequest as ts_rs::TS>::decl(&ts_rs::Config::default());
         assert!(
             definition.contains("working_directory?:"),
             "working_directory must be optional in generated TypeScript: {definition}"

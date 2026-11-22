@@ -2698,7 +2698,7 @@ mod tests {
     use rig::completion::{
         CompletionError, CompletionModel, CompletionRequest, CompletionResponse, Usage,
     };
-    use rig::message::{AssistantContent, ReasoningContent, UserContent};
+    use rig::message::{AssistantContent, UserContent};
     use rig::streaming::{
         RawStreamingChoice, RawStreamingToolCall, StreamFinal, StreamPartId,
         StreamingCompletionResponse, WireId,

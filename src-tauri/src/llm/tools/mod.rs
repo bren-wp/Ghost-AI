@@ -51,3 +51,9 @@ pub use mcp_tool_use::{
 pub use skill::{SkillCatalogEntry, SkillTool};
 pub use web_fetch::{HttpUrlByteFetcher, WebFetchTool};
 pub use web_search::WebSearchTool;
+// Real-network E2E tests construct these argument values directly.
+// Keep the names available in test builds without unused release re-exports.
+#[cfg(test)]
+pub use web_fetch::WebFetchArgs;
+#[cfg(test)]
+pub use web_search::WebSearchArgs;

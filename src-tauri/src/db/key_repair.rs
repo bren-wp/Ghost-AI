@@ -94,7 +94,6 @@ mod tests {
     // #[tokio::test] defaults to a single-threaded current-thread runtime.
     #![allow(clippy::await_holding_lock)]
 
-    use super::*;
     use crate::db::Database;
 
     async fn fresh_db() -> Database {

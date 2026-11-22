@@ -80,7 +80,7 @@
 //! - `GHOST_AI_SMOKE_API_KEY`    optional; default `smoke-key` for the mock
 //! - `GHOST_AI_SMOKE_API_STYLE`  optional; default `chat_completions`
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 
 use super::tools::VisionQuestionResponder;
 use super::{ChatMessage, call_provider};

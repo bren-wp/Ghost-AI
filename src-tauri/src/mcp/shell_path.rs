@@ -108,7 +108,7 @@ fn read_etc_paths() -> Option<String> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
 
