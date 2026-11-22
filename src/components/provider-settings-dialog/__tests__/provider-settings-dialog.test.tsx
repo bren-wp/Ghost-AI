@@ -168,7 +168,7 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
   }
 
   function expectEmptyForm() {
-    expect(screen.getByLabelText('Provider Name')).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: /^Provider Name/ })).toHaveValue('')
     expect(screen.getByLabelText('API Key')).toHaveValue('')
     expect(screen.getByLabelText(/^API Base URL/)).toHaveValue('')
     expect(screen.getByRole('button', { name: 'Save Configuration' })).toBeDisabled()
@@ -207,7 +207,7 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
 
     await waitFor(() => expect(mockedInvoke).toHaveBeenCalledWith('list_providers'))
     selectProvider('new')
-    fireEvent.change(screen.getByLabelText('Provider Name'), { target: { value: provider.name } })
+    fireEvent.change(screen.getByRole('textbox', { name: /^Provider Name/ }), { target: { value: provider.name } })
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: provider.api_key } })
     fireEvent.change(screen.getByLabelText(/^API Base URL/), {
       target: { value: provider.base_url },
