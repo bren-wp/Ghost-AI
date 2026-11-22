@@ -248,10 +248,39 @@ fn parse_www_authenticate(headers: &reqwest::header::HeaderMap) -> Result<WwwAut
     Ok(params)
 }
 
+/// Reject metadata that claims a different OAuth issuer. RFC 8414 requires the
+/// returned issuer to match the AS used for discovery; accepting a mismatch
+/// can send later authorization requests to an untrusted provider.
+/// Plain HTTP is allowed only for local MCP test/development servers.
+fn validate_metadata_issuer(requested: &str, reported: &str) -> Result<()> {
+    let wanted = Url::parse(requested).context("Invalid OAuth issuer URL")?;
+    let got = Url::parse(reported).context("Invalid metadata issuer URL")?;
+    let loopback = matches!(wanted.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
+    if wanted.scheme() != "https" && !(wanted.scheme() == "http" && loopback) {
+        anyhow::bail!("OAuth issuer must use HTTPS except on loopback");
+    }
+    if wanted.username() != "" || wanted.password().is_some()
+        || wanted.query().is_some() || wanted.fragment().is_some()
+        || got.username() != "" || got.password().is_some()
+        || got.query().is_some() || got.fragment().is_some()
+    {
+        anyhow::bail!("OAuth issuer must not include credentials, a query, or a fragment");
+    }
+    if wanted.origin() != got.origin()
+        || wanted.path().trim_end_matches('/') != got.path().trim_end_matches('/')
+    {
+        anyhow::bail!("OAuth metadata issuer does not match the requested authorization server");
+    }
+    Ok(())
+}
+
 async fn fetch_as_metadata(
     client: &reqwest::Client,
     issuer: &str,
 ) -> Result<AuthorizationServerMetadata> {
+    // Check the target before any HTTP metadata request. Do not permit
+    // non-loopback plain HTTP OAuth discovery.
+    validate_metadata_issuer(issuer, issuer)?;
     let base = issuer.trim_end_matches('/');
     let endpoints = [
         format!("{}/.well-known/oauth-authorization-server", base),
@@ -260,8 +289,9 @@ async fn fetch_as_metadata(
     for url in &endpoints {
         if let Ok(resp) = client.get(url).send().await
             && resp.status().is_success()
-            && let Ok(meta) = resp.json().await
+            && let Ok(meta) = resp.json::<AuthorizationServerMetadata>().await
         {
+            validate_metadata_issuer(issuer, &meta.issuer)?;
             return Ok(meta);
         }
     }
@@ -581,6 +611,17 @@ mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[test]
+    fn authorization_server_metadata_must_match_issuer() {
+        assert!(validate_metadata_issuer("https://auth.example.com", "https://auth.example.com").is_ok());
+        assert!(validate_metadata_issuer("https://auth.example.com/path/", "https://auth.example.com/path").is_ok());
+        assert!(validate_metadata_issuer("https://auth.example.com", "https://evil.example.com").is_err());
+        assert!(validate_metadata_issuer("https://auth.example.com", "https://auth.example.com/other").is_err());
+        assert!(validate_metadata_issuer("http://auth.example.com", "http://auth.example.com").is_err());
+        assert!(validate_metadata_issuer("http://127.0.0.1:43000", "http://127.0.0.1:43000").is_ok());
+        assert!(validate_metadata_issuer("https://auth.example.com?token=x", "https://auth.example.com?token=x").is_err());
+    }
 
     // ---- loopback HTTP stub (single server, request-count bounded) ----
 
