@@ -12,6 +12,7 @@ import { AddModelDialog } from '@/components/provider-settings-dialog/add-model-
 import { EditModelDialog } from '@/components/provider-settings-dialog/edit-model-dialog'
 import { useProviderSettings } from '@/components/provider-settings-dialog/useProviderSettings'
 import { ProviderSelect } from '@/components/provider-settings-dialog/provider-select'
+import { requiresApiKeyForFetch } from '@/components/provider-settings-dialog/constants'
 import { isCustomProvider, type LLMProvider } from '@/components/provider-settings-dialog/types'
 
 interface LLMProviderSettingsProps {
@@ -94,7 +95,7 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
         existingProvider.name !== (isCustom ? providerName : selectedProvider.name) ||
         existingProvider.provider_type !== effectiveProviderType ||
         existingProvider.api_style !== effectiveApiStyle)) ||
-    (!existingProvider && (isCustom || apiKey.trim().length > 0))
+    (!existingProvider && (isCustom || !requiresApiKeyForFetch(selectedProvider.id) || apiKey.trim().length > 0))
 
   const handleSelectProvider = (provider: LLMProvider, storedProviderId?: string) => {
     if (provider.isCustom) {
@@ -177,7 +178,7 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
           <Button
             onClick={handleSave}
             disabled={
-              isSaving || !hasChanges || (selectedProvider.id !== 'ollama' && !apiKey.trim()) ||
+              isSaving || !hasChanges || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim()) ||
               (isCustom && (!providerName.trim() || !apiBaseUrl.trim()))
             }
           >
