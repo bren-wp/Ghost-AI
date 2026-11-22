@@ -1532,7 +1532,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       <DialogContent className="max-h-[min(92vh,800px)] w-[min(96vw,940px)] max-w-[96vw] overflow-hidden p-0 md:max-w-[94vw] lg:max-w-[940px]">
         <DialogTitle className="sr-only">{tc('settings')}</DialogTitle>
         <DialogDescription className="sr-only">{tc('settings')}</DialogDescription>
-        <SidebarProvider className="items-start">
+        <SidebarProvider className="min-h-0 min-w-0 items-start">
           <Sidebar collapsible="none" className="hidden md:flex">
             <SidebarContent>
               <SidebarGroup>
@@ -1554,7 +1554,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </SidebarGroup>
             </SidebarContent>
           </Sidebar>
-          <main className="flex min-h-0 h-[min(84vh,680px)] flex-1 flex-col overflow-hidden">
+          <main className="flex h-[min(84dvh,680px)] min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
               <div className="flex min-w-0 items-center gap-2 px-4">
                 <label className="sr-only" htmlFor="ghost-settings-navigation">Settings section</label>
@@ -1575,7 +1575,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </div>
             </header>
             <div
-              className={`flex flex-1 flex-col overflow-hidden ${activeSection === 'llmProvider' ? '' : 'gap-4 overflow-y-auto p-4 pt-0'}`}
+              className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${activeSection === 'llmProvider' ? '' : 'gap-4 overflow-y-auto p-4 pt-0'}`}
             >
               {renderContent()}
             </div>
