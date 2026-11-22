@@ -83,10 +83,10 @@ impl Database {
     }
 
     pub async fn delete_thinking_step(&self, id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "thinking_steps",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())
@@ -176,10 +176,10 @@ impl Database {
     }
 
     pub async fn delete_search_decision(&self, id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "search_decisions",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())
@@ -296,10 +296,10 @@ impl Database {
     }
 
     pub async fn delete_tool_call(&self, id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "tool_calls",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())
@@ -398,10 +398,10 @@ impl Database {
     }
 
     pub async fn delete_code_execution(&self, id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "code_executions",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())
@@ -475,10 +475,10 @@ impl Database {
     }
 
     pub async fn delete_content_block(&self, id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "content_blocks",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())

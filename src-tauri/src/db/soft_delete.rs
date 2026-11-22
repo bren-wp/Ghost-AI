@@ -152,7 +152,7 @@ pub async fn tombstone_children_of_messages(
             table,
             &format!("message_id IN (SELECT id FROM messages WHERE {message_predicate})"),
         );
-        let mut query = sqlx::query(&sql).bind(now.clone());
+        let mut query = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(now.clone());
         for param in params {
             query = query.bind(param);
         }

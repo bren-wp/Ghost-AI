@@ -117,7 +117,7 @@ impl Database {
             placeholders.join(", ")
         );
 
-        let mut query_builder = sqlx::query(&query);
+        let mut query_builder = sqlx::query(sqlx::AssertSqlSafe(query.as_str()));
         for id in ids {
             query_builder = query_builder.bind(id);
         }
@@ -152,10 +152,10 @@ impl Database {
 
     /// Delete a tool
     pub async fn delete_tool(&self, id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "tools",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())
@@ -312,10 +312,10 @@ impl Database {
         for row in &all_builtin_rows {
             let id: String = row.get("id");
             if !canonical_ids.contains(&id.as_str()) {
-                sqlx::query(&crate::db::soft_delete::tombstone_update(
+                sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
                     "tools",
                     "id = ?2 AND deleted_at IS NULL",
-                ))
+                )))
                 .bind(chrono::Utc::now().to_rfc3339())
                 .bind(&id)
                 .execute(self.pool.as_ref())
@@ -386,7 +386,7 @@ impl Database {
             placeholders.join(", ")
         );
 
-        let mut query_builder = sqlx::query_scalar::<_, String>(&query);
+        let mut query_builder = sqlx::query_scalar::<_, String>(sqlx::AssertSqlSafe(query.as_str()));
         for id in ids {
             query_builder = query_builder.bind(id);
         }
