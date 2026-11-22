@@ -292,10 +292,10 @@ impl Database {
     }
 
     pub async fn delete_conversation_settings(&self, conversation_id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "conversation_settings",
             "conversation_id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(conversation_id)
         .execute(self.pool.as_ref())

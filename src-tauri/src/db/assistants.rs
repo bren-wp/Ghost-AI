@@ -240,19 +240,19 @@ impl Database {
         // Soft-delete the assistant and its junction rows explicitly - the
         // old FK-cascade trick no longer fires now that removal is a
         // tombstone update, and tombstones are what propagate via merge.
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "assistants",
             "id = ?2",
-        ))
+        )))
         .bind(&now)
         .bind(id)
         .execute(self.pool.as_ref())
         .await?;
         for table in ["assistant_tools", "assistant_skills"] {
-            sqlx::query(&crate::db::soft_delete::tombstone_update(
+            sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
                 table,
                 "assistant_id = ?2 AND deleted_at IS NULL",
-            ))
+            )))
             .bind(&now)
             .bind(id)
             .execute(self.pool.as_ref())
@@ -269,10 +269,10 @@ impl Database {
     /// associations and insert the requested ones as fresh rows.
     async fn sync_assistant_tools(&self, assistant_id: &str, tool_ids: &[String]) -> Result<()> {
         // Tombstone existing associations (soft-delete propagates via merge)
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "assistant_tools",
             "assistant_id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(Utc::now().to_rfc3339())
         .bind(assistant_id)
         .execute(self.pool.as_ref())

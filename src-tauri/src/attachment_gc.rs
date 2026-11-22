@@ -38,7 +38,7 @@ pub async fn tombstone_unlinked_files(
              WHERE ma.attachment_id = files.id
                AND ma.deleted_at IS NULL AND m.deleted_at IS NULL)",
     );
-    let result = sqlx::query(&sql)
+    let result = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(cutoff.to_rfc3339())
         .execute(db.pool())

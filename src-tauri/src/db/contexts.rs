@@ -87,10 +87,10 @@ impl Database {
         context_type: ContextType,
         context_id: &str,
     ) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "message_contexts",
             "message_id = ?2 AND context_type = ?3 AND context_id = ?4 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(message_id)
         .bind(context_type.to_string())

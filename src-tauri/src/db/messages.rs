@@ -173,7 +173,7 @@ impl Database {
         // ends the path read-time — an orphaned tail degrades gracefully
         // instead of erroring. The depth cap bounds hypothetical cycles
         // introduced by pathological merges.
-        let rows = sqlx::query(&format!(
+        let rows = sqlx::query(sqlx::AssertSqlSafe(format!(
             "WITH RECURSIVE chain(id, depth) AS (
                  SELECT id, 0 FROM messages WHERE id = ?1
                  UNION ALL
@@ -186,7 +186,7 @@ impl Database {
                     msg.sender_id, msg.content, msg.tokens, msg.created_at
              FROM messages msg JOIN chain ON msg.id = chain.id
              ORDER BY chain.depth DESC, msg.created_at ASC, msg.id ASC",
-        ))
+        )))
         .bind(&leaf)
         .fetch_all(self.pool.as_ref())
         .await?;
@@ -291,10 +291,10 @@ impl Database {
         // Soft-delete (ADR 01): truncated messages tombstone instead of hard
         // DELETE so the deletion propagates through snapshot merges.
         let now = chrono::Utc::now().to_rfc3339();
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "messages",
             "conversation_id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(&now)
         .bind(conversation_id)
         .execute(self.pool.as_ref())
@@ -352,9 +352,9 @@ impl Database {
             subtree_anchor.replacen("= ?", "= ?2", 1)
         );
 
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             "DELETE FROM messages_fts WHERE message_id IN ({subtree_ids_1})"
-        ))
+        )))
         .bind(message_id)
         .execute(self.pool.as_ref())
         .await?;
@@ -369,10 +369,10 @@ impl Database {
         // Soft-delete (ADR 01): regenerated tail messages tombstone instead
         // of hard DELETE so the truncation propagates through merges.
         let now = chrono::Utc::now().to_rfc3339();
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "messages",
             &format!("id IN ({subtree_ids_2}) AND deleted_at IS NULL"),
-        ))
+        )))
         .bind(&now)
         .bind(message_id)
         .execute(self.pool.as_ref())
@@ -387,9 +387,9 @@ impl Database {
         .fetch_optional(self.pool.as_ref())
         .await?;
         if let Some((Some(active_id),)) = active {
-            let in_subtree: bool = sqlx::query_scalar(&format!(
+            let in_subtree: bool = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
                 "SELECT EXISTS(SELECT 1 FROM ({subtree_ids_1}) WHERE id = ?)"
-            ))
+            )))
             .bind(message_id)
             .bind(&active_id)
             .fetch_one(self.pool.as_ref())

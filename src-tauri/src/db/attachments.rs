@@ -79,10 +79,10 @@ impl Database {
     }
 
     pub async fn delete_file_attachment(&self, id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "files",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())
@@ -160,7 +160,7 @@ impl Database {
                    AND ma.message_id IN ({placeholders})
                  ORDER BY ma.message_id, ma.display_order, ma.created_at"
             );
-            let mut query = sqlx::query(&sql);
+            let mut query = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()));
             for id in chunk {
                 query = query.bind(id);
             }
@@ -212,10 +212,10 @@ impl Database {
         message_id: &str,
         attachment_id: &str,
     ) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "message_attachments",
             "message_id = ?2 AND attachment_id = ?3 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(message_id)
         .bind(attachment_id)
