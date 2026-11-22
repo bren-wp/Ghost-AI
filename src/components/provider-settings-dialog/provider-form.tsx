@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import type { LLMProvider, ModelItem } from './types'
 import { isCustomProvider } from './types'
+import { requiresApiKeyForFetch } from './constants'
 
 type CheckStatus = 'idle' | 'checking' | 'success' | 'failed'
 
@@ -238,7 +239,7 @@ export function ProviderForm({
             size="sm"
             className="h-9 max-w-full shrink-0"
             onClick={handleCheckApi}
-            disabled={checkStatus === 'checking' || (!apiKey && selectedProvider.id !== 'ollama')}
+            disabled={checkStatus === 'checking' || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())}
           >
             {checkStatus === 'checking' ? (
               <Loader2 className="size-4 animate-spin" />
