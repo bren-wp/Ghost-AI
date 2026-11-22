@@ -13,6 +13,7 @@ import { EditModelDialog } from '@/components/provider-settings-dialog/edit-mode
 import { useProviderSettings } from '@/components/provider-settings-dialog/useProviderSettings'
 import { ProviderSelect } from '@/components/provider-settings-dialog/provider-select'
 import { requiresApiKeyForFetch } from '@/components/provider-settings-dialog/constants'
+import { isValidProviderEndpoint } from '@/components/provider-settings-dialog/provider-endpoint'
 import { isCustomProvider, type LLMProvider } from '@/components/provider-settings-dialog/types'
 
 interface LLMProviderSettingsProps {
@@ -193,7 +194,8 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
             onClick={handleSave}
             disabled={
               isSaving || !hasChanges || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim()) ||
-              (isCustom && (!providerName.trim() || !apiBaseUrl.trim()))
+              (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) ||
+              (apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl))
             }
           >
             {isSaving ? (
