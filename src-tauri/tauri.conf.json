@@ -88,7 +88,6 @@
     "homepage": "https://brendigo.com",
     "shortDescription": "Your AI. Your desktop.",
     "longDescription": "Ghost AI brings conversations, documents, research and intelligent tools into one beautifully focused workspace.",
-    "licenseFile": "../legal/EULA-EN.txt",
     "windows": {
       "nsis": {
         "installMode": "currentUser",
