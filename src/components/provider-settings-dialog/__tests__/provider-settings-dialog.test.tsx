@@ -1,6 +1,6 @@
 // Ghost AI by Brendigo
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { invoke } from '@tauri-apps/api/core'
 import i18n from '@/lib/i18n'
 import { ProviderSettingsDialog } from '../provider-settings-dialog'
@@ -119,6 +119,28 @@ describe('ProviderSettingsDialog deep link', () => {
       apiKey: 'sk-test',
       baseUrl: provider.base_url,
     })
+  })
+
+  it('preserves unsaved form edits when the model store refreshes in the background', async () => {
+    mockBackend({ models: [model], providers: [provider] })
+    renderDialog(provider.id)
+
+    const key = await screen.findByLabelText('API Key')
+    await waitFor(() => expect(key).toHaveValue('sk-test'))
+    const nameInput = screen.getByDisplayValue(model.name)
+
+    fireEvent.change(key, { target: { value: 'sk-unsaved-edit' } })
+    fireEvent.change(nameInput, { target: { value: 'Unsaved model name' } })
+
+    act(() => {
+      useModelStore.setState({
+        providers: [{ ...provider }],
+        models: [{ ...model, name: 'Refreshed backend model' }],
+      })
+    })
+
+    expect(screen.getByLabelText('API Key')).toHaveValue('sk-unsaved-edit')
+    expect(screen.getByDisplayValue('Unsaved model name')).toBeInTheDocument()
   })
 
   it('does not fetch when the focused provider already has a model', async () => {
