@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { invoke } from '@tauri-apps/api/core'
+import { logger } from '@/lib/logger'
 import i18n from '@/lib/i18n'
 import { useProviderSave } from '../useProviderSave'
 import type { ModelItem } from '../types'
@@ -41,10 +42,12 @@ function setup({
   models,
   modelsToDelete = [],
   existing = existingProvider,
+  providerName = 'Acme',
 }: {
   models: ModelItem[]
   modelsToDelete?: string[]
   existing?: Provider | null
+  providerName?: string
 }) {
   const onOpenChange = vi.fn()
   const onSavedWithoutModels = vi.fn()
@@ -57,7 +60,7 @@ function setup({
       existingProvider: existing,
       apiKey: 'sk-test',
       apiBaseUrl: 'http://127.0.0.1:18080/llm/v1',
-      providerName: 'Acme',
+      providerName,
       apiStyle: 'chat_completions',
       compatibilityType: 'openai',
       selectedProvider: existing
@@ -121,5 +124,47 @@ describe('useProviderSave without models', () => {
     expect(onOpenChange).not.toHaveBeenCalled()
     expect(onSavedWithoutModels).toHaveBeenCalledTimes(1)
     expect(result.current.savedWithoutModels).toBe(true)
+  })
+})
+
+
+describe('useProviderSave security and reliability', () => {
+  it('never logs an API key from the returned provider object', async () => {
+    const apiSecret = 'sk-secret-should-never-appear-in-logs'
+    vi.mocked(logger.info).mockClear()
+    vi.mocked(invoke).mockResolvedValue({ ...existingProvider, api_key: apiSecret })
+    const { result } = setup({ models: [], existing: null })
+
+    await act(async () => {
+      await result.current.handleSave()
+    })
+
+    expect(invoke).toHaveBeenCalledWith('create_provider', expect.anything())
+    expect(JSON.stringify(vi.mocked(logger.info).mock.calls)).not.toContain(apiSecret)
+  })
+
+  it('rejects an empty custom provider name before contacting the backend', async () => {
+    const { result } = setup({ models: [], existing: null, providerName: ' ' })
+    await act(async () => {
+      await result.current.handleSave()
+    })
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('prevents duplicate creation while the first save is pending', async () => {
+    let finish!: (value: Provider) => void
+    const pending = new Promise<Provider>((resolve) => { finish = resolve })
+    vi.mocked(invoke).mockReturnValue(pending as never)
+    const { result } = setup({ models: [], existing: null })
+
+    await act(async () => {
+      const first = result.current.handleSave()
+      const second = result.current.handleSave()
+      expect(invoke).toHaveBeenCalledTimes(1)
+      finish(existingProvider)
+      await Promise.all([first, second])
+    })
+
+    expect(invoke).toHaveBeenCalledTimes(1)
   })
 })
