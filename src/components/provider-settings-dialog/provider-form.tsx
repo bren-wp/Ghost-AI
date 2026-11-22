@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import type { LLMProvider, ModelItem } from './types'
 import { isCustomProvider } from './types'
 import { requiresApiKeyForFetch } from './constants'
+import { isPlaintextRemoteEndpoint, isValidProviderEndpoint } from './provider-endpoint'
 
 type CheckStatus = 'idle' | 'checking' | 'success' | 'failed'
 
@@ -61,6 +62,8 @@ export function ProviderForm({
 }: ProviderFormProps) {
   const { t } = useTranslation('providers')
   const isCustom = isCustomProvider(selectedProvider)
+  const invalidEndpoint = apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl)
+  const plaintextRemoteEndpoint = isPlaintextRemoteEndpoint(apiBaseUrl)
 
   const [checkStatus, setCheckStatus] = React.useState<CheckStatus>('idle')
   const [checkError, setCheckError] = React.useState<string | null>(null)
@@ -286,10 +289,22 @@ export function ProviderForm({
           type="url"
           required={isCustom}
           aria-required={isCustom}
+          aria-invalid={invalidEndpoint}
+          aria-describedby={invalidEndpoint ? 'api-base-url-error' : undefined}
           placeholder="https://api.example.com/v1"
           value={apiBaseUrl}
           onChange={(e) => onApiBaseUrlChange(e.target.value)}
         />
+        {invalidEndpoint && (
+          <p id="api-base-url-error" role="alert" className="text-xs text-destructive">
+            {t('invalidBaseUrl')}
+          </p>
+        )}
+        {plaintextRemoteEndpoint && (
+          <p role="status" className="text-xs text-warning">
+            {t('unsecuredEndpointWarning')}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           {isCustom ? (
             t('apiBaseUrlRequired')
