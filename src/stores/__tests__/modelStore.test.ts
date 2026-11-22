@@ -1,5 +1,6 @@
 // Ghost AI by Brendigo
 import { invoke } from '@tauri-apps/api/core'
+import { logger } from '@/lib/logger'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useModelStore } from '../modelStore'
 import type { Model, Provider } from '@/types'
@@ -109,7 +110,7 @@ describe('useModelStore', () => {
       await useModelStore.getState().loadModels()
 
       const state = useModelStore.getState()
-      expect(state.error).toBe('Error: network down')
+      expect(state.error).toBe('Unable to load models. Please retry.')
       expect(state.isLoading).toBe(false)
       expect(state.models).toEqual([])
     })
@@ -147,7 +148,7 @@ describe('useModelStore', () => {
       await useModelStore.getState().loadProviders()
 
       const state = useModelStore.getState()
-      expect(state.error).toBe('db unavailable')
+      expect(state.error).toBe('Unable to load AI providers. Please retry.')
       expect(state.isLoading).toBe(false)
       expect(state.providers).toEqual([])
     })
@@ -183,11 +184,30 @@ describe('useModelStore', () => {
       await useModelStore.getState().loadAll()
 
       const state = useModelStore.getState()
-      expect(state.error).toBe('Error: providers unavailable')
+      expect(state.error).toBe('Unable to load AI providers or models. Please retry.')
       expect(state.isLoading).toBe(false)
       expect(state.models).toEqual([])
       expect(state.providers).toEqual([])
     })
+  })
+
+  it('never sends provider API keys or raw backend errors to log files', async () => {
+    const secret = 'sk-secret-that-must-not-be-logged'
+    const provider = createMockProvider({ api_key: secret })
+    mockInvoke.mockImplementation(async (command: string) => {
+      if (command === 'list_providers') return [provider]
+      if (command === 'list_all_models') return []
+      throw new Error('unexpected command')
+    })
+
+    await useModelStore.getState().loadAll()
+    expect(useModelStore.getState().providers[0].api_key).toBe(secret)
+    expect(JSON.stringify(vi.mocked(logger.info).mock.calls)).not.toContain(secret)
+
+    mockInvoke.mockRejectedValueOnce(new Error(`request failed: ${secret}`))
+    await useModelStore.getState().loadProviders()
+    expect(useModelStore.getState().error).not.toContain(secret)
+    expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain(secret)
   })
 
   describe('updateModel', () => {
@@ -250,7 +270,7 @@ describe('useModelStore', () => {
       ).rejects.toThrow('validation failed')
 
       const state = useModelStore.getState()
-      expect(state.error).toBe('Error: validation failed')
+      expect(state.error).toBe('Unable to update model. Please retry.')
       expect(state.isLoading).toBe(false)
       // Optimistic-free: list keeps the old model after failure
       expect(state.models[0].name).toBe('Old name')
@@ -294,7 +314,7 @@ describe('useModelStore', () => {
       await expect(useModelStore.getState().deleteModel('model-a')).rejects.toThrow('delete denied')
 
       const state = useModelStore.getState()
-      expect(state.error).toBe('Error: delete denied')
+      expect(state.error).toBe('Unable to delete model. Please retry.')
       expect(state.isLoading).toBe(false)
       expect(state.models[0].is_deleted).toBe(false)
     })
