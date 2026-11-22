@@ -196,13 +196,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Ghost-AI-Windows
-          path: release/*
+          path: |
+            release/Ghost-AI-*
+            release/SHA256SUMS.txt
           if-no-files-found: error
 
   linux:
     name: Linux AppImage and DEB
     needs: validate
-    continue-on-error: true
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -245,7 +246,6 @@ jobs:
   macos:
     name: macOS DMG and App
     needs: validate
-    continue-on-error: true
     runs-on: macos-latest
     timeout-minutes: 120
     env:
@@ -284,18 +284,30 @@ jobs:
     name: Publish versioned Ghost AI release
     runs-on: ubuntu-24.04
     needs: [validate, windows, linux, macos]
-    if: always() && needs.validate.result == 'success' && needs.windows.result == 'success'
+    if: always() && needs.validate.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && needs.macos.result == 'success'
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: Ghost-AI-*
+          name: Ghost-AI-Windows
           path: release
-          merge-multiple: true
-      - name: Verify release assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: Ghost-AI-Linux
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: Ghost-AI-macOS
+          path: release
+      - name: Verify all platform assets and complete checksums
+        shell: bash
         run: |
-          test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Setup.exe"
-          test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Portable.exe"
-          test -s "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Update.exe"
+          tag="${{ needs.validate.outputs.release_tag }}"
+          for suffix in Setup.exe Portable.exe Portable.zip Update.exe Linux.AppImage Linux.deb macOS.dmg; do
+            test -s "release/Ghost-AI-$tag-$suffix" || { echo "Missing release asset: $suffix"; exit 1; }
+          done
+          cd release
+          sha256sum Ghost-AI-* > SHA256SUMS.txt
+          test "$(wc -l < SHA256SUMS.txt)" -ge 7
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:

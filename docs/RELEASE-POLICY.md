@@ -1,6 +1,6 @@
 # Ghost AI release and distribution policy
 
-The first release line starts at **v0.1.0**. Subsequent builds use semantic versions and only publish when tests, packaging, malware checks and required signature validation succeed.
+The first release line starts at **v0.1.0**. Subsequent builds use semantic versions. GitHub releases remain **prereleases** until clean-machine launch, package integrity, platform signing and security checks have been independently verified. A successful build is not evidence that the application launches correctly.
 
 ## Expected deliverables
 
@@ -11,6 +11,14 @@ The first release line starts at **v0.1.0**. Subsequent builds use semantic vers
 | macOS | .dmg | App bundle archive | Signed/notarized app updates |
 
 A portable Windows executable can require companion resources, model catalogs or the system WebView runtime. A one-file EXE is *not* a promise of full portability unless confirmed on clean Windows test machines.
+
+## CI checks and current limits
+
+- Every pull request compiles and opens a production Windows executable staged with its packaged resources. The smoke check fails if the process exits, no main window becomes visible, or the window disappears immediately.
+- Windows release jobs check installed, portable and update packages, and save diagnostics even when a check fails.
+- Linux and macOS release jobs currently build their packages, but do **not** yet prove a visible application window or operation on a clean user device. Their build failures must block publication rather than silently omit an artifact.
+- A release requires all expected platform files and a regenerated SHA-256 list covering the actual uploaded packages.
+- GitHub CI does not by itself establish antivirus cleanliness, Authenticode signing, macOS notarization, functional AI provider coverage, or accessibility compliance. Record these independently before promoting any build from prerelease to stable.
 
 ## Static site without database
 
