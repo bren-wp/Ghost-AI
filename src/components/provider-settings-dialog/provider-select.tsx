@@ -1,6 +1,7 @@
 // Ghost AI by Brendigo
 'use client'
 
+import { useId } from 'react'
 import type { Provider } from '@/types'
 import type { LLMProvider } from './types'
 import { isCustomProviderType } from './types'
@@ -22,6 +23,7 @@ export function ProviderSelect({
   onSelectProvider,
   className = '',
 }: ProviderSelectProps) {
+  const selectId = useId()
   const customProviders = storeProviders.filter((item) => isCustomProviderType(item.provider_type))
   const currentValue = editingCustomProviderId
     ? `custom:${editingCustomProviderId}`
@@ -29,11 +31,11 @@ export function ProviderSelect({
 
   return (
     <div className={`min-w-0 space-y-1 ${className}`}>
-      <label htmlFor="ghost-provider-select" className="block text-xs font-medium text-muted-foreground">
+      <label htmlFor={selectId} className="block text-xs font-medium text-muted-foreground">
         AI provider
       </label>
       <select
-        id="ghost-provider-select"
+        id={selectId}
         aria-label="AI provider"
         className="h-10 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         value={currentValue}
