@@ -100,6 +100,19 @@ jobs:
           name: Ghost-AI-PR-Windows-Startup
           path: smoke/diagnostics/
           if-no-files-found: warn
+      - name: Capture real running application for layout review
+        id: screenshot
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          ./scripts/ghost-ai-capture-screenshot.ps1 -Executable 'smoke/Portable/Ghost-AI.exe' -Output 'smoke/screenshots/ghost-ai-first-run.png'
+      - name: Preserve real Windows screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-PR-Windows-Screenshot
+          path: smoke/screenshots/*.png
+          if-no-files-found: warn
       - name: Block merge when the application does not open
         if: steps.startup.outcome != 'success'
         shell: pwsh
