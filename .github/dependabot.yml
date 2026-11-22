@@ -1,4 +1,6 @@
 # Ghost AI by Brendigo
+# Allow dependency updates; previous limit=0 silently disabled version-update PRs.
+# Group compatible updates while keeping major upgrades isolated for review.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -6,25 +8,43 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 0
+      time: "03:00"
+      timezone: Europe/Zagreb
+    open-pull-requests-limit: 6
     groups:
-      ghost-ai-frontend:
-        patterns: ['*']
+      ghost-ai-npm-nonbreaking:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      ghost-ai-npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 0
+      time: "03:30"
+      timezone: Europe/Zagreb
+    open-pull-requests-limit: 6
     groups:
-      ghost-ai-rust:
-        patterns: ['*']
+      ghost-ai-cargo-nonbreaking:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      ghost-ai-cargo-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 0
+      time: "04:00"
+      timezone: Europe/Zagreb
+    open-pull-requests-limit: 3
     groups:
-      ghost-ai-ci:
-        patterns: ['*']
+      ghost-ai-actions:
+        patterns: ["*"]
