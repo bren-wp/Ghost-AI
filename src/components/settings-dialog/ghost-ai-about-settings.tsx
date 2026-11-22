@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { useUpdaterStore, updateChannelAvailable } from '@/stores/updaterStore'
 import { ReleaseNotes } from './release-notes'
 import appIcon from '@/assets/app-icon.png'
+import { GhostLegalDocuments } from '@/components/license/ghost-ai-legal-documents'
 
 const WEBSITE = 'https://brendigo.com'
 
@@ -152,6 +153,7 @@ export function GhostAboutSettings() {
           </div>
         )}
       </section>
+      <GhostLegalDocuments />
     </div>
   )
 }
