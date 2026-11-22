@@ -43,11 +43,13 @@ function setup({
   modelsToDelete = [],
   existing = existingProvider,
   providerName = 'Acme',
+  apiKey = 'sk-test',
 }: {
   models: ModelItem[]
   modelsToDelete?: string[]
   existing?: Provider | null
   providerName?: string
+  apiKey?: string
 }) {
   const onOpenChange = vi.fn()
   const onSavedWithoutModels = vi.fn()
@@ -58,7 +60,7 @@ function setup({
       originalModelNames: {},
       originalModelIds: {},
       existingProvider: existing,
-      apiKey: 'sk-test',
+      apiKey,
       apiBaseUrl: 'http://127.0.0.1:18080/llm/v1',
       providerName,
       apiStyle: 'chat_completions',
@@ -127,6 +129,19 @@ describe('useProviderSave without models', () => {
   })
 })
 
+
+describe('API key removal', () => {
+  it('passes an explicit empty key so the backend erases a stored secret', async () => {
+    const saved = { ...existingProvider, api_key: 'sk-will-be-removed' }
+    vi.mocked(invoke).mockResolvedValue(saved)
+    const { result } = setup({ models: [newModel('model-1')], existing: saved, apiKey: '' })
+    await act(async () => { await result.current.handleSave() })
+    expect(invoke).toHaveBeenCalledWith('update_provider', expect.objectContaining({
+      id: saved.id,
+      req: expect.objectContaining({ api_key: '' }),
+    }))
+  })
+})
 
 describe('useProviderSave security and reliability', () => {
   it('never logs an API key from the returned provider object', async () => {
