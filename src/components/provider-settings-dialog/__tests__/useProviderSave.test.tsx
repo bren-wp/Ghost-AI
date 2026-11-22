@@ -44,12 +44,14 @@ function setup({
   existing = existingProvider,
   providerName = 'Acme',
   apiKey = 'sk-test',
+  apiBaseUrl = 'http://127.0.0.1:18080/llm/v1',
 }: {
   models: ModelItem[]
   modelsToDelete?: string[]
   existing?: Provider | null
   providerName?: string
   apiKey?: string
+  apiBaseUrl?: string
 }) {
   const onOpenChange = vi.fn()
   const onSavedWithoutModels = vi.fn()
@@ -61,7 +63,7 @@ function setup({
       originalModelIds: {},
       existingProvider: existing,
       apiKey,
-      apiBaseUrl: 'http://127.0.0.1:18080/llm/v1',
+      apiBaseUrl,
       providerName,
       apiStyle: 'chat_completions',
       compatibilityType: 'openai',
@@ -156,6 +158,31 @@ describe('useProviderSave security and reliability', () => {
 
     expect(invoke).toHaveBeenCalledWith('create_provider', expect.anything())
     expect(JSON.stringify(vi.mocked(logger.info).mock.calls)).not.toContain(apiSecret)
+  })
+
+  it('normalizes custom provider names and endpoint whitespace', async () => {
+    vi.mocked(invoke).mockResolvedValue(existingProvider)
+    const { result } = setup({
+      models: [],
+      existing: null,
+      providerName: '  Acme  ',
+      apiBaseUrl: '  https://api.example.com/v1  ',
+    })
+
+    await act(async () => { await result.current.handleSave() })
+
+    expect(invoke).toHaveBeenCalledWith('create_provider', {
+      req: expect.objectContaining({
+        name: 'Acme',
+        base_url: 'https://api.example.com/v1',
+      }),
+    })
+  })
+
+  it('blocks malformed endpoints before calling native providers', async () => {
+    const { result } = setup({ models: [], existing: null, apiBaseUrl: 'file:///secrets' })
+    await act(async () => { await result.current.handleSave() })
+    expect(invoke).not.toHaveBeenCalled()
   })
 
   it('rejects an empty custom provider name before contacting the backend', async () => {
