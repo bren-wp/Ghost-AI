@@ -1,7 +1,7 @@
 # SQLx 0.9 migration — reviewed dynamic SQL
 
 SQLx 0.9 requires an explicit `sqlx::AssertSqlSafe` at callsites using
-constructed SQL strings. This change updates 53 such query calls in 19 source
+constructed SQL strings. This change updates 53 production query calls plus 5 test-only callsites in 19 source
 files, including statement-building inside schema migrations.
 
 **Security review:**

@@ -785,7 +785,7 @@ mod tests {
     }
 
     async fn columns(pool: &SqlitePool, table: &str) -> Vec<String> {
-        let rows = sqlx::query(&format!("PRAGMA table_info({table})"))
+        let rows = sqlx::query(sqlx::AssertSqlSafe(format!("PRAGMA table_info({table})")))
             .fetch_all(pool)
             .await
             .unwrap();
@@ -841,10 +841,10 @@ mod tests {
         let pool = fresh_pool().await;
         init_schema(&pool).await.expect("init schema");
         for table in ["message_prompts", "message_tools"] {
-            sqlx::query(&format!(
+            sqlx::query(sqlx::AssertSqlSafe(format!(
                 "CREATE TABLE {table} (id TEXT PRIMARY KEY, message_id TEXT NOT NULL, \
                  created_at TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT '', deleted_at TEXT)"
-            ))
+            )))
             .execute(&pool)
             .await
             .unwrap();

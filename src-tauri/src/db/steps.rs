@@ -610,7 +610,7 @@ mod tests {
     }
 
     async fn row_deleted_at(db: &Database, table: &str, id: &str) -> Option<String> {
-        sqlx::query_scalar(&format!("SELECT deleted_at FROM {table} WHERE id = ?"))
+        sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT deleted_at FROM {table} WHERE id = ?")))
             .bind(id)
             .fetch_one(db.pool())
             .await
@@ -1579,9 +1579,9 @@ mod tests {
             "code_executions",
             "content_blocks",
         ] {
-            let count: i64 = sqlx::query_scalar(&format!(
+            let count: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
                 "SELECT COUNT(*) FROM {table} WHERE message_id = ?"
-            ))
+            )))
             .bind(&msg)
             .fetch_one(db.pool())
             .await

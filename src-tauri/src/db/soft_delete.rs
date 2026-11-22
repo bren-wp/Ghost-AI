@@ -209,7 +209,7 @@ mod tests {
         ];
         for (table, where_clause) in cases {
             let sql = tombstone_update(table, where_clause);
-            sqlx::query(&sql)
+            sqlx::query(sqlx::AssertSqlSafe(sql.as_str()))
                 .fetch_all(&pool)
                 .await
                 .unwrap_or_else(|e| panic!("{table}: {e} — {sql}"));
