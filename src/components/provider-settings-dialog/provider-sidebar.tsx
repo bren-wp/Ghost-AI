@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 
 interface ProviderSidebarProps {
   selectedProvider: LLMProvider
-  onSelectProvider: (provider: LLMProvider) => void
+  onSelectProvider: (provider: LLMProvider, storedProviderId?: string) => void
   storeProviders: Provider[]
   editingCustomProviderId?: string | null
   /** Overrides the default fixed height, e.g. to fill an embedding container. */
@@ -84,7 +84,7 @@ export function ProviderSidebar({
                         name: cp.name,
                         baseUrl: cp.base_url || '',
                         isCustom: true,
-                      })
+                      }, cp.id)
                     }
                     isActive={editingCustomProviderId === cp.id}
                   >
