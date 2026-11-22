@@ -34,6 +34,34 @@ jobs:
         run: pnpm test
       - name: Signed manifest tests
         run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Inventory available npm dependency updates
+        id: npm_outdated
+        shell: bash
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          pnpm outdated --recursive > reports/npm-outdated.txt 2>&1
+      - name: Scan npm dependency advisories
+        id: npm_audit
+        shell: bash
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          pnpm audit --audit-level high > reports/npm-security-audit.txt 2>&1
+      - name: Publish dependency inventory and security findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-Dependency-Audit
+          path: |
+            reports/npm-outdated.txt
+            reports/npm-security-audit.txt
+          if-no-files-found: warn
+      - name: Highlight unresolved security audits
+        if: steps.npm_audit.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::warning::High-severity npm advisory detected or audit registry unavailable. Review Ghost-AI-Dependency-Audit artifact before release."
       - name: Review first-party code for maintainability and risk
         run: python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
       - name: Save Ghost AI source review
