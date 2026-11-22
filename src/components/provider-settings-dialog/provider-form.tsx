@@ -65,8 +65,11 @@ export function ProviderForm({
   const [checkError, setCheckError] = React.useState<string | null>(null)
   const [checkLatency, setCheckLatency] = React.useState<number | null>(null)
   const resetTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const requestGenerationRef = React.useRef(0)
 
   React.useEffect(() => {
+    requestGenerationRef.current += 1
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current)
     setCheckStatus('idle')
     setCheckError(null)
     setCheckLatency(null)
@@ -74,11 +77,14 @@ export function ProviderForm({
 
   React.useEffect(() => {
     return () => {
+      requestGenerationRef.current += 1
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current)
     }
   }, [])
 
   const handleCheckApi = React.useCallback(async () => {
+    const generation = ++requestGenerationRef.current
+    const redact = (value: string) => apiKey.trim() ? value.replaceAll(apiKey.trim(), '[redacted]') : value
     const providerType = isCustom
       ? compatibilityType === 'anthropic'
         ? 'custom_anthropic'
@@ -107,22 +113,26 @@ export function ProviderForm({
         apiStyle: isCustom && compatibilityType === 'openai' ? apiStyle : null,
       })
 
+      if (generation !== requestGenerationRef.current) return
       if (result.success) {
         setCheckStatus('success')
         setCheckLatency(result.latency_ms)
         resetTimerRef.current = setTimeout(() => {
-          setCheckStatus('idle')
-          setCheckLatency(null)
+          if (generation === requestGenerationRef.current) {
+            setCheckStatus('idle')
+            setCheckLatency(null)
+          }
         }, 5000)
       } else {
         setCheckStatus('failed')
-        setCheckError(result.error || 'Connection failed')
+        setCheckError(redact(result.error || 'Connection failed'))
       }
     } catch (e) {
+      if (generation !== requestGenerationRef.current) return
       setCheckStatus('failed')
-      setCheckError(e instanceof Error ? e.message : String(e))
+      setCheckError(redact(e instanceof Error ? e.message : String(e)))
     }
-  }, [selectedProvider, isCustom, compatibilityType, apiKey, apiBaseUrl, apiStyle, models])
+  }, [selectedProvider, isCustom, compatibilityType, apiKey, apiBaseUrl, apiStyle, models, t])
 
   return (
     <div className="min-w-0 space-y-4">
