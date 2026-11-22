@@ -123,7 +123,7 @@ jobs:
       - name: Build production Windows binary
         run: pnpm tauri build --no-bundle
       - name: Verify provider encryption and database rollback on Windows
-        run: 'cargo test --manifest-path src-tauri/Cargo.toml --lib providers::tests:: -- --nocapture'
+        run: 'cargo test --manifest-path src-tauri/Cargo.toml --lib providers::tests:: -- --nocapture --test-threads=1'
       - name: Stage packaged resources as in Portable.zip
         shell: pwsh
         run: |
