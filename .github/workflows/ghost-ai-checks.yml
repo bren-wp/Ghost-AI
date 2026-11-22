@@ -100,6 +100,19 @@ jobs:
           name: Ghost-AI-PR-Windows-Startup
           path: smoke/diagnostics/
           if-no-files-found: warn
+      - name: Observe early visible frames for white startup flashes
+        id: first_paint
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          ./scripts/ghost-ai-first-paint.ps1 -Executable 'smoke/Portable/Ghost-AI.exe' -OutputDirectory 'smoke/first-paint' -ObserveSeconds 18 -SampleIntervalMs 85
+      - name: Preserve first-paint frames and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-AI-PR-Windows-First-Paint
+          path: smoke/first-paint/
+          if-no-files-found: warn
       - name: Capture real app and Settings at supported desktop sizes
         id: screenshots
         shell: pwsh
@@ -145,8 +158,8 @@ jobs:
           name: Ghost-AI-PR-Windows-Screenshots
           path: smoke/screenshots/
           if-no-files-found: warn
-      - name: Block merge when the application does not open
-        if: steps.startup.outcome != 'success'
+      - name: Block merge when the application does not open or first paint cannot be verified
+        if: steps.startup.outcome != 'success' || steps.first_paint.outcome != 'success' || steps.screenshots.outcome != 'success'
         shell: pwsh
         run: |
-          throw 'Ghost AI Windows startup smoke test failed: no stable main window'
+          throw 'Ghost AI Windows verification failed; inspect startup, first-paint and screenshot artifacts'
