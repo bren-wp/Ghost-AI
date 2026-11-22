@@ -7,10 +7,14 @@ The first release line starts at **v0.1.0**. Subsequent builds use semantic vers
 | Platform | Installer | Portable | Update |
 |---|---|---|---|
 | Windows x64 | Ghost-AI-vX.Y.Z-Setup.exe | Ghost-AI-vX.Y.Z-Portable.exe and ZIP with required resources | Signed Tauri updater for installed build; standalone Update.exe only if it can validate the publisher signature |
-| Linux x86_64 | AppImage and .deb | AppImage | Signed AppImage update |
-| macOS | .dmg | App bundle archive | Signed/notarized app updates |
+| Linux x86_64 | .deb installer | .AppImage standalone portable package | Signed AppImage update when configured |
+| macOS | .dmg installer | .app wrapped in a verified .zip portable archive | Signed/notarized app updates when provisioned |
 
 A portable Windows executable can require companion resources, model catalogs or the system WebView runtime. A one-file EXE is *not* a promise of full portability unless confirmed on clean Windows test machines.
+
+## Mandatory release on each completed iteration
+
+Continue changes in the currently open PR until merged. Each **completed and verified** development iteration increments the application version and triggers a versioned `release/vX.Y.Z` pipeline with all supported platform packages. If any mandatory build, signing configuration, security, startup or packaging check fails, **keep the candidate unannounced and fix it; do not publish incomplete assets or bypass checks**. A release candidate is not a published release. 
 
 ## CI checks and current limits
 
