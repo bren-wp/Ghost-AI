@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, SquarePen, X } from 'lucide-react'
 import { MorphSpinner } from '@/components/ui/morph-spinner'
+import appIcon from '@/assets/app-icon.png'
 import { AppSidebar } from '@/components/app-sidebar'
 import { ChatView } from '@/components/chat-view'
 import { ContactProfile } from '@/components/contact-profile'
@@ -176,20 +177,19 @@ export function ChatPage() {
     })
   }, [])
 
-  // Show loading screen while initializing
+  // Branded, dark-only transition after WebView initialization. Keep the
+  // same logo/title as the static HTML splash instead of showing a black frame.
   if (!isInitialized) {
     return (
-      <div className="relative h-screen">
-        {/* Spinner pinned at the exact viewport center, matching the
-            index.html splash — the "loading" text appears below it without
-            shifting the spinner, so the splash handoff never jitters. */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <MorphSpinner size={16} />
+      <main role="status" aria-live="polite" className="flex h-dvh min-h-[400px] w-full flex-col items-center justify-center gap-4 bg-[#080f1a] text-foreground">
+        <img src={appIcon} width={94} height={94} alt="" className="size-[94px] rounded-[20px]" />
+        <div className="text-center">
+          <h1 className="text-[22px] font-semibold tracking-tight">Ghost AI</h1>
+          <p className="text-xs text-muted-foreground">by Brendigo</p>
         </div>
-        <p className="absolute inset-x-0 top-1/2 mt-5 text-center text-sm text-muted-foreground">
-          {t('common:loading')}
-        </p>
-      </div>
+        <MorphSpinner size={16} />
+        <span className="text-xs text-muted-foreground">{t('common:loading')}</span>
+      </main>
     )
   }
 
