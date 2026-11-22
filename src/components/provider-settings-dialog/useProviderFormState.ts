@@ -36,6 +36,11 @@ export function useProviderFormState(): UseProviderFormStateReturn {
   const [compatibilityType, setCompatibilityType] = React.useState('openai')
   const [editingCustomProviderId, setEditingCustomProviderId] = React.useState<string | null>(null)
 
+  // Visibility never carries over when switching to another provider's credentials.
+  React.useEffect(() => {
+    setShowApiKey(false)
+  }, [selectedProvider, editingCustomProviderId])
+
   // Update base URL when provider changes (only for non-custom providers)
   React.useEffect(() => {
     if (!isCustomProvider(selectedProvider)) {
