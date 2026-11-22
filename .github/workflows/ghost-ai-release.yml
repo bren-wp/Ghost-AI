@@ -214,7 +214,7 @@ jobs:
           if-no-files-found: error
 
   linux:
-    name: Linux AppImage and DEB
+    name: Linux installer (DEB) and portable (AppImage)
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -256,7 +256,7 @@ jobs:
           if-no-files-found: error
 
   macos:
-    name: macOS DMG and App
+    name: macOS installer (DMG) and portable (.app.zip)
     needs: validate
     runs-on: macos-latest
     timeout-minutes: 120
@@ -281,10 +281,19 @@ jobs:
       - run: python3 scripts/configure_updater.py
       - name: Build macOS
         run: pnpm tauri build --bundles app,dmg
-      - name: Package macOS
+      - name: Package macOS installer and portable app bundle
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p release
-          cp src-tauri/target/release/bundle/dmg/*.dmg "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-macOS.dmg"
+          tag="${{ needs.validate.outputs.release_tag }}"
+          cp src-tauri/target/release/bundle/dmg/*.dmg "release/Ghost-AI-$tag-macOS.dmg"
+          app=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' -type d -print -quit)
+          test -n "$app" && test -s "$app/Contents/Info.plist" || { echo 'Missing macOS .app bundle'; exit 1; }
+          # ditto preserves macOS app metadata, unlike a generic ZIP packer.
+          ditto -c -k --sequesterRsrc --keepParent "$app" "release/Ghost-AI-$tag-macOS-Portable.zip"
+          unzip -t "release/Ghost-AI-$tag-macOS-Portable.zip" >/dev/null
+          test -s "release/Ghost-AI-$tag-macOS-Portable.zip"
           find src-tauri/target/release/bundle -type f \( -name '*.app.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
       - uses: actions/upload-artifact@v7
         with:
@@ -314,12 +323,12 @@ jobs:
         shell: bash
         run: |
           tag="${{ needs.validate.outputs.release_tag }}"
-          for suffix in Setup.exe Portable.exe Portable.zip Update.exe Linux.AppImage Linux.deb macOS.dmg; do
+          for suffix in Setup.exe Portable.exe Portable.zip Update.exe Linux.AppImage Linux.deb macOS.dmg macOS-Portable.zip; do
             test -s "release/Ghost-AI-$tag-$suffix" || { echo "Missing release asset: $suffix"; exit 1; }
           done
           cd release
           sha256sum Ghost-AI-* > SHA256SUMS.txt
-          test "$(wc -l < SHA256SUMS.txt)" -ge 7
+          test "$(wc -l < SHA256SUMS.txt)" -ge 8
       - name: Publish release
         uses: softprops/action-gh-release@v3
         with:
