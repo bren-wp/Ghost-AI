@@ -87,8 +87,6 @@ def main() -> None:
         markdown.append("All scanned files include the first-party header.")
     markdown.extend(["", "## Review candidates", "", "| Signal | Source | Line |", "| --- | --- | ---: |"])
     markdown.extend(f"| {kind} | `{name}` | {line} |" for kind, name, line in signals)
-    if len(signals) > 160:
-        markdown.append(f"\nAdditional items not displayed: {len(signals)-160}")
     markdown.extend(["", "## What is not certified", "",
         "This report does not certify vulnerability absence, dependency safety, UI pixel "
         "matching, full dead-code coverage, or release signing.", ""])
