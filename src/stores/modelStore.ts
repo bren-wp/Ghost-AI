@@ -112,12 +112,13 @@ export const useModelStore = create<ModelState>()(
           draft.isLoading = false
         })
         return model
-      } catch (error) {
+      } catch {
         set((draft) => {
           draft.error = 'Unable to update model. Please retry.'
           draft.isLoading = false
         })
-        throw error
+        // Do not propagate a native exception containing provider secrets.
+        throw new Error('Unable to update model. Please retry.')
       }
     },
 
@@ -135,12 +136,12 @@ export const useModelStore = create<ModelState>()(
           }
           draft.isLoading = false
         })
-      } catch (error) {
+      } catch {
         set((draft) => {
           draft.error = 'Unable to delete model. Please retry.'
           draft.isLoading = false
         })
-        throw error
+        throw new Error('Unable to delete model. Please retry.')
       }
     },
 
