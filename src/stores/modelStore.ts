@@ -35,15 +35,15 @@ export const useModelStore = create<ModelState>()(
       try {
         // Use list_all_models to include soft-deleted models for display purposes
         const models = await invoke<Model[]>('list_all_models')
-        logger.info('[modelStore] Loaded models:', models)
+        logger.info('[modelStore] Models loaded', { count: models.length })
         set((draft) => {
           draft.models = models
           draft.isLoading = false
         })
-      } catch (error) {
-        logger.error('[modelStore] Failed to load models:', error)
+      } catch {
+        logger.error('[modelStore] Failed to load models')
         set((draft) => {
-          draft.error = String(error)
+          draft.error = 'Unable to complete the model operation. Please retry.'
           draft.isLoading = false
         })
       }
@@ -56,15 +56,15 @@ export const useModelStore = create<ModelState>()(
       })
       try {
         const providers = await invoke<Provider[]>('list_providers')
-        logger.info('[modelStore] Loaded providers:', providers)
+        logger.info('[modelStore] Providers loaded', { count: providers.length })
         set((draft) => {
           draft.providers = providers
           draft.isLoading = false
         })
-      } catch (error) {
-        logger.error('[modelStore] Failed to load providers:', error)
+      } catch {
+        logger.error('[modelStore] Failed to load providers')
         set((draft) => {
-          draft.error = String(error)
+          draft.error = 'Unable to complete the model operation. Please retry.'
           draft.isLoading = false
         })
       }
@@ -81,17 +81,17 @@ export const useModelStore = create<ModelState>()(
           invoke<Model[]>('list_all_models'),
           invoke<Provider[]>('list_providers'),
         ])
-        logger.info('[modelStore] Loaded models:', models)
-        logger.info('[modelStore] Loaded providers:', providers)
+        logger.info('[modelStore] Models loaded', { count: models.length })
+        logger.info('[modelStore] Providers loaded', { count: providers.length })
         set((draft) => {
           draft.models = models
           draft.providers = providers
           draft.isLoading = false
         })
-      } catch (error) {
-        logger.error('[modelStore] Failed to load models and providers:', error)
+      } catch {
+        logger.error('[modelStore] Failed to load models and providers')
         set((draft) => {
-          draft.error = String(error)
+          draft.error = 'Unable to complete the model operation. Please retry.'
           draft.isLoading = false
         })
       }
@@ -114,7 +114,7 @@ export const useModelStore = create<ModelState>()(
         return model
       } catch (error) {
         set((draft) => {
-          draft.error = String(error)
+          draft.error = 'Unable to complete the model operation. Please retry.'
           draft.isLoading = false
         })
         throw error
@@ -137,7 +137,7 @@ export const useModelStore = create<ModelState>()(
         })
       } catch (error) {
         set((draft) => {
-          draft.error = String(error)
+          draft.error = 'Unable to complete the model operation. Please retry.'
           draft.isLoading = false
         })
         throw error
