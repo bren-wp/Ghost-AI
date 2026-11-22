@@ -86,7 +86,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # PDF text extraction
 
 # Web scraping
-scraper = "0.18"
+scraper = "0.29"
 htmd = "0.5"
 url = "2"
 urlencoding = "2"
