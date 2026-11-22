@@ -35,6 +35,9 @@ use tokio::sync::{Semaphore, mpsc};
 pub const SCHEME: &str = "ghost_ai-wvf";
 
 const MAX_CONCURRENT: usize = 2;
+/// Do not queue unbounded HTML from untrusted webview documents.
+const MAX_DELIVERY_BYTES: usize = super::fetcher::MAX_REMOTE_SOURCE_BYTES;
+const MAX_PENDING_DELIVERIES: usize = 2;
 const DEFAULT_TIMEOUT_SECS: u64 = 25;
 /// Hard cap inside the page: deliver whatever exists by then, so slow pages
 /// still return before the Rust-side timeout tears the webview down.
@@ -46,7 +49,7 @@ const DOM_QUIET_MS: u64 = 600;
 pub(crate) const HANDLER_NAME: &str = "ghost_aiWvf";
 
 static APP: LazyLock<Mutex<Option<tauri::AppHandle>>> = LazyLock::new(|| Mutex::new(None));
-static SLOTS: LazyLock<Mutex<HashMap<String, mpsc::UnboundedSender<String>>>> =
+static SLOTS: LazyLock<Mutex<HashMap<String, mpsc::Sender<String>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static SEM: LazyLock<Semaphore> = LazyLock::new(|| Semaphore::new(MAX_CONCURRENT));
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -209,7 +212,7 @@ pub async fn fetch_html(url: &str) -> Result<String> {
         NEXT_ID.fetch_add(1, Ordering::Relaxed)
     );
     let label = id.clone();
-    let (tx, mut rx) = mpsc::unbounded_channel();
+    let (tx, mut rx) = mpsc::channel(MAX_PENDING_DELIVERIES);
     SLOTS.lock().insert(id.clone(), tx);
 
     let result = run_fetch(&app, &id, &label, url, &mut rx).await;
@@ -234,7 +237,7 @@ async fn run_fetch(
     id: &str,
     label: &str,
     url: &str,
-    rx: &mut mpsc::UnboundedReceiver<String>,
+    rx: &mut mpsc::Receiver<String>,
 ) -> Result<String> {
     let target =
         tauri::WebviewUrl::External(url::Url::parse(url).context("invalid URL for webview fetch")?);
@@ -286,6 +289,10 @@ async fn run_fetch(
 /// (Windows/Linux delivery path). Returns the response body the protocol
 /// should answer with.
 pub fn deliver(uri: &str, body: &[u8]) -> &'static str {
+    if body.len() > MAX_DELIVERY_BYTES {
+        tracing::warn!("[webview] Rejected oversized rendered HTML delivery");
+        return "oversize";
+    }
     let Some(id) = extract_id(uri) else {
         tracing::warn!("[webview] Delivery without id: {}", uri);
         return "ignored";
@@ -297,6 +304,11 @@ pub fn deliver(uri: &str, body: &[u8]) -> &'static str {
 /// payload is the JSON the injected script builds.
 #[cfg(target_os = "macos")]
 pub(crate) fn deliver_message(payload: &str) -> &'static str {
+    // JSON string escaping can expand HTML, so allow overhead before parsing.
+    if payload.len() > (MAX_DELIVERY_BYTES * 2 + 64 * 1024) {
+        tracing::warn!("[webview] Rejected oversized macOS delivery payload");
+        return "oversize";
+    }
     match serde_json::from_str::<DeliveredPage>(payload) {
         Ok(page) => route_delivery(&page.id, page.html),
         Err(error) => {
@@ -316,10 +328,18 @@ struct DeliveredPage {
 /// Push delivered HTML into the waiting fetch. The sender stays registered:
 /// challenge pages re-deliver later.
 fn route_delivery(id: &str, html: String) -> &'static str {
+    if html.len() > MAX_DELIVERY_BYTES {
+        tracing::warn!("[webview] Rejected oversized rendered HTML delivery");
+        return "oversize";
+    }
     let slots = SLOTS.lock();
     if let Some(tx) = slots.get(id) {
-        let _ = tx.send(html);
-        "ok"
+        // Bounded nonblocking send: a remote page may post many messages.
+        match tx.try_send(html) {
+            Ok(()) => "ok",
+            Err(mpsc::error::TrySendError::Full(_)) => "busy",
+            Err(mpsc::error::TrySendError::Closed(_)) => "unknown",
+        }
     } else {
         tracing::warn!("[webview] Delivery for unknown id: {}", id);
         "unknown"
@@ -388,6 +408,23 @@ mod tests {
             extract_id("ghost_ai-wvf://localhost/done?id=a&x=1"),
             Some("a".to_string())
         );
+    }
+
+    #[test]
+    fn webview_delivery_queue_is_bounded() {
+        let id = "webview-bound-test";
+        let (tx, _rx) = mpsc::channel(1);
+        SLOTS.lock().insert(id.to_string(), tx);
+        assert_eq!(route_delivery(id, "<html>one</html>".to_string()), "ok");
+        assert_eq!(route_delivery(id, "<html>two</html>".to_string()), "busy");
+        SLOTS.lock().remove(id);
+        assert_eq!(route_delivery(id, "<html>three</html>".to_string()), "unknown");
+    }
+
+    #[test]
+    fn oversized_delivery_is_rejected_without_decoding() {
+        let large = vec![b'X'; MAX_DELIVERY_BYTES + 1];
+        assert_eq!(deliver("ghost_ai-wvf://localhost/done?id=any", &large), "oversize");
     }
 
     #[test]
