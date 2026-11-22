@@ -15,6 +15,11 @@ A portable Windows executable can require companion resources, model catalogs or
 ## CI checks and current limits
 
 - Every pull request compiles and opens a production Windows executable staged with its packaged resources. The smoke check fails if the process exits, no main window becomes visible, or the window disappears immediately.
+
+- Windows starts its Tauri window hidden and reveals the branded dark content after React replaces the static splash. A native watchdog restores visibility after a timeout if the frontend fails; neither mechanism alone proves the absence of flashes on a real graphics stack.
+- CI attempts real main-window and Settings screenshots at 820×580, 940×640, 1160×760 and 1440×900. The screenshot artifact includes `coverage-report.txt`, which distinguishes captured images from virtual desktop sizes and dialog interactions that were **not verified**. A reviewer must examine image content; changed pixels are not definitive proof of a correct Settings dialog.
+- Pixel-perfect claims additionally require comparison with the reference images and interactive checks across all Settings sections, model-selection dialogs, accessibility/scaling modes, and actual hardware. Unit tests and screenshot files alone are insufficient.
+
 - Windows release jobs check installed, portable and update packages, and save diagnostics even when a check fails.
 - Linux and macOS release jobs currently build their packages, but do **not** yet prove a visible application window or operation on a clean user device. Their build failures must block publication rather than silently omit an artifact.
 - A release requires all expected platform files and a regenerated SHA-256 list covering the actual uploaded packages.
