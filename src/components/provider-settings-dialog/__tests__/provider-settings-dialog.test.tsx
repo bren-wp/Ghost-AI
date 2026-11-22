@@ -159,6 +159,14 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
     )
   }
 
+  // Both entry points expose a native picker. Test the real interaction
+  // instead of looking for buttons removed by the responsive redesign.
+  function selectProvider(value: string) {
+    fireEvent.change(screen.getByRole('combobox', { name: 'AI provider' }), {
+      target: { value },
+    })
+  }
+
   function expectEmptyForm() {
     expect(screen.getByLabelText('Provider Name')).toHaveValue('')
     expect(screen.getByLabelText('API Key')).toHaveValue('')
@@ -171,10 +179,11 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
     mockBackend({ models: [model], providers: [provider] })
     renderSettings()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Acme/ }))
+    await screen.findByRole('option', { name: provider.name })
+    selectProvider(`custom:${provider.id}`)
     await waitFor(() => expect(screen.getByLabelText('API Key')).toHaveValue(provider.api_key))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Provider' }))
+    selectProvider('new')
 
     await waitFor(expectEmptyForm)
   })
@@ -197,7 +206,7 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
     renderSettings()
 
     await waitFor(() => expect(mockedInvoke).toHaveBeenCalledWith('list_providers'))
-    fireEvent.click(screen.getByRole('button', { name: 'Add Provider' }))
+    selectProvider('new')
     fireEvent.change(screen.getByLabelText('Provider Name'), { target: { value: provider.name } })
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: provider.api_key } })
     fireEvent.change(screen.getByLabelText(/^API Base URL/), {
@@ -218,7 +227,7 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Provider' }))
+    selectProvider('new')
 
     await waitFor(expectEmptyForm)
   })
