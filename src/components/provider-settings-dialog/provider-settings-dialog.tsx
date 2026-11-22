@@ -26,6 +26,7 @@ import type { ProviderSettingsDialogProps } from './types'
 import { isCustomProvider, isCustomProviderType } from './types'
 import { useProviderSettings } from './useProviderSettings'
 import { ProviderSidebar } from './provider-sidebar'
+import { ProviderSelect } from './provider-select'
 import { ProviderForm } from './provider-form'
 import { ModelsTable } from './models-table'
 import { FetchModelsDialog } from './fetch-models-dialog'
@@ -212,10 +213,10 @@ export function ProviderSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(96vw,900px)] max-w-[96vw] max-h-[92vh] overflow-hidden p-0 gap-0">
+      <DialogContent className="flex h-[min(92dvh,760px)] w-[min(96vw,960px)] max-w-[96vw] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:flex-row">
         <DialogTitle className="sr-only">{t('dialogTitle')}</DialogTitle>
         <DialogDescription className="sr-only">{t('dialogDescription')}</DialogDescription>
-        <SidebarProvider className="min-h-0">
+        <SidebarProvider className="min-h-0 min-w-0 flex-1">
           <ProviderSidebar
             selectedProvider={selectedProvider}
             onSelectProvider={(p) => {
@@ -228,7 +229,14 @@ export function ProviderSettingsDialog({
             storeProviders={storeProviders}
             editingCustomProviderId={editingCustomProviderId}
           />
-          <main className="flex h-[min(86vh,640px)] min-h-0 flex-1 flex-col overflow-hidden">
+          <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <ProviderSelect
+              className="shrink-0 border-b border-border p-3 md:hidden"
+              selectedProvider={selectedProvider}
+              editingCustomProviderId={editingCustomProviderId}
+              storeProviders={storeProviders}
+              onSelectProvider={(provider) => provider.isCustom ? handleCustomProviderSelect(provider) : handleSidebarSelect(provider)}
+            />
             {!isDataLoaded ? (
               <div role="status" aria-live="polite" className="flex flex-1 items-center justify-center gap-3 text-sm text-muted-foreground">
                 <Loader2 className="size-5 animate-spin" aria-hidden="true" />
@@ -251,8 +259,8 @@ export function ProviderSettingsDialog({
                 </Breadcrumb>
               </div>
             </header>
-            <div className="flex-1 overflow-y-auto p-6 pt-0">
-              <div className="space-y-6">
+            <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pt-0 sm:p-6 sm:pt-0">
+              <div className="min-w-0 space-y-6">
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold">
                     {existingProvider ? t('common:edit') : t('common:add')} {displayName}
@@ -297,7 +305,7 @@ export function ProviderSettingsDialog({
                 />
               </div>
             </div>
-            <DialogFooter className="shrink-0 border-t p-4 sm:justify-end items-center gap-3">
+            <DialogFooter className="shrink-0 flex flex-wrap items-center gap-2 border-t p-3 sm:justify-end sm:p-4">
               {savedWithoutModels && (
                 <p className="mr-auto text-sm text-warning">{t('addModelsBeforeChatting')}</p>
               )}
