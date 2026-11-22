@@ -34,6 +34,7 @@ import { AddModelDialog } from './add-model-dialog'
 import { EditModelDialog } from './edit-model-dialog'
 import { BUILTIN_PROVIDERS } from './constants'
 import { isSupportedFetchProvider, requiresApiKeyForFetch } from './constants'
+import { isValidProviderEndpoint } from './provider-endpoint'
 import { useModelStore } from '@/stores/modelStore'
 
 export function ProviderSettingsDialog({
@@ -321,7 +322,8 @@ export function ProviderSettingsDialog({
                 onClick={handleSave}
                 disabled={
                   isSaving || !hasChanges || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim()) ||
-                  (isCustom && (!providerName.trim() || !apiBaseUrl.trim()))
+                  (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) ||
+              (apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl))
                 }
               >
                 {isSaving ? (
