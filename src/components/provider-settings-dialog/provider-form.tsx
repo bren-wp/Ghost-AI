@@ -73,7 +73,7 @@ export function ProviderForm({
     setCheckStatus('idle')
     setCheckError(null)
     setCheckLatency(null)
-  }, [selectedProvider.id])
+  }, [selectedProvider.id, apiKey, apiBaseUrl])
 
   React.useEffect(() => {
     return () => {
