@@ -22,12 +22,13 @@ jobs:
       release_tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - name: Verify matching release versions
         id: version
         shell: bash
@@ -71,7 +72,7 @@ jobs:
     name: Windows setup, portable, update
     runs-on: windows-2022
     needs: validate
-    timeout-minutes: 120
+    timeout-minutes: 85
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -79,12 +80,13 @@ jobs:
       VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
@@ -92,8 +94,6 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
-      - name: Execute full Windows Rust library regression suite
-        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
       - name: Configure trusted updater
         run: python scripts/configure_updater.py
       - name: Prepare Ghost AI installation artwork
@@ -103,6 +103,12 @@ jobs:
           python scripts/ghost_installer_art.py
       - name: Build Windows
         run: pnpm tauri build --bundles nsis
+      # Reuse the release-profile Rust dependencies from the production build
+      # rather than recompiling the entire tree again in debug profile.
+      # The PR Quality Gates independently execute the complete debug-mode test suite.
+      - name: Execute all production-profile Windows Rust library tests
+        timeout-minutes: 40
+        run: cargo test --release --manifest-path src-tauri/Cargo.toml --lib -- --nocapture --test-threads=1
       - name: Package Ghost AI Windows
         shell: pwsh
         run: |
@@ -237,12 +243,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -277,12 +284,13 @@ jobs:
       VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:

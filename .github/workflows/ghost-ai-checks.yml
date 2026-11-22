@@ -41,12 +41,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Build
@@ -129,15 +130,19 @@ jobs:
   windows-startup:
     name: Build and open Ghost AI on Windows
     runs-on: windows-2022
-    timeout-minutes: 120
+    timeout-minutes: 65
+    env:
+      # Avoid generating multi-gigabyte PDBs in CI; keep test debug assertions enabled.
+      CARGO_PROFILE_TEST_DEBUG: '0'
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
@@ -147,10 +152,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build production Windows binary
         run: pnpm tauri build --no-bundle
-      - name: Verify provider encryption and database rollback on Windows
-        run: 'cargo test --manifest-path src-tauri/Cargo.toml --lib providers::tests:: -- --nocapture --test-threads=1'
+      # This full suite includes providers::tests; do not compile/run that subset twice.
       - name: Run all Rust library regression tests on Windows
-        run: 'cargo test --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1'
+        timeout-minutes: 40
+        run: 'cargo test --manifest-path src-tauri/Cargo.toml --lib -- --nocapture --test-threads=1'
       - name: Stage packaged resources as in Portable.zip
         shell: pwsh
         run: |
