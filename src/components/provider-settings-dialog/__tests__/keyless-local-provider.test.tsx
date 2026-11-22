@@ -36,6 +36,23 @@ describe('keyless local provider controls', () => {
     expect(screen.getByRole('button', { name: 'Manage Models' })).toBeEnabled()
   })
 
+  it('blocks model discovery for a malformed API address', () => {
+    render(
+      <ModelsTable
+        models={[]}
+        selectedProvider={localProvider}
+        apiKey=""
+        apiBaseUrl="file:///etc/passwd"
+        onOpenFetchModal={noop}
+        onOpenAddModelDialog={noop}
+        onUpdateModelName={noop}
+        onDeleteModel={noop}
+        onModelSettings={noop}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Manage Models' })).toBeDisabled()
+  })
+
   it('enables connection testing for a configured local model', () => {
     render(
       <ProviderForm

@@ -22,11 +22,13 @@ import {
 } from '@/components/ui/table'
 import type { ModelItem, LLMProvider } from './types'
 import { isSupportedFetchProvider, requiresApiKeyForFetch } from './constants'
+import { isValidProviderEndpoint } from './provider-endpoint'
 
 interface ModelsTableProps {
   models: ModelItem[]
   selectedProvider: LLMProvider
   apiKey: string
+  apiBaseUrl?: string
   onOpenFetchModal: () => void
   onOpenAddModelDialog: () => void
   onUpdateModelName: (id: string, newDisplayName: string) => void
@@ -38,6 +40,7 @@ export function ModelsTable({
   models,
   selectedProvider,
   apiKey,
+  apiBaseUrl,
   onOpenFetchModal,
   onOpenAddModelDialog,
   onUpdateModelName,
@@ -62,6 +65,7 @@ export function ModelsTable({
             onClick={onOpenFetchModal}
             disabled={
               !isSupportedFetchProvider(selectedProvider.id) ||
+              (Boolean(apiBaseUrl?.trim()) && !isValidProviderEndpoint(apiBaseUrl!)) ||
               (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())
             }
           >

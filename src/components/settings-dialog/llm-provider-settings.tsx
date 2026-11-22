@@ -176,6 +176,7 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
               models={models}
               selectedProvider={selectedProvider}
               apiKey={apiKey}
+              apiBaseUrl={apiBaseUrl}
               onOpenFetchModal={handleOpenFetchModal}
               onOpenAddModelDialog={() => setAddModelDialogOpen(true)}
               onUpdateModelName={handleUpdateModelName}

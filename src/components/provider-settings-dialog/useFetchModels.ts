@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import type { LLMProvider, ModelInfo } from './types'
 import { logger } from '@/lib/logger'
 import i18n from '@/lib/i18n'
+import { isValidProviderEndpoint } from './provider-endpoint'
 
 export interface UseFetchModelsReturn {
   availableModels: ModelInfo[]
@@ -79,6 +80,10 @@ export function useFetchModels({
     setAvailableModels([])
 
     try {
+      const endpoint = apiBaseUrl || selectedProvider.baseUrl
+      if (endpoint && !isValidProviderEndpoint(endpoint)) {
+        throw new ProviderInputError(i18n.t('providers:invalidBaseUrl'))
+      }
       const providerId = selectedProvider.id
       let fetchedModels: ModelInfo[] = []
 

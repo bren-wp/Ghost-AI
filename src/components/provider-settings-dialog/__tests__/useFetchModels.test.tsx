@@ -67,6 +67,19 @@ describe('model discovery reliability', () => {
     expect(result.current.isLoading).toBe(false)
   })
 
+  it('rejects malformed endpoints before invoking the native network layer', async () => {
+    const { result } = renderHook(() => useFetchModels({
+      selectedProvider: openAI,
+      apiKey: 'sk-test',
+      apiBaseUrl: 'file:///etc/passwd',
+      compatibilityType: 'openai',
+    }))
+    await act(async () => { await result.current.handleFetchModels() })
+    expect(invokeMock.mock.calls.filter(([name]) => String(name).startsWith('fetch_'))).toHaveLength(0)
+    expect(result.current.fetchError).toBeTruthy()
+    expect(result.current.isLoading).toBe(false)
+  })
+
   it('does not render secret-bearing backend errors', async () => {
     // Only the request under test rejects. Background Tauri setting calls
     // must not inherit an unhandled rejection from this shared mock.
