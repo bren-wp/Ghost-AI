@@ -44,4 +44,8 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'build(lockfiles): resolve stable rig and rand for Ghost AI'
+          # The PR may receive unrelated audit/docs commits while Cargo resolves.
+          # Replay our lockfile-only commit on the current remote head; never force-push.
+          git fetch origin refs/heads/fix/ghost-ai-main-rust-visual-gates-20261122
+          git rebase FETCH_HEAD
           git push origin HEAD:refs/heads/fix/ghost-ai-main-rust-visual-gates-20261122
