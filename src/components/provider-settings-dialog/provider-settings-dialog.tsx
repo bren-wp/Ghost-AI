@@ -117,7 +117,7 @@ export function ProviderSettingsDialog({
         existingProvider.name !== (isCustom ? providerName : selectedProvider.name) ||
         existingProvider.provider_type !== effectiveProviderType ||
         existingProvider.api_style !== effectiveApiStyle)) ||
-    (!existingProvider && (isCustom || apiKey.trim().length > 0))
+    (!existingProvider && (isCustom || !requiresApiKeyForFetch(selectedProvider.id) || apiKey.trim().length > 0))
 
   const appliedFocusRef = React.useRef<string | null>(null)
   const autoOpenedModelsRef = React.useRef<string | null>(null)
@@ -313,7 +313,7 @@ export function ProviderSettingsDialog({
               <Button
                 onClick={handleSave}
                 disabled={
-                  isSaving || !hasChanges || (selectedProvider.id !== 'ollama' && !apiKey.trim()) ||
+                  isSaving || !hasChanges || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim()) ||
                   (isCustom && (!providerName.trim() || !apiBaseUrl.trim()))
                 }
               >
