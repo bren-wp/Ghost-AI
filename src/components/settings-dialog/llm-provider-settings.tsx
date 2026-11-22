@@ -96,12 +96,13 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
         existingProvider.api_style !== effectiveApiStyle)) ||
     (!existingProvider && (isCustom || apiKey.trim().length > 0))
 
-  const handleSelectProvider = (provider: LLMProvider) => {
+  const handleSelectProvider = (provider: LLMProvider, storedProviderId?: string) => {
     if (provider.isCustom) {
-      const storeProvider = storeProviders.find(
-        (p) => p.provider_type === provider.id && p.name === provider.name
-      )
-      if (storeProvider) setEditingCustomProviderId(storeProvider.id)
+      const storeProvider = storedProviderId
+        ? storeProviders.find((p) => p.id === storedProviderId)
+        : storeProviders.find((p) => p.provider_type === provider.id && p.name === provider.name)
+      // Selecting 'Add custom provider' must clear the previous edit target.
+      setEditingCustomProviderId(storeProvider?.id ?? null)
     } else {
       setEditingCustomProviderId(null)
     }
