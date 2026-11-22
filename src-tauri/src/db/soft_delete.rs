@@ -242,7 +242,7 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        sqlx::query(&tombstone_update("tool_calls", "id = ?2"))
+        sqlx::query(sqlx::AssertSqlSafe(tombstone_update("tool_calls", "id = ?2")))
             .bind(now)
             .bind("tc1")
             .execute(&pool)
