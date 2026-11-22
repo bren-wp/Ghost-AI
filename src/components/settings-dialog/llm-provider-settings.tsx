@@ -69,6 +69,9 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
     handleSave,
     groupedModels,
     savedWithoutModels,
+    isDataLoaded,
+    loadError,
+    retryLoad,
   } = useProviderSettings(open, () => {})
 
   const isCustom = isCustomProvider(selectedProvider)
@@ -122,6 +125,17 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
         />
       </div>
 
+      {loadError ? (
+        <div role="alert" className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm">
+          <p className="text-destructive">{loadError}</p>
+          <Button type="button" variant="outline" onClick={retryLoad}>{t('common:retry')}</Button>
+        </div>
+      ) : !isDataLoaded ? (
+        <div role="status" aria-live="polite" className="flex min-w-0 flex-1 items-center justify-center gap-2 p-6 text-muted-foreground">
+          <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+          {t('common:loading')}
+        </div>
+      ) : (
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
           <div className="mx-auto w-full max-w-3xl min-w-0 space-y-6">
@@ -195,6 +209,7 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
           </Button>
         </div>
       </div>
+      )}
 
       {/* Fetch Models Dialog */}
       <FetchModelsDialog
