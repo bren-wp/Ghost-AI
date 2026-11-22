@@ -34,12 +34,12 @@ export const useProviderStore = create<ProviderStore>()(
           draft.providers = providers
           draft.isLoading = false
         })
-      } catch (error) {
+      } catch {
         set((draft) => {
-          draft.error = String(error)
+          draft.error = 'Unable to load AI providers. Please retry.'
           draft.isLoading = false
         })
-        logger.error('Failed to load providers:', error)
+        logger.error('Failed to load providers')
       }
     },
 
@@ -55,12 +55,12 @@ export const useProviderStore = create<ProviderStore>()(
           draft.isLoading = false
         })
         return provider
-      } catch (error) {
+      } catch {
         set((draft) => {
-          draft.error = String(error)
+          draft.error = 'Unable to create AI provider. Please retry.'
           draft.isLoading = false
         })
-        throw error
+        throw new Error('Provider operation failed. Please retry.')
       }
     },
 
@@ -79,12 +79,12 @@ export const useProviderStore = create<ProviderStore>()(
           draft.isLoading = false
         })
         return provider
-      } catch (error) {
+      } catch {
         set((draft) => {
-          draft.error = String(error)
+          draft.error = 'Unable to update AI provider. Please retry.'
           draft.isLoading = false
         })
-        throw error
+        throw new Error('Provider operation failed. Please retry.')
       }
     },
 
@@ -99,12 +99,12 @@ export const useProviderStore = create<ProviderStore>()(
           draft.providers = draft.providers.filter((p: Provider) => p.id !== id)
           draft.isLoading = false
         })
-      } catch (error) {
+      } catch {
         set((draft) => {
-          draft.error = String(error)
+          draft.error = 'Unable to delete AI provider. Please retry.'
           draft.isLoading = false
         })
-        throw error
+        throw new Error('Provider operation failed. Please retry.')
       }
     },
 
