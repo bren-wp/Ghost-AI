@@ -18,31 +18,21 @@ jobs:
   rust-advisories:
     name: Rust dependency security advisories
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     permissions:
       contents: read
-      checks: write
     steps:
       - uses: actions/checkout@v4
-      - name: Audit desktop Rust dependency graph
-        id: desktop_audit
-        continue-on-error: true
-        uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: src-tauri
-      - name: Audit shared AI agent Rust dependency graph
-        id: agent_audit
-        continue-on-error: true
-        uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          working-directory: vendor/agent
-      - name: Reject any Rust dependency security advisory
-        if: steps.desktop_audit.outcome != 'success' || steps.agent_audit.outcome != 'success'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned RustSec audit CLI
         shell: bash
-        run: |
-          echo "::error::RustSec did not pass for both Cargo.lock workspaces. Do not ship a release with vulnerabilities or an incomplete audit."
-          exit 1
+        run: cargo install cargo-audit --locked --version 0.23.0
+      - name: Audit desktop Cargo.lock (must have zero vulnerabilities)
+        shell: bash
+        run: cargo audit --file src-tauri/Cargo.lock
+      - name: Audit shared AI agent Cargo.lock (must have zero vulnerabilities)
+        shell: bash
+        run: cargo audit --file vendor/agent/Cargo.lock
   frontend:
     name: App quality and legal checks
     runs-on: ubuntu-24.04
