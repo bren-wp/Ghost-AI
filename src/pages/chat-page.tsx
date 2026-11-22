@@ -196,12 +196,16 @@ export function ChatPage() {
   // Show error if initialization failed
   if (initError) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <p className="text-lg text-destructive">{t('common:failedToInitialize')}</p>
+      <main role="alert" className="flex min-h-dvh items-center justify-center bg-[#080f1a] p-6">
+        <div className="mx-auto flex max-w-md flex-col items-center gap-4 text-center">
+          <img src={appIcon} width={64} height={64} alt="" className="size-16 rounded-xl" />
+          <h1 className="text-lg font-semibold text-destructive">{t('common:failedToInitialize')}</h1>
           <p className="text-sm text-muted-foreground">{initError}</p>
+          <Button variant="outline" type="button" onClick={() => window.location.reload()}>
+            {t('common:retry')}
+          </Button>
         </div>
-      </div>
+      </main>
     )
   }
 
