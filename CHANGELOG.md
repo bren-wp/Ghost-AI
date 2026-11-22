@@ -1,5 +1,13 @@
 # Ghost AI by Brendigo — release history
 
+## v0.1.3 — CI hardening and dependency consolidation (release candidate; not yet published)
+
+- Consolidates pending dependency upgrades into one auditable change set; compatibility must be confirmed by the final CI runs.
+- Restores frozen pnpm/Cargo lockfile consistency and retains audited package overrides.
+- Runs quality checks on merged `main`, executes all Windows Rust library tests and requires complete viewport screenshot evidence.
+- Strengthens release blocking tests for JavaScript and Rust dependency security findings.
+- Requires actual build, startup, installer, update and packaging evidence before release. This section describes candidate changes, not a published or verified release.
+
 ## v0.1.2 — Windows launch and recovery
 
 - Prevents the updater component from initializing before the required trusted updater key is available, addressing the confirmed Windows launch regression in v0.1.1.
