@@ -90,6 +90,8 @@ export interface UseProviderSettingsReturn {
   originalModelIds: Record<string, string>
   storeProviders: Provider[]
   isDataLoaded: boolean
+  loadError: string | null
+  retryLoad: () => void
 
   // Manual add model dialog
   addModelDialogOpen: boolean
