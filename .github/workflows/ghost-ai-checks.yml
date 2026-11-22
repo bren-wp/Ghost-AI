@@ -15,6 +15,26 @@ permissions:
   contents: read
 
 jobs:
+  rust-advisories:
+    name: Rust dependency security advisories
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check RustSec advisory database
+        id: audit
+        continue-on-error: true
+        uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: src-tauri
+      - name: Highlight Rust dependency vulnerabilities
+        if: steps.audit.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::warning::RustSec found advisories or the audit could not complete. Review the Rust advisory log and update Cargo.lock before release."
   frontend:
     name: App quality and legal checks
     runs-on: ubuntu-24.04
