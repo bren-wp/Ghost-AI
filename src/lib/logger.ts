@@ -94,10 +94,14 @@ class Logger {
       data,
     }
 
-    // Write to file asynchronously
-    this.writeToFile(entry).catch((error) => {
-      console.error('Failed to write log:', error)
-    })
+    // File persistence belongs to the native desktop runtime only. Browser
+    // previews and Vitest lack a real AppData directory and filesystem bridge.
+    // Skipping writes there avoids noisy errors and unnecessary async work.
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window && import.meta.env.MODE !== 'test') {
+      void this.writeToFile(entry).catch(() => {
+        // Logging must never break the application or print sensitive errors.
+      })
+    }
 
     // Also log to console in development
     if (import.meta.env.DEV) {

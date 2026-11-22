@@ -68,7 +68,14 @@ describe('model discovery reliability', () => {
   })
 
   it('does not render secret-bearing backend errors', async () => {
-    invokeMock.mockRejectedValue(new Error('request failed, bearer sk-never-display'))
+    // Only the request under test rejects. Background Tauri setting calls
+    // must not inherit an unhandled rejection from this shared mock.
+    invokeMock.mockImplementation(((command: string) => {
+      if (command === 'fetch_openai_models') {
+        return Promise.reject(new Error('request failed, bearer sk-never-display'))
+      }
+      return Promise.resolve(null)
+    }) as never)
     const { result } = renderHook(() => useFetchModels({
       selectedProvider: openAI,
       apiKey: 'sk-never-display',
@@ -76,6 +83,10 @@ describe('model discovery reliability', () => {
       compatibilityType: 'openai',
     }))
     await act(async () => { await result.current.handleFetchModels() })
+    expect(invokeMock).toHaveBeenCalledWith('fetch_openai_models', {
+      apiKey: 'sk-never-display',
+      baseUrl: openAI.baseUrl,
+    })
     expect(result.current.fetchError).toBe('Failed to fetch models')
     expect(result.current.fetchError).not.toContain('sk-never-display')
   })

@@ -67,6 +67,11 @@ export function useFetchModels({
     setFetchError(null)
   }, [selectedProvider.id, apiKey, apiBaseUrl, compatibilityType])
 
+  // Invalidate pending requests when the editor closes or unmounts.
+  React.useEffect(() => () => {
+    activeRequestRef.current += 1
+  }, [])
+
   const handleFetchModels = React.useCallback(async () => {
     const requestId = ++activeRequestRef.current
     setIsLoading(true)
@@ -181,7 +186,7 @@ export function useFetchModels({
   const handleOpenFetchModal = React.useCallback(() => {
     setModelSearchQuery('')
     setFetchModalOpen(true)
-    handleFetchModels()
+    void handleFetchModels()
   }, [handleFetchModels])
 
   return {

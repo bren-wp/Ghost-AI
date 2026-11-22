@@ -77,7 +77,7 @@ export function ProviderForm({
     setCheckStatus('idle')
     setCheckError(null)
     setCheckLatency(null)
-  }, [selectedProvider.id, apiKey, apiBaseUrl])
+  }, [selectedProvider.id, apiKey, apiBaseUrl, compatibilityType, apiStyle, models])
 
   React.useEffect(() => {
     return () => {
@@ -88,7 +88,6 @@ export function ProviderForm({
 
   const handleCheckApi = React.useCallback(async () => {
     const generation = ++requestGenerationRef.current
-    const redact = (value: string) => apiKey.trim() ? value.replaceAll(apiKey.trim(), '[redacted]') : value
     const providerType = isCustom
       ? compatibilityType === 'anthropic'
         ? 'custom_anthropic'
@@ -129,12 +128,14 @@ export function ProviderForm({
         }, 5000)
       } else {
         setCheckStatus('failed')
-        setCheckError(redact(result.error || 'Connection failed'))
+        // Never surface provider responses verbatim: URLs, query parameters
+        // and unrelated credentials can appear in native transport errors.
+        setCheckError(t('connectionFailed'))
       }
-    } catch (e) {
+    } catch {
       if (generation !== requestGenerationRef.current) return
       setCheckStatus('failed')
-      setCheckError(redact(e instanceof Error ? e.message : String(e)))
+      setCheckError(t('connectionFailed'))
     }
   }, [selectedProvider, isCustom, compatibilityType, apiKey, apiBaseUrl, apiStyle, models, t])
 
@@ -242,7 +243,7 @@ export function ProviderForm({
             size="sm"
             className="h-9 max-w-full shrink-0"
             onClick={handleCheckApi}
-            disabled={checkStatus === 'checking' || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())}
+            disabled={checkStatus === 'checking' || invalidEndpoint || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())}
           >
             {checkStatus === 'checking' ? (
               <Loader2 className="size-4 animate-spin" />
@@ -262,7 +263,7 @@ export function ProviderForm({
           </Button>
         </div>
         {checkStatus === 'failed' && checkError && (
-          <div className="text-xs text-destructive space-y-1">
+          <div role="alert" className="text-xs text-destructive space-y-1">
             <p className="font-medium">{t('connectionFailed')}</p>
             <div className="px-2 py-1.5 bg-destructive/5 rounded max-h-24 overflow-y-auto">
               <p className="font-mono text-destructive/80 whitespace-pre-wrap break-all">
