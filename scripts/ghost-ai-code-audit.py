@@ -16,7 +16,7 @@ SIGNALS = {
     "HTML injection boundary": re.compile(r"dangerouslySetInnerHTML|\.innerHTML\s*=", re.I),
     "shell execution boundary": re.compile(r"\bshell\s*:\s*true\b|Command::new\(\s*\"(?:sh|bash|cmd|powershell)\"", re.I),
     "non-HTTPS endpoint": re.compile(r"http://(?!localhost\b|127\.0\.0\.1\b|asset\.localhost\b|ipc\.localhost\b)", re.I),
-    "permissive CORS header boundary": re.compile(r"Access-Control-Allow-Origin.{0,16}\\*", re.I),
+    "permissive CORS header boundary": re.compile(r"Access-Control-Allow-Origin.{0,16}\*", re.I),
     "potential TLS validation bypass": re.compile(r"danger_accept_invalid_certs|accept_invalid_certs|danger_disable_certificate_validation|verify\s*[:=]\s*false", re.I),
     "Rust unsafe boundary": re.compile(r"\bunsafe\s*(?:\{|impl\b|fn\b|trait\b)", re.I),
     "embedded credential candidate": re.compile(r"""(?:api[_-]?key|client[_-]?secret|access[_-]?token|private[_-]?key)\s*[:=]\s*["'][a-zA-Z0-9_-]{24,}["']""", re.I),
