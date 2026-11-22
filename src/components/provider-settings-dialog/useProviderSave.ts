@@ -57,6 +57,8 @@ export function useProviderSave({
 }: UseProviderSaveParams): UseProviderSaveReturn {
   const { t } = useTranslation('messages')
   const [isSaving, setIsSaving] = React.useState(false)
+  // A ref blocks rapid double clicks before the next React render commits.
+  const saveInFlightRef = React.useRef(false)
   const [savedWithoutModels, setSavedWithoutModels] = React.useState(false)
 
   React.useEffect(() => {
@@ -66,6 +68,13 @@ export function useProviderSave({
   }, [models, modelsToDelete])
 
   const handleSave = React.useCallback(async () => {
+    if (saveInFlightRef.current) return
+    const isCustom = isCustomProvider(selectedProvider)
+    if (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) {
+      toast.error(t('providers:requiredField'))
+      return
+    }
+    saveInFlightRef.current = true
     const newModels = models.filter((m) => !m.isExisting)
     const modifiedModels = models.filter(
       (m) =>
@@ -79,7 +88,6 @@ export function useProviderSave({
     setIsSaving(true)
     try {
       let providerId: string
-      const isCustom = isCustomProvider(selectedProvider)
       const effectiveName = isCustom ? providerName || selectedProvider.name : selectedProvider.name
       const effectiveProviderType = isCustom
         ? compatibilityType === 'anthropic'
@@ -122,7 +130,8 @@ export function useProviderSave({
         }
 
         const provider = await invoke<Provider>('create_provider', { req: providerReq })
-        logger.info('Created provider:', provider)
+        // Provider objects can contain credentials. Never write them to diagnostics.
+      logger.info('Created provider:', { id: provider.id, type: effectiveProviderType })
         providerId = provider.id
         onProviderCreated?.(providerId)
       }
@@ -166,11 +175,12 @@ export function useProviderSave({
       toast.success(t('providerSavedSuccessfully'))
       onOpenChange(false)
     } catch (error) {
-      logger.error('Failed to save provider:', error)
-      toast.error(t('failedToSaveProvider'), {
-        description: error instanceof Error ? error.message : String(error),
-      })
+      // Backend errors could contain URLs, query strings or provider credentials.
+      // Log the operation only, never the raw error or secret-bearing request.
+      logger.error('Failed to save provider configuration')
+      toast.error(t('failedToSaveProvider'))
     } finally {
+      saveInFlightRef.current = false
       setIsSaving(false)
     }
   }, [
