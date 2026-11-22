@@ -71,11 +71,12 @@ export function useProviderSave({
   const handleSave = React.useCallback(async () => {
     if (saveInFlightRef.current) return
     const isCustom = isCustomProvider(selectedProvider)
-    if (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) {
+    const normalizedBaseUrl = apiBaseUrl.trim()
+    if (isCustom && (!providerName.trim() || !normalizedBaseUrl)) {
       toast.error(t('providers:requiredField'))
       return
     }
-    if (apiBaseUrl.trim() && !isValidProviderEndpoint(apiBaseUrl)) {
+    if (normalizedBaseUrl && !isValidProviderEndpoint(normalizedBaseUrl)) {
       toast.error(t('providers:invalidBaseUrl'))
       return
     }
@@ -93,7 +94,7 @@ export function useProviderSave({
     setIsSaving(true)
     try {
       let providerId: string
-      const effectiveName = isCustom ? providerName || selectedProvider.name : selectedProvider.name
+      const effectiveName = isCustom ? providerName.trim() : selectedProvider.name
       const effectiveProviderType = isCustom
         ? compatibilityType === 'anthropic'
           ? 'custom_anthropic'
@@ -104,7 +105,7 @@ export function useProviderSave({
       if (existingProvider) {
         const needsUpdate =
           existingProvider.api_key !== apiKey ||
-          existingProvider.base_url !== apiBaseUrl ||
+          (existingProvider.base_url || '') !== normalizedBaseUrl ||
           existingProvider.name !== effectiveName ||
           existingProvider.provider_type !== effectiveProviderType ||
           existingProvider.api_style !== effectiveApiStyle
@@ -116,7 +117,7 @@ export function useProviderSave({
               name: effectiveName,
               provider_type: effectiveProviderType,
               api_key: apiKey,
-              base_url: apiBaseUrl || undefined,
+              base_url: normalizedBaseUrl || undefined,
               api_style: effectiveApiStyle,
               is_enabled: existingProvider.is_enabled,
             },
@@ -129,7 +130,7 @@ export function useProviderSave({
           name: effectiveName,
           provider_type: effectiveProviderType,
           api_key: apiKey || undefined,
-          base_url: apiBaseUrl || undefined,
+          base_url: normalizedBaseUrl || undefined,
           api_style: effectiveApiStyle,
           is_enabled: true,
         }
@@ -179,7 +180,7 @@ export function useProviderSave({
       }
       toast.success(t('providerSavedSuccessfully'))
       onOpenChange(false)
-    } catch (error) {
+    } catch {
       // Backend errors could contain URLs, query strings or provider credentials.
       // Log the operation only, never the raw error or secret-bearing request.
       logger.error('Failed to save provider configuration')
