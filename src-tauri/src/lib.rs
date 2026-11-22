@@ -95,6 +95,17 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // Do not strand a hidden process if the frontend cannot render.
+            // The window retains the bundled dark splash in that failure case.
+            if let Some(window) = app.get_webview_window("main") {
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(12)).await;
+                    if !window.is_visible().unwrap_or(false) {
+                        let _ = window.show();
+                    }
+                });
+            }
+
             // The system-WebView fetch tier needs the app handle to create
             // hidden fetch webviews at runtime.
             web_fetch::webview_set_app_handle(app.handle().clone());
