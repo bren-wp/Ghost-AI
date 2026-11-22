@@ -217,9 +217,9 @@ export function ProviderSettingsDialog({
         <SidebarProvider className="min-h-0 min-w-0 flex-1">
           <ProviderSidebar
             selectedProvider={selectedProvider}
-            onSelectProvider={(p) => {
+            onSelectProvider={(p, storedId) => {
               if (p.isCustom) {
-                handleCustomProviderSelect(p)
+                handleCustomProviderSelect(p, storedId)
               } else {
                 handleSidebarSelect(p)
               }
