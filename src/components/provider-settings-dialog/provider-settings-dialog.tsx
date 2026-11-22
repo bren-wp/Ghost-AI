@@ -91,6 +91,8 @@ export function ProviderSettingsDialog({
     groupedModels,
     savedWithoutModels,
     isDataLoaded,
+    loadError,
+    retryLoad,
   } = useProviderSettings(open, onOpenChange)
 
   const isCustom = isCustomProvider(selectedProvider)
@@ -235,7 +237,12 @@ export function ProviderSettingsDialog({
               storeProviders={storeProviders}
               onSelectProvider={(provider, storedId) => provider.isCustom ? handleCustomProviderSelect(provider, storedId) : handleSidebarSelect(provider)}
             />
-            {!isDataLoaded ? (
+            {loadError ? (
+              <div role="alert" className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm">
+                <p className="text-destructive">{loadError}</p>
+                <Button type="button" variant="outline" onClick={retryLoad}>{t('common:retry')}</Button>
+              </div>
+            ) : !isDataLoaded ? (
               <div role="status" aria-live="polite" className="flex flex-1 items-center justify-center gap-3 text-sm text-muted-foreground">
                 <Loader2 className="size-5 animate-spin" aria-hidden="true" />
                 {t("common:loading")}
