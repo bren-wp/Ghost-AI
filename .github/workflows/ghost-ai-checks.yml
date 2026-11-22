@@ -2,6 +2,9 @@
 name: Ghost AI Quality Gates
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -124,6 +127,8 @@ jobs:
         run: pnpm tauri build --no-bundle
       - name: Verify provider encryption and database rollback on Windows
         run: 'cargo test --manifest-path src-tauri/Cargo.toml --lib providers::tests:: -- --nocapture --test-threads=1'
+      - name: Run all Rust library regression tests on Windows
+        run: 'cargo test --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1'
       - name: Stage packaged resources as in Portable.zip
         shell: pwsh
         run: |
@@ -198,8 +203,8 @@ jobs:
           }
           $coverage | Set-Content -Path 'smoke/screenshots/coverage-report.txt'
           $coverage | ForEach-Object { Write-Host $_ }
-          if ($captured -lt 2) {
-            throw 'Unable to capture main and Settings surfaces on this CI desktop'
+          if ($captured -ne 8) {
+            throw "Only $captured of 8 required main/Settings screenshot cases were captured; see coverage-report.txt for missing viewports"
           }
       - name: Preserve screenshot evidence and skipped-viewport report
         if: always()
