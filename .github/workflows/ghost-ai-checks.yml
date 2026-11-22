@@ -61,7 +61,19 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p reports
-          pnpm outdated --recursive > reports/npm-outdated.txt 2>&1
+          # pnpm outdated exits 1 when upgrades exist; that is a report result,
+          # not a failing build or an npm security advisory.
+          if pnpm outdated --recursive > reports/npm-outdated.txt 2>&1; then
+            echo "Dependency inventory is current"
+          else
+            code=$?
+            if [[ "$code" -eq 1 ]]; then
+              echo "Available upgrades recorded in reports/npm-outdated.txt"
+            else
+              echo "::error::Unable to retrieve npm dependency inventory (exit $code)"
+              exit "$code"
+            fi
+          fi
       - name: Scan npm dependency advisories
         id: npm_audit
         shell: bash
