@@ -49,6 +49,6 @@ describe('responsive provider picker', () => {
       name: custom.name,
       baseUrl: custom.base_url,
       isCustom: true,
-    }))
+    }), custom.id)
   })
 })
