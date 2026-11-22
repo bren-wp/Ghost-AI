@@ -2,7 +2,8 @@
 'use client'
 
 import { useTranslation } from 'react-i18next'
-import { MoreHorizontal, ListChecks, Plus } from 'lucide-react'
+import { MoreHorizontal, ListChecks, Plus, Copy } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -48,6 +49,17 @@ export function ModelsTable({
   onModelSettings,
 }: ModelsTableProps) {
   const { t } = useTranslation('providers')
+
+  const copyModelId = async (modelId: string) => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable')
+      await navigator.clipboard.writeText(modelId)
+      toast.success(t('modelIdCopied'))
+    } catch {
+      // Browser permissions and insecure contexts can block the clipboard.
+      toast.error(t('modelIdCopyFailed'))
+    }
+  }
 
   return (
     <div className="min-w-0 space-y-3">
@@ -108,6 +120,10 @@ export function ModelsTable({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => void copyModelId(model.modelId)}>
+                          <Copy className="mr-2 size-4" aria-hidden="true" />
+                          {t('copyModelId')}
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onModelSettings(model)}>
                           {t('common:edit')}
                         </DropdownMenuItem>
