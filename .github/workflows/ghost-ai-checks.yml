@@ -85,13 +85,21 @@ jobs:
           echo "::error::npm audit is not clean (low, moderate, high, or critical advisories). Review Ghost-AI-Dependency-Audit before release."
           tail -n 60 reports/npm-security-audit.txt || true
           exit 1
-      - name: Review first-party code for maintainability and risk
-        run: python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
-      - name: Save Ghost AI source review
+      - name: Audit every first-party frontend and Rust module for dead code and security review candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/ghost-ai-code-audit.py scripts/ghost-ai-dead-code-audit.py
+          python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
+          python3 scripts/ghost-ai-dead-code-audit.py --output reports/ghost-ai-dead-code-audit.md
+      - name: Save complete static audit inventories
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Code-Review
-          path: reports/ghost-ai-code-audit.md
+          path: |
+            reports/ghost-ai-code-audit.md
+            reports/ghost-ai-dead-code-audit.md
           if-no-files-found: error
       - name: Verify legal notices and brand assets
         shell: bash
