@@ -139,10 +139,12 @@ export function ProviderForm({
       {isCustom && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="provider-name">{t('providerName')}</Label>
+            <Label htmlFor="provider-name">{t('providerName')} <span aria-hidden="true" className="text-destructive">*</span></Label>
             <Input
               id="provider-name"
               type="text"
+              required
+              aria-required="true"
               placeholder={t('customProviderPlaceholder')}
               value={providerName}
               onChange={(e) => onProviderNameChange(e.target.value)}
@@ -281,6 +283,8 @@ export function ProviderForm({
         <Input
           id="api-base-url"
           type="url"
+          required={isCustom}
+          aria-required={isCustom}
           placeholder="https://api.example.com/v1"
           value={apiBaseUrl}
           onChange={(e) => onApiBaseUrlChange(e.target.value)}
