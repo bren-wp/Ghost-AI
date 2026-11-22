@@ -44,7 +44,6 @@ pub(crate) async fn load_fetch_config(state: &AppState) -> FetchConfig {
 /// Result of URL processing
 pub(crate) struct UrlProcessingResult {
     pub fetched_resources: Vec<FetchedWebResource>,
-    pub attachment_ids: Vec<String>,
 }
 
 /// Rebuild the projected resource of a stored fetch result from disk.
@@ -229,10 +228,7 @@ pub(crate) async fn fetch_and_store_urls(
                 }),
             );
         }
-        return UrlProcessingResult {
-            fetched_resources,
-            attachment_ids,
-        };
+        return UrlProcessingResult { fetched_resources };
     }
 
     tracing::info!("🔍 [url_processing] Processing {} URLs", urls.len());
@@ -409,10 +405,7 @@ pub(crate) async fn fetch_and_store_urls(
         }),
     );
 
-    UrlProcessingResult {
-        fetched_resources,
-        attachment_ids,
-    }
+    UrlProcessingResult { fetched_resources }
 }
 
 #[cfg(test)]

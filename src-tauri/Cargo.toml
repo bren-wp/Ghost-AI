@@ -94,7 +94,10 @@ readability = { version = "0.3", default-features = false }
 headless_chrome = "1"
 async-stream = "0.3.6"
 http = "1"
-ts-rs = { version = "12", features = ["serde-json-impl"] }
+# Serde's custom double-Option deserializer intentionally distinguishes missing
+# fields from explicit null. ts-rs cannot interpret deserialize_with but the
+# corresponding field is explicitly marked optional and regression-tested.
+ts-rs = { version = "12", features = ["serde-json-impl", "no-serde-warnings"] }
 iana-time-zone = "0.1.65"
 sys-locale = "0.3.2"
 whatlang = "0.18.0"

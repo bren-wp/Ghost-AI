@@ -44,6 +44,8 @@ pub struct WebSearchTool {
 }
 
 impl WebSearchTool {
+    // Retain the convenience constructor for callers configuring search tools.
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
     }

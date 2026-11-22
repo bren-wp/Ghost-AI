@@ -5,8 +5,10 @@
 //! (/usr/bin:/bin:/usr/sbin:/sbin). This module resolves the full PATH
 //! by running the user's login shell, with fallbacks.
 
+#[cfg(target_os = "macos")]
 use std::sync::OnceLock;
 
+#[cfg(target_os = "macos")]
 static RESOLVED_PATH: OnceLock<Option<String>> = OnceLock::new();
 
 /// Resolve the user's full shell PATH. The result is cached after the first call.

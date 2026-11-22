@@ -27,6 +27,8 @@ pub struct ProtectedResourceMetadata {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct AuthorizationServerMetadata {
+    // Preserve RFC 8414 metadata for future issuer validation.
+    #[allow(dead_code)]
     pub issuer: String,
     pub authorization_endpoint: String,
     pub token_endpoint: String,
@@ -35,6 +37,8 @@ pub struct AuthorizationServerMetadata {
     #[serde(default)]
     pub scopes_supported: Option<Vec<String>>,
     #[serde(default)]
+    // PKCE S256 is already used for authorization; preserve advertised metadata.
+    #[allow(dead_code)]
     pub code_challenge_methods_supported: Option<Vec<String>>,
 }
 

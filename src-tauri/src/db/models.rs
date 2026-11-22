@@ -2,7 +2,6 @@
 use anyhow::Result;
 use chrono::Utc;
 use sqlx::Row;
-use uuid;
 
 use super::Database;
 use crate::models::{CreateModelRequest, Model};

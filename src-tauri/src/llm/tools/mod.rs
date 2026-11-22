@@ -49,5 +49,5 @@ pub use mcp_tool_use::{
     McpAuthFailureNotifier, McpClientEntry, McpProgressNotifier, McpToolUseTool,
 };
 pub use skill::{SkillCatalogEntry, SkillTool};
-pub use web_fetch::{HttpUrlByteFetcher, WebFetchArgs, WebFetchTool};
-pub use web_search::{WebSearchArgs, WebSearchTool};
+pub use web_fetch::{HttpUrlByteFetcher, WebFetchTool};
+pub use web_search::WebSearchTool;

@@ -1,6 +1,5 @@
 // Ghost AI by Brendigo
 use serde::Serialize;
-use std::io::Seek;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tauri::{AppHandle, Manager, State};

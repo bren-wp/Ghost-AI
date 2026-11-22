@@ -38,13 +38,13 @@ pub struct SyncWiring {
 /// Debug builds fall back to a local staging dir so publish/sync_now stay
 /// exercisable; release builds are structurally off without the container
 /// (ADR 04 §7 — the de-facto always-on staging fallback is corrected here).
-pub fn resolve_sync_target(app_data_dir: &std::path::Path) -> Option<(PathBuf, &'static str)> {
+pub fn resolve_sync_target(_app_data_dir: &std::path::Path) -> Option<(PathBuf, &'static str)> {
     if let Some(dir) = detect_icloud_container() {
         return Some((dir, "iCloud container"));
     }
     #[cfg(debug_assertions)]
     {
-        let staging = app_data_dir.join("sync-staging");
+        let staging = _app_data_dir.join("sync-staging");
         std::fs::create_dir_all(&staging).ok()?;
         #[allow(unreachable_code)]
         return Some((staging, "local staging dir (debug)"));
