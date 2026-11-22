@@ -215,7 +215,7 @@ impl Database {
         query.push_str(&updates.join(", "));
         query.push_str(" WHERE id = ?");
 
-        let mut q = sqlx::query(&query);
+        let mut q = sqlx::query(sqlx::AssertSqlSafe(query.as_str()));
 
         if let Some(name) = &req.name {
             q = q.bind(name);
@@ -333,10 +333,10 @@ impl Database {
             ));
         }
 
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "model_parameter_presets",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())
