@@ -162,7 +162,9 @@ describe('API key preservation when the secure store is inaccessible', () => {
   })
 
   it('does not write a blank key when only a model is added', async () => {
-    const unreadable = { ...existingProvider, api_key: null }
+    // Rust Option::None can serialize as null; generated TS types mark this
+    // field optional, so deliberately exercise that runtime-only payload.
+    const unreadable = { ...existingProvider, api_key: null } as unknown as Provider
     vi.mocked(invoke).mockResolvedValue(unreadable)
     const { result } = setup({ models: [newModel('new-model')], existing: unreadable, apiKey: '' })
     await act(async () => { await result.current.handleSave() })
@@ -173,7 +175,9 @@ describe('API key preservation when the secure store is inaccessible', () => {
   })
 
   it('rotates an unreadable key only when a new non-empty key is provided', async () => {
-    const unreadable = { ...existingProvider, api_key: null }
+    // Rust Option::None can serialize as null; generated TS types mark this
+    // field optional, so deliberately exercise that runtime-only payload.
+    const unreadable = { ...existingProvider, api_key: null } as unknown as Provider
     vi.mocked(invoke).mockResolvedValue(unreadable)
     const { result } = setup({ models: [], existing: unreadable, apiKey: 'sk-replacement' })
     await act(async () => { await result.current.handleSave() })
