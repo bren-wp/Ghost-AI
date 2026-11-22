@@ -52,6 +52,13 @@ export function useProviderData({
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [existingProvider, setExistingProvider] = React.useState<Provider | null>(null)
   const activeLoadRef = React.useRef(0)
+  // Data refreshes may arrive while the user edits a provider. Hydrate the
+  // form only when the selected provider changes or a deliberate reload begins;
+  // otherwise store updates would silently erase unsaved credentials/models.
+  const lastHydratedRef = React.useRef<{
+    provider: LLMProvider
+    editingId: string | null
+  } | null>(null)
 
   const loadExistingData = React.useCallback(() => {
     const request = ++activeLoadRef.current
@@ -89,7 +96,15 @@ export function useProviderData({
 
   // Load existing provider data when provider type changes OR data is loaded
   React.useEffect(() => {
-    if (!isDataLoaded) return
+    if (!isDataLoaded) {
+      lastHydratedRef.current = null
+      return
+    }
+    const last = lastHydratedRef.current
+    if (last?.provider === selectedProvider && last.editingId === editingCustomProviderId) {
+      return
+    }
+    lastHydratedRef.current = { provider: selectedProvider, editingId: editingCustomProviderId }
 
     // Reset tracking state
     setModelsToDelete([])
