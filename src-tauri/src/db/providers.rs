@@ -48,9 +48,9 @@ impl Database {
                             tracing::info!("🔐 [db] API key encrypted and stored in database");
                             Some(encrypted)
                         }
-                        Err(e) => {
-                            tracing::warn!("⚠️  [db] Failed to encrypt API key: {}", e);
-                            None
+                        Err(_) => {
+                            tracing::error!("[db] Provider creation rejected: API key encryption failure");
+                            return Err(anyhow::anyhow!("Unable to securely save provider credentials"));
                         }
                     }
                 } else {
@@ -106,12 +106,8 @@ impl Database {
                 let api_key = encrypted_api_key
                     .and_then(|encrypted| match crate::crypto::decrypt(&encrypted) {
                         Ok(decrypted) => Some(decrypted),
-                        Err(e) => {
-                            tracing::error!(
-                                "⚠️  [db] Failed to decrypt API key for provider {}: {}",
-                                provider_id,
-                                e
-                            );
+                        Err(_) => {
+                            tracing::error!("[db] Failed to decrypt API key for provider {}", provider_id);
                             None
                         }
                     })
@@ -153,12 +149,8 @@ impl Database {
             let api_key = encrypted_api_key
                 .and_then(|encrypted| match crate::crypto::decrypt(&encrypted) {
                     Ok(decrypted) => Some(decrypted),
-                    Err(e) => {
-                        tracing::error!(
-                            "⚠️  [db] Failed to decrypt API key for provider {}: {}",
-                            provider_id,
-                            e
-                        );
+                    Err(_) => {
+                        tracing::error!("[db] Failed to decrypt API key for provider {}", provider_id);
                         None
                     }
                 })
@@ -192,13 +184,15 @@ impl Database {
             if !api_key.is_empty() {
                 if crate::crypto::is_keychain_available() {
                     // Keychain available: encrypt and store in DB
-                    // Also clear any cached key
-                    crate::crypto::remove_cached_api_key(id);
                     match crate::crypto::encrypt(api_key) {
-                        Ok(encrypted) => Some(encrypted),
-                        Err(e) => {
-                            tracing::warn!("⚠️  [db] Failed to encrypt API key: {}", e);
-                            None
+                        Ok(encrypted) => {
+                            // Never discard the cached key before successful rotation.
+                            crate::crypto::remove_cached_api_key(id);
+                            Some(encrypted)
+                        }
+                        Err(_) => {
+                            tracing::error!("[db] API key rotation rejected: encryption failure");
+                            return Err(anyhow::anyhow!("Unable to securely update provider credentials"));
                         }
                     }
                 } else {
