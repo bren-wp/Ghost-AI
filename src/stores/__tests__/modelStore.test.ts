@@ -267,7 +267,7 @@ describe('useModelStore', () => {
           provider_id: 'provider-1',
           model_id: 'gpt-4o',
         })
-      ).rejects.toThrow('validation failed')
+      ).rejects.toThrow('Unable to update model. Please retry.')
 
       const state = useModelStore.getState()
       expect(state.error).toBe('Unable to update model. Please retry.')
@@ -311,13 +311,29 @@ describe('useModelStore', () => {
       useModelStore.setState({ models: [createMockModel({ id: 'model-a' })] })
       mockInvoke.mockRejectedValueOnce(new Error('delete denied'))
 
-      await expect(useModelStore.getState().deleteModel('model-a')).rejects.toThrow('delete denied')
+      await expect(useModelStore.getState().deleteModel('model-a')).rejects.toThrow('Unable to delete model. Please retry.')
 
       const state = useModelStore.getState()
       expect(state.error).toBe('Unable to delete model. Please retry.')
       expect(state.isLoading).toBe(false)
       expect(state.models[0].is_deleted).toBe(false)
     })
+  })
+
+  it('never rethrows secret-bearing native model mutation errors', async () => {
+    const secret = 'sk-must-not-be-present-in-ui'
+    mockInvoke.mockRejectedValueOnce(new Error(`failed to update: ${secret}`))
+    await expect(useModelStore.getState().updateModel('model-a', {
+      name: 'Model',
+      provider_id: 'provider-1',
+      model_id: 'model-a',
+    })).rejects.toThrow('Unable to update model. Please retry.')
+    expect(useModelStore.getState().error).not.toContain(secret)
+
+    mockInvoke.mockRejectedValueOnce(new Error(`failed to delete: ${secret}`))
+    await expect(useModelStore.getState().deleteModel('model-a'))
+      .rejects.toThrow('Unable to delete model. Please retry.')
+    expect(useModelStore.getState().error).not.toContain(secret)
   })
 
   describe('getModelById', () => {
