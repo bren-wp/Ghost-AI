@@ -11,7 +11,7 @@ import { FetchModelsDialog } from '@/components/provider-settings-dialog/fetch-m
 import { AddModelDialog } from '@/components/provider-settings-dialog/add-model-dialog'
 import { EditModelDialog } from '@/components/provider-settings-dialog/edit-model-dialog'
 import { useProviderSettings } from '@/components/provider-settings-dialog/useProviderSettings'
-import { ProviderSidebar } from '@/components/provider-settings-dialog/provider-sidebar'
+import { ProviderSelect } from '@/components/provider-settings-dialog/provider-select'
 import { isCustomProvider, type LLMProvider } from '@/components/provider-settings-dialog/types'
 
 interface LLMProviderSettingsProps {
@@ -109,19 +109,20 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1">
-      <ProviderSidebar
-        className="h-auto min-h-0"
-        selectedProvider={selectedProvider}
-        onSelectProvider={handleSelectProvider}
-        storeProviders={storeProviders}
-        editingCustomProviderId={editingCustomProviderId}
-      />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 border-b border-border bg-card/50 px-4 py-3 sm:px-6">
+        <ProviderSelect
+          className="max-w-lg"
+          selectedProvider={selectedProvider}
+          editingCustomProviderId={editingCustomProviderId}
+          storeProviders={storeProviders}
+          onSelectProvider={handleSelectProvider}
+        />
+      </div>
 
-      {/* Provider Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
+          <div className="mx-auto w-full max-w-3xl min-w-0 space-y-6">
             <div className="space-y-2">
               <h3 className="text-lg font-semibold">
                 {existingProvider ? t('common:edit') : t('common:add')} {displayName}
@@ -168,7 +169,7 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
         </div>
 
         {/* Footer with Save Button */}
-        <div className="shrink-0 border-t p-4 flex items-center justify-end gap-2">
+        <div className="shrink-0 border-t p-3 sm:p-4 flex flex-wrap items-center justify-end gap-2">
           {savedWithoutModels && (
             <p className="mr-auto text-sm text-warning">{t('addModelsBeforeChatting')}</p>
           )}
