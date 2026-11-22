@@ -87,6 +87,27 @@ beforeEach(() => {
 })
 
 describe('ProviderSettingsDialog deep link', () => {
+  it('shows a safe retry state when provider loading fails', async () => {
+    let available = false
+    mockedInvoke.mockImplementation((async (command: string) => {
+      if (command === 'list_all_models') return []
+      if (command === 'list_providers') {
+        if (!available) throw new Error('database error containing sk-private-value')
+        return []
+      }
+      return null
+    }) as never)
+
+    renderDialog()
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Unable to load AI providers or models')
+    expect(alert).not.toHaveTextContent('sk-private-value')
+    available = true
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('button', { name: 'Save Configuration' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('focuses the provider and opens model selection when it has no models', async () => {
     mockBackend({ models: [], providers: [provider] })
 
