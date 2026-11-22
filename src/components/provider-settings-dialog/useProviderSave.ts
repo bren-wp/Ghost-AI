@@ -115,7 +115,7 @@ export function useProviderSave({
             req: {
               name: effectiveName,
               provider_type: effectiveProviderType,
-              api_key: apiKey || undefined,
+              api_key: apiKey,
               base_url: apiBaseUrl || undefined,
               api_style: effectiveApiStyle,
               is_enabled: existingProvider.is_enabled,
