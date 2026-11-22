@@ -81,7 +81,7 @@ impl Database {
             FETCH_RESULT_COLUMNS
         );
 
-        let row = sqlx::query(&query)
+        let row = sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
             .bind(id)
             .fetch_optional(self.pool.as_ref())
             .await?
@@ -96,7 +96,7 @@ impl Database {
             FETCH_RESULT_COLUMNS
         );
 
-        let row = sqlx::query(&query)
+        let row = sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
             .bind(content_hash)
             .fetch_optional(self.pool.as_ref())
             .await?;
@@ -114,7 +114,7 @@ impl Database {
             FETCH_RESULT_COLUMNS
         );
 
-        let rows = sqlx::query(&query)
+        let rows = sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
             .bind(source_type)
             .bind(source_id)
             .fetch_all(self.pool.as_ref())
@@ -161,10 +161,10 @@ impl Database {
     }
 
     pub async fn delete_fetch_result(&self, id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "fetch_results",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())

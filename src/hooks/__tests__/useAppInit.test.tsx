@@ -233,10 +233,7 @@ describe('useAppInit', () => {
       const { result } = await renderInitialized()
 
       expect(result.current.keychainAvailable).toBe(true)
-      expect(logger.warn).toHaveBeenCalledWith(
-        'Failed to check keychain availability:',
-        expect.any(Error)
-      )
+      expect(logger.warn).toHaveBeenCalledWith('Failed to check keychain availability')
       expect(result.current.error).toBeNull()
     })
 
@@ -251,14 +248,25 @@ describe('useAppInit', () => {
       expect(onboarding.flowOwnsSyncOffer).toBe(true)
     })
 
+    it('does not leak secret-bearing native startup errors into UI or logs', async () => {
+      const secret = 'sk-never-expose-this-in-startup'
+      loadSettings.mockRejectedValue(new Error(`Storage error with token ${secret}`))
+
+      const { result } = await renderInitialized()
+
+      expect(result.current.isInitialized).toBe(true)
+      expect(result.current.error).not.toContain(secret)
+      expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain(secret)
+    })
+
     it('surfaces initialization errors while still finishing', async () => {
       loadSettings.mockRejectedValue(new Error('disk corrupt'))
 
       const { result } = await renderInitialized()
 
       expect(result.current.isInitialized).toBe(true)
-      expect(result.current.error).toBe('Error: disk corrupt')
-      expect(logger.error).toHaveBeenCalledWith('Failed to initialize app:', expect.any(Error))
+      expect(result.current.error).toBe('Local application data could not be loaded. Please retry.')
+      expect(logger.error).toHaveBeenCalledWith('Failed to initialize app')
     })
   })
 

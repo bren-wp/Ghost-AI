@@ -1296,41 +1296,27 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
     if (activeSection === 'language') {
       return (
-        <div className="grid gap-6">
-          <div className="grid gap-2">
-            <Label>{t('language')}</Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full max-w-md justify-between">
-                  <span>
-                    {supportedLanguages.find((l) => l.code === currentLanguage)?.name ??
-                      currentLanguage}
-                  </span>
-                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[400px]">
-                {supportedLanguages.map((lang) => (
-                  <DropdownMenuItem
-                    key={lang.code}
-                    onClick={async () => {
-                      await changeLanguage(lang.code)
-                      setCurrentLanguage(lang.code)
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      {lang.code === currentLanguage && <Check className="h-4 w-4 text-primary" />}
-                      <span className={lang.code === currentLanguage ? 'font-medium' : ''}>
-                        {lang.name}
-                      </span>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <p className="text-xs text-muted-foreground max-w-md">{t('languageDescription')}</p>
-          </div>
-        </div>
+        <section className="grid w-full max-w-xl gap-4 rounded-xl border border-border bg-card p-4 sm:p-6">
+          <label htmlFor="ghost-interface-language" className="text-sm font-medium">{t('language')}</label>
+          <select
+            id="ghost-interface-language"
+            value={currentLanguage}
+            onChange={(event) => {
+              const code = supportedLanguages.find((item) => item.code === event.target.value)?.code ?? 'en'
+              void changeLanguage(code).then(() => setCurrentLanguage(code))
+            }}
+            className="min-h-11 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            {supportedLanguages.map((lang) => (
+              <option value={lang.code} key={lang.code}>{lang.name}</option>
+            ))}
+          </select>
+          <p className="text-xs leading-5 text-muted-foreground">
+            English is the default interface language. Croatian, German, Spanish, French, Portuguese and Italian
+            include an initial set of translated controls. Other languages currently use English for untranslated
+            interface text until full localization is reviewed.
+          </p>
+        </section>
       )
     }
 
@@ -1532,7 +1518,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       <DialogContent className="max-h-[min(92vh,800px)] w-[min(96vw,940px)] max-w-[96vw] overflow-hidden p-0 md:max-w-[94vw] lg:max-w-[940px]">
         <DialogTitle className="sr-only">{tc('settings')}</DialogTitle>
         <DialogDescription className="sr-only">{tc('settings')}</DialogDescription>
-        <SidebarProvider className="items-start">
+        <SidebarProvider className="min-h-0 min-w-0 items-start">
           <Sidebar collapsible="none" className="hidden md:flex">
             <SidebarContent>
               <SidebarGroup>
@@ -1554,7 +1540,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </SidebarGroup>
             </SidebarContent>
           </Sidebar>
-          <main className="flex min-h-0 h-[min(84vh,680px)] flex-1 flex-col overflow-hidden">
+          <main className="flex h-[min(84dvh,680px)] min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
               <div className="flex min-w-0 items-center gap-2 px-4">
                 <label className="sr-only" htmlFor="ghost-settings-navigation">Settings section</label>
@@ -1575,7 +1561,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </div>
             </header>
             <div
-              className={`flex flex-1 flex-col overflow-hidden ${activeSection === 'llmProvider' ? '' : 'gap-4 overflow-y-auto p-4 pt-0'}`}
+              className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${activeSection === 'llmProvider' ? '' : 'gap-4 overflow-y-auto p-4 pt-0'}`}
             >
               {renderContent()}
             </div>

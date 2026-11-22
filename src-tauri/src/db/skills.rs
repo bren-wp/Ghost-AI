@@ -140,13 +140,13 @@ impl Database {
         let manifest_json = manifest_json(&req);
         let revive_clause = if revive { ", deleted_at = NULL" } else { "" };
 
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             "UPDATE skills SET name = ?, description = ?, source = ?, path = ?, icon = ?,
              required_tool_ids = ?, allow_model_invocation = ?, allow_user_invocation = ?,
              content_hash = ?, cached_instructions = ?, is_enabled = ?, files_manifest = ?,
              updated_at = ?{revive_clause}
              WHERE id = ?"
-        ))
+        )))
         .bind(&req.name)
         .bind(&req.description)
         .bind(&req.source)
@@ -257,10 +257,10 @@ impl Database {
             ("assistant_skills", "skill_id = ?2 AND deleted_at IS NULL"),
             ("skills", "id = ?2 AND deleted_at IS NULL"),
         ] {
-            sqlx::query(&crate::db::soft_delete::tombstone_update(
+            sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
                 table,
                 where_clause,
-            ))
+            )))
             .bind(&now)
             .bind(id)
             .execute(self.pool.as_ref())
@@ -325,10 +325,10 @@ impl Database {
         assistant_id: &str,
         skill_ids: &[String],
     ) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "assistant_skills",
             "assistant_id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(Utc::now().to_rfc3339())
         .bind(assistant_id)
         .execute(self.pool.as_ref())

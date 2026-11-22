@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/ghost-ai-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light dark" />
-    <!-- Applies the saved theme (the `.dark` class) before first paint. -->
+    <meta name="color-scheme" content="dark" />
+    <!-- Set dark appearance before the application initializes. -->
     <script src="/theme-init.js"></script>
     <title>Ghost AI</title>
     <style>
@@ -18,10 +18,10 @@
        * 16px size matches the in-chat streaming indicator.
        */
       html {
-        background-color: oklch(1 0 0);
+        background-color: #080f1a;
       }
       html.dark {
-        background-color: oklch(0.145 0 0);
+        background-color: #080f1a;
       }
       #splash {
         position: fixed;

@@ -3,6 +3,13 @@ import * as React from 'react'
 import { useModelStore } from '@/stores/modelStore'
 import type { ModelItem, ModelInfo } from './types'
 
+let draftModelSequence = 0
+function nextDraftModelId(): string {
+  // Date.now() alone produced identical React keys for rapidly imported models.
+  draftModelSequence += 1
+  return `draft-model-${Date.now()}-${draftModelSequence}`
+}
+
 export interface UseModelListReturn {
   models: ModelItem[]
   setModels: React.Dispatch<React.SetStateAction<ModelItem[]>>
@@ -24,7 +31,17 @@ export interface UseModelListReturn {
  */
 export function useModelList(): UseModelListReturn {
   const storeModels = useModelStore((state) => state.models)
-  const [models, setModels] = React.useState<ModelItem[]>([])
+  const [models, setModelsState] = React.useState<ModelItem[]>([])
+  const modelsRef = React.useRef(models)
+  const setModels = React.useCallback<React.Dispatch<React.SetStateAction<ModelItem[]>>>(
+    (action) => {
+      // Keep batched imports in sync before React commits the next render.
+      const next = typeof action === 'function' ? action(modelsRef.current) : action
+      modelsRef.current = next
+      setModelsState(next)
+    },
+    []
+  )
   const [modelsToDelete, setModelsToDelete] = React.useState<string[]>([])
   const [originalModelNames, setOriginalModelNames] = React.useState<Record<string, string>>({})
   const [originalModelIds, setOriginalModelIds] = React.useState<Record<string, string>>({})
@@ -39,7 +56,7 @@ export function useModelList(): UseModelListReturn {
     setModels((prev) => {
       const target = prev.find((model) => model.id === id)
       if (target?.isExisting) {
-        setModelsToDelete((dels) => [...dels, target.id])
+        setModelsToDelete((dels) => dels.includes(target.id) ? dels : [...dels, target.id])
       }
       return prev.filter((model) => model.id !== id)
     })
@@ -54,7 +71,7 @@ export function useModelList(): UseModelListReturn {
           const existingModel = prevModels[existingIndex]
           if (existingModel.isExisting) {
             // Mark for soft delete
-            setModelsToDelete((prev) => [...prev, existingModel.id])
+            setModelsToDelete((prev) => prev.includes(existingModel.id) ? prev : [...prev, existingModel.id])
           }
           return prevModels.filter((_, idx) => idx !== existingIndex)
         } else {
@@ -85,7 +102,7 @@ export function useModelList(): UseModelListReturn {
           return [
             ...prevModels,
             {
-              id: Date.now().toString(),
+              id: nextDraftModelId(),
               displayName: model.name,
               modelId: model.id,
             },
@@ -101,20 +118,20 @@ export function useModelList(): UseModelListReturn {
       const trimmedId = modelId.trim()
       if (!trimmedId) return false
 
-      const alreadyExists = models.some((m) => m.modelId === trimmedId)
+      const alreadyExists = modelsRef.current.some((m) => m.modelId === trimmedId)
       if (alreadyExists) return false
 
       setModels((prev) => [
         ...prev,
         {
-          id: Date.now().toString(),
+          id: nextDraftModelId(),
           displayName: displayName?.trim() || trimmedId,
           modelId: trimmedId,
         },
       ])
       return true
     },
-    [models]
+    [setModels]
   )
 
   const isModelImported = React.useCallback(

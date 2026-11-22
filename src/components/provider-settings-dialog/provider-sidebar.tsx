@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 
 interface ProviderSidebarProps {
   selectedProvider: LLMProvider
-  onSelectProvider: (provider: LLMProvider) => void
+  onSelectProvider: (provider: LLMProvider, storedProviderId?: string) => void
   storeProviders: Provider[]
   editingCustomProviderId?: string | null
   /** Overrides the default fixed height, e.g. to fill an embedding container. */
@@ -45,7 +45,7 @@ export function ProviderSidebar({
   const customStoreProviders = storeProviders.filter((p) => isCustomProviderType(p.provider_type))
 
   return (
-    <Sidebar collapsible="none" className={cn('hidden md:flex h-[600px]', className)}>
+    <Sidebar collapsible="none" className={cn('hidden h-full min-h-0 w-52 shrink-0 border-r border-border md:flex lg:w-60', className)}>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
@@ -84,7 +84,7 @@ export function ProviderSidebar({
                         name: cp.name,
                         baseUrl: cp.base_url || '',
                         isCustom: true,
-                      })
+                      }, cp.id)
                     }
                     isActive={editingCustomProviderId === cp.id}
                   >

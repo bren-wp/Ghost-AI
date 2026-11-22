@@ -1,22 +1,7 @@
 // Ghost AI by Brendigo
-// Applies the saved theme before the first paint, so a dark-mode launch never
-// flashes the light canvas. Runs as a classic blocking script from index.html
-// (the CSP forbids inline scripts). Keep the storage key and resolution logic
-// in step with src/lib/theme.ts, which takes over once React mounts.
+// Apply the only supported theme before first paint, independently of saved OS preferences.
 ;(function () {
-  var preference = 'dark'
-  try {
-    var saved = localStorage.getItem('ghost_ai_theme')
-    if (saved === 'light' || saved === 'dark' || saved === 'system') preference = saved
-  } catch (e) {
-    // Storage unavailable: follow the system appearance.
-  }
-  var dark =
-    preference === 'dark' ||
-    (preference === 'system' &&
-      window.matchMedia &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches)
-  var root = document.documentElement
-  root.classList.toggle('dark', dark)
-  root.style.colorScheme = dark ? 'dark' : 'light'
+  document.documentElement.classList.add('dark')
+  document.documentElement.style.colorScheme = 'dark'
+  try { localStorage.setItem('ghost_ai_theme', 'dark') } catch (_error) { /* best effort */ }
 })()

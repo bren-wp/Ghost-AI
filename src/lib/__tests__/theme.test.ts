@@ -6,94 +6,38 @@ vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({ setTheme }),
 }))
 
-// A controllable `prefers-color-scheme: dark` media query.
-function mockSystemDark(initial: boolean) {
-  let matches = initial
-  const listeners = new Set<() => void>()
-  window.matchMedia = vi.fn().mockImplementation(() => ({
-    get matches() {
-      return matches
-    },
-    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
-    removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
-  }))
-  return (next: boolean) => {
-    matches = next
-    listeners.forEach((listener) => listener())
-  }
-}
-
 async function loadTheme() {
   vi.resetModules()
   return import('@/lib/theme')
 }
 
-const isDarkClass = () => document.documentElement.classList.contains('dark')
-
-describe('theme', () => {
+describe('dark-only appearance', () => {
   beforeEach(() => {
     localStorage.clear()
     document.documentElement.classList.remove('dark')
     setTheme.mockClear()
     Object.assign(window, { __TAURI_INTERNALS__: {} })
   })
-
   afterEach(() => {
     delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
   })
 
-  it('defaults to Dark and follows the OS only when System is selected', async () => {
-    const setSystemDark = mockSystemDark(true)
+  it.each(['light', 'system', 'dark'])('migrates saved %s to dark before showing the app', async (oldPreference) => {
+    localStorage.setItem('ghost_ai_theme', oldPreference)
     const { initTheme, useThemeStore } = await loadTheme()
     initTheme()
-
     expect(useThemeStore.getState().preference).toBe('dark')
     expect(useThemeStore.getState().resolved).toBe('dark')
-    expect(isDarkClass()).toBe(true)
-    expect(setTheme).toHaveBeenCalledWith('dark')
-
-    useThemeStore.getState().setPreference('system')
-    expect(setTheme).toHaveBeenLastCalledWith(null)
-    setSystemDark(false)
-    expect(useThemeStore.getState().resolved).toBe('light')
-    expect(isDarkClass()).toBe(false)
-  })
-
-  it('restores a saved preference on startup', async () => {
-    mockSystemDark(false)
-    localStorage.setItem('ghost_ai_theme', 'dark')
-    const { initTheme, useThemeStore } = await loadTheme()
-    initTheme()
-
-    expect(useThemeStore.getState().preference).toBe('dark')
-    expect(isDarkClass()).toBe(true)
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
     expect(document.documentElement.style.colorScheme).toBe('dark')
+    expect(localStorage.getItem('ghost_ai_theme')).toBe('dark')
     expect(setTheme).toHaveBeenCalledWith('dark')
   })
 
-  it('ignores an invalid saved preference', async () => {
-    mockSystemDark(false)
-    localStorage.setItem('ghost_ai_theme', 'sepia')
-    const { useThemeStore } = await loadTheme()
-
-    expect(useThemeStore.getState().preference).toBe('dark')
-  })
-
-  it('persists and applies an explicit choice, ignoring OS changes', async () => {
-    const setSystemDark = mockSystemDark(false)
-    const { initTheme, useThemeStore } = await loadTheme()
-    initTheme()
-
+  it('never exposes a light or system setting', async () => {
+    const { THEME_PREFERENCES, useThemeStore } = await loadTheme()
+    expect(THEME_PREFERENCES).toEqual(['dark'])
     useThemeStore.getState().setPreference('dark')
-    expect(localStorage.getItem('ghost_ai_theme')).toBe('dark')
-    expect(isDarkClass()).toBe(true)
-    expect(setTheme).toHaveBeenLastCalledWith('dark')
-
-    setSystemDark(false)
-    expect(useThemeStore.getState().resolved).toBe('dark')
-
-    useThemeStore.getState().setPreference('light')
-    expect(isDarkClass()).toBe(false)
-    expect(setTheme).toHaveBeenLastCalledWith('light')
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
 })

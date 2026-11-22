@@ -29,7 +29,7 @@ impl Database {
         let now = Utc::now().to_rfc3339();
         let mut tx = self.local_pool.begin().await?;
 
-        let entry: TranslationHistoryEntry = sqlx::query_as(&format!(
+        let entry: TranslationHistoryEntry = sqlx::query_as(sqlx::AssertSqlSafe(format!(
             "INSERT INTO translation_history
                 (id, source_text, translated_text, source_language, target_language, model_id, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -38,7 +38,7 @@ impl Database {
                 model_id = excluded.model_id,
                 created_at = excluded.created_at
              RETURNING {SELECT_COLUMNS}"
-        ))
+        )))
         .bind(Uuid::now_v7().to_string())
         .bind(source_text)
         .bind(translated_text)
@@ -67,9 +67,9 @@ impl Database {
     /// Newest-first entries (already capped by inserts). Filtering happens in
     /// the UI, where case folding handles non-ASCII text correctly.
     pub async fn list_translation_history(&self) -> Result<Vec<TranslationHistoryEntry>> {
-        let entries = sqlx::query_as(&format!(
+        let entries = sqlx::query_as(sqlx::AssertSqlSafe(format!(
             "SELECT {SELECT_COLUMNS} FROM translation_history ORDER BY created_at DESC, id DESC"
-        ))
+        )))
         .fetch_all(self.local_pool.as_ref())
         .await?;
         Ok(entries)

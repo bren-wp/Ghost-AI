@@ -259,11 +259,14 @@ pub struct UpdateConversationSettingsRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub enabled_skill_ids: Option<Vec<String>>,
+    // Optional in TypeScript, nullable when explicitly clearing the setting.
+    // Serde's custom deserializer preserves absent vs null vs string.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         deserialize_with = "deserialize_double_option"
     )]
+    #[ts(optional)]
     pub working_directory: Option<Option<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -357,6 +360,18 @@ mod tests {
         let json = r#"{"working_directory": "/tmp/test"}"#;
         let req: UpdateConversationSettingsRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.working_directory, Some(Some("/tmp/test".to_string())));
+    }
+
+    #[test]
+    fn test_working_directory_typescript_request_contract() {
+        // Missing means keep the existing setting; null means clear it.
+        // The exported request type must allow clients to omit this field.
+        let definition =
+            <UpdateConversationSettingsRequest as ts_rs::TS>::decl(&ts_rs::Config::default());
+        assert!(
+            definition.contains("working_directory?:"),
+            "working_directory must be optional in generated TypeScript: {definition}"
+        );
     }
 
     #[test]

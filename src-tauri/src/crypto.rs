@@ -239,10 +239,12 @@ pub fn remove_cached_api_key(provider_id: &str) {
 /// synchronizable transport item — set by [`init_encryption_key`]. Callers
 /// MUST NOT write the item when this is false: the ecosystem key would be
 /// overwritten with the local one.
+#[cfg(target_os = "macos")]
 pub fn should_publish_master_key() -> bool {
     PUBLISH_MASTER_KEY.get().copied().unwrap_or(false)
 }
 /// Get the base64-encoded master encryption key for export to peer devices.
+#[cfg(target_os = "macos")]
 pub fn get_master_key_b64() -> Result<String> {
     let key = get_encryption_key()?;
     Ok(general_purpose::STANDARD.encode(key))
@@ -322,6 +324,13 @@ pub(crate) fn set_keys_for_tests(current: [u8; 32], previous: Option<[u8; 32]>) 
     *ENCRYPTION_KEY_CACHE.write() = Some(current);
     *PREVIOUS_KEY_CACHE.write() = previous;
     let _ = KEYCHAIN_AVAILABLE.set(true);
+}
+
+/// Simulate a transient unavailable encryption key while the caller holds
+/// keys_test_guard. Used to prove provider updates cannot erase credentials.
+#[cfg(test)]
+pub(crate) fn clear_current_key_for_tests() {
+    *ENCRYPTION_KEY_CACHE.write() = None;
 }
 
 #[cfg(test)]

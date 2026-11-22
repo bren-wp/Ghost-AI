@@ -2,7 +2,8 @@
 'use client'
 
 import { useTranslation } from 'react-i18next'
-import { MoreHorizontal, ListChecks, Plus } from 'lucide-react'
+import { MoreHorizontal, ListChecks, Plus, Copy } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,12 +22,14 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { ModelItem, LLMProvider } from './types'
-import { isSupportedFetchProvider } from './constants'
+import { isSupportedFetchProvider, requiresApiKeyForFetch } from './constants'
+import { isValidProviderEndpoint } from './provider-endpoint'
 
 interface ModelsTableProps {
   models: ModelItem[]
   selectedProvider: LLMProvider
   apiKey: string
+  apiBaseUrl?: string
   onOpenFetchModal: () => void
   onOpenAddModelDialog: () => void
   onUpdateModelName: (id: string, newDisplayName: string) => void
@@ -38,6 +41,7 @@ export function ModelsTable({
   models,
   selectedProvider,
   apiKey,
+  apiBaseUrl,
   onOpenFetchModal,
   onOpenAddModelDialog,
   onUpdateModelName,
@@ -46,11 +50,22 @@ export function ModelsTable({
 }: ModelsTableProps) {
   const { t } = useTranslation('providers')
 
+  const copyModelId = async (modelId: string) => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable')
+      await navigator.clipboard.writeText(modelId)
+      toast.success(t('modelIdCopied'))
+    } catch {
+      // Browser permissions and insecure contexts can block the clipboard.
+      toast.error(t('modelIdCopyFailed'))
+    }
+  }
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+    <div className="min-w-0 space-y-3">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <Label>{t('models')}</Label>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={onOpenAddModelDialog}>
             <Plus className="size-4 mr-2" />
             {t('addModel')}
@@ -62,7 +77,8 @@ export function ModelsTable({
             onClick={onOpenFetchModal}
             disabled={
               !isSupportedFetchProvider(selectedProvider.id) ||
-              (selectedProvider.id !== 'ollama' && !apiKey)
+              (Boolean(apiBaseUrl?.trim()) && !isValidProviderEndpoint(apiBaseUrl!)) ||
+              (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())
             }
           >
             <ListChecks className="size-4 mr-2" />
@@ -70,8 +86,8 @@ export function ModelsTable({
           </Button>
         </div>
       </div>
-      <div className="rounded-md border">
-        <Table className="table-fixed">
+      <div className="min-w-0 max-w-full overflow-x-auto rounded-md border">
+        <Table className="min-w-[340px] table-fixed">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[45%]">{t('modelId')}</TableHead>
@@ -99,11 +115,15 @@ export function ModelsTable({
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm">
+                        <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${model.displayName}`}>
                           <MoreHorizontal className="size-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => void copyModelId(model.modelId)}>
+                          <Copy className="mr-2 size-4" aria-hidden="true" />
+                          {t('copyModelId')}
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onModelSettings(model)}>
                           {t('common:edit')}
                         </DropdownMenuItem>

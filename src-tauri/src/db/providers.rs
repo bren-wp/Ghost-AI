@@ -48,9 +48,9 @@ impl Database {
                             tracing::info!("🔐 [db] API key encrypted and stored in database");
                             Some(encrypted)
                         }
-                        Err(e) => {
-                            tracing::warn!("⚠️  [db] Failed to encrypt API key: {}", e);
-                            None
+                        Err(_) => {
+                            tracing::error!("[db] Provider creation rejected: API key encryption failure");
+                            return Err(anyhow::anyhow!("Unable to securely save provider credentials"));
                         }
                     }
                 } else {
@@ -106,12 +106,8 @@ impl Database {
                 let api_key = encrypted_api_key
                     .and_then(|encrypted| match crate::crypto::decrypt(&encrypted) {
                         Ok(decrypted) => Some(decrypted),
-                        Err(e) => {
-                            tracing::error!(
-                                "⚠️  [db] Failed to decrypt API key for provider {}: {}",
-                                provider_id,
-                                e
-                            );
+                        Err(_) => {
+                            tracing::error!("[db] Failed to decrypt API key for provider {}", provider_id);
                             None
                         }
                     })
@@ -153,12 +149,8 @@ impl Database {
             let api_key = encrypted_api_key
                 .and_then(|encrypted| match crate::crypto::decrypt(&encrypted) {
                     Ok(decrypted) => Some(decrypted),
-                    Err(e) => {
-                        tracing::error!(
-                            "⚠️  [db] Failed to decrypt API key for provider {}: {}",
-                            provider_id,
-                            e
-                        );
+                    Err(_) => {
+                        tracing::error!("[db] Failed to decrypt API key for provider {}", provider_id);
                         None
                     }
                 })
@@ -192,13 +184,15 @@ impl Database {
             if !api_key.is_empty() {
                 if crate::crypto::is_keychain_available() {
                     // Keychain available: encrypt and store in DB
-                    // Also clear any cached key
-                    crate::crypto::remove_cached_api_key(id);
                     match crate::crypto::encrypt(api_key) {
-                        Ok(encrypted) => Some(encrypted),
-                        Err(e) => {
-                            tracing::warn!("⚠️  [db] Failed to encrypt API key: {}", e);
-                            None
+                        Ok(encrypted) => {
+                            // Never discard the cached key before successful rotation.
+                            crate::crypto::remove_cached_api_key(id);
+                            Some(encrypted)
+                        }
+                        Err(_) => {
+                            tracing::error!("[db] API key rotation rejected: encryption failure");
+                            return Err(anyhow::anyhow!("Unable to securely update provider credentials"));
                         }
                     }
                 } else {
@@ -272,10 +266,10 @@ impl Database {
         // Clear cached API key if any
         crate::crypto::remove_cached_api_key(id);
 
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "providers",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())
@@ -349,6 +343,56 @@ mod tests {
         assert_eq!(fetched.api_style.as_deref(), Some("chat_completions"));
         assert_eq!(fetched.description.as_deref(), Some("Acme endpoint"));
         assert!(fetched.is_enabled);
+    }
+
+    #[tokio::test]
+    async fn create_provider_does_not_insert_row_when_encryption_fails() {
+        let _keys = crate::crypto::keys_test_guard();
+        crate::crypto::set_keys_for_tests([0x5a; 32], None);
+        let (db, _dir) = test_db().await;
+
+        crate::crypto::clear_current_key_for_tests();
+        let outcome = db
+            .create_provider(CreateProviderRequest {
+                api_key: Some("sk-would-be-lost".to_string()),
+                ..custom_req("Failed Encryption")
+            })
+            .await;
+        crate::crypto::set_keys_for_tests([0x5a; 32], None);
+
+        assert!(outcome.is_err(), "must refuse to create an unusable provider");
+        assert!(db.list_providers().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn failed_key_rotation_preserves_the_previous_encrypted_key() {
+        let _keys = crate::crypto::keys_test_guard();
+        crate::crypto::set_keys_for_tests([0x5a; 32], None);
+        let (db, _dir) = test_db().await;
+        let original = db
+            .create_provider(CreateProviderRequest {
+                api_key: Some("sk-existing-secret".to_string()),
+                ..custom_req("Secure Provider")
+            })
+            .await
+            .unwrap();
+
+        crate::crypto::clear_current_key_for_tests();
+        let outcome = db
+            .update_provider(
+                &original.id,
+                CreateProviderRequest {
+                    api_key: Some("sk-new-secret".to_string()),
+                    ..custom_req("Renamed Provider")
+                },
+            )
+            .await;
+        crate::crypto::set_keys_for_tests([0x5a; 32], None);
+
+        assert!(outcome.is_err(), "key rotation must fail closed");
+        let persisted = db.get_provider(&original.id).await.unwrap().unwrap();
+        assert_eq!(persisted.api_key.as_deref(), Some("sk-existing-secret"));
+        assert_eq!(persisted.name, "Secure Provider");
     }
 
     #[tokio::test]

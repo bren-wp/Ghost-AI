@@ -72,6 +72,21 @@ export function AppSidebar({
   const navItems = React.useMemo(() => getNavItems(t), [t])
   const activeItem = navItems.find((item) => item.id === activeSection) || navItems[0]
   const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false)
+
+  // Native-feeling shortcut on Windows/Linux (Ctrl+,) and macOS (Cmd+,).
+  // Ignore it while another blocking modal owns keyboard focus.
+  React.useEffect(() => {
+    const onSettingsShortcut = (event: KeyboardEvent) => {
+      if (event.code !== 'Comma' || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) {
+        return
+      }
+      if (hasBlockingDialog()) return
+      event.preventDefault()
+      setSettingsDialogOpen(true)
+    }
+    window.addEventListener('keydown', onSettingsShortcut)
+    return () => window.removeEventListener('keydown', onSettingsShortcut)
+  }, [])
   const [assistantDialogOpen, setAssistantDialogOpen] = React.useState(false)
   const [promptDialogOpen, setPromptDialogOpen] = React.useState(false)
   const [editingAssistant, setEditingAssistant] = React.useState<AssistantDB | null>(null)

@@ -21,7 +21,10 @@
         "center": true,
         "fullscreen": false,
         "maximized": false,
-        "resizable": true
+        "resizable": true,
+        "backgroundColor": "#080F1A",
+        "theme": "Dark",
+        "visible": false
       }
     ],
     "security": {
@@ -86,7 +89,6 @@
     "homepage": "https://brendigo.com",
     "shortDescription": "Your AI. Your desktop.",
     "longDescription": "Ghost AI brings conversations, documents, research and intelligent tools into one beautifully focused workspace.",
-    "licenseFile": "../legal/EULA-EN.txt",
     "windows": {
       "nsis": {
         "installMode": "currentUser",

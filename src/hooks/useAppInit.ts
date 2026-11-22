@@ -78,8 +78,9 @@ export function useAppInit() {
           if (!available) {
             logger.warn('Keychain access denied, API keys will not persist across restarts')
           }
-        } catch (err) {
-          logger.warn('Failed to check keychain availability:', err)
+        } catch {
+          // Native errors can contain secrets or internal filesystem paths.
+          logger.warn('Failed to check keychain availability')
         }
 
         // Check if onboarding is needed. Assistants are no longer part of
@@ -98,9 +99,10 @@ export function useAppInit() {
         }
 
         logger.info('App initialization complete')
-      } catch (err) {
-        logger.error('Failed to initialize app:', err)
-        setError(String(err))
+      } catch {
+        // Do not write or render raw native errors: they may contain credentials.
+        logger.error('Failed to initialize app')
+        setError('Local application data could not be loaded. Please retry.')
       } finally {
         setIsInitialized(true)
       }

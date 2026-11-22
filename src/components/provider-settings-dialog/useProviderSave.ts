@@ -7,6 +7,7 @@ import type { CreateProviderRequest, CreateModelRequest, Provider } from '@/type
 import type { LLMProvider, ModelItem } from './types'
 import { isCustomProvider } from './types'
 import { logger } from '@/lib/logger'
+import { isValidProviderEndpoint } from './provider-endpoint'
 
 export interface UseProviderSaveReturn {
   isSaving: boolean
@@ -57,6 +58,8 @@ export function useProviderSave({
 }: UseProviderSaveParams): UseProviderSaveReturn {
   const { t } = useTranslation('messages')
   const [isSaving, setIsSaving] = React.useState(false)
+  // A ref blocks rapid double clicks before the next React render commits.
+  const saveInFlightRef = React.useRef(false)
   const [savedWithoutModels, setSavedWithoutModels] = React.useState(false)
 
   React.useEffect(() => {
@@ -66,6 +69,18 @@ export function useProviderSave({
   }, [models, modelsToDelete])
 
   const handleSave = React.useCallback(async () => {
+    if (saveInFlightRef.current) return
+    const isCustom = isCustomProvider(selectedProvider)
+    const normalizedBaseUrl = apiBaseUrl.trim()
+    if (isCustom && (!providerName.trim() || !normalizedBaseUrl)) {
+      toast.error(t('providers:requiredField'))
+      return
+    }
+    if (normalizedBaseUrl && !isValidProviderEndpoint(normalizedBaseUrl)) {
+      toast.error(t('providers:invalidBaseUrl'))
+      return
+    }
+    saveInFlightRef.current = true
     const newModels = models.filter((m) => !m.isExisting)
     const modifiedModels = models.filter(
       (m) =>
@@ -79,8 +94,7 @@ export function useProviderSave({
     setIsSaving(true)
     try {
       let providerId: string
-      const isCustom = isCustomProvider(selectedProvider)
-      const effectiveName = isCustom ? providerName || selectedProvider.name : selectedProvider.name
+      const effectiveName = isCustom ? providerName.trim() : selectedProvider.name
       const effectiveProviderType = isCustom
         ? compatibilityType === 'anthropic'
           ? 'custom_anthropic'
@@ -89,9 +103,16 @@ export function useProviderSave({
       const effectiveApiStyle = compatibilityType === 'openai' && isCustom ? apiStyle : undefined
 
       if (existingProvider) {
+        // A missing/decryption-inaccessible stored key hydrates as an empty
+        // field but MUST NOT be interpreted as a request to delete ciphertext.
+        // Only clearing a previously readable non-empty key sends '' to the
+        // backend; a new non-empty key is explicitly rotated.
+        const storedKey = existingProvider.api_key ?? ''
+        const apiKeyChanged = storedKey !== apiKey
+        const keyUpdate = apiKeyChanged ? apiKey : undefined
         const needsUpdate =
-          existingProvider.api_key !== apiKey ||
-          existingProvider.base_url !== apiBaseUrl ||
+          apiKeyChanged ||
+          (existingProvider.base_url || '') !== normalizedBaseUrl ||
           existingProvider.name !== effectiveName ||
           existingProvider.provider_type !== effectiveProviderType ||
           existingProvider.api_style !== effectiveApiStyle
@@ -102,8 +123,8 @@ export function useProviderSave({
             req: {
               name: effectiveName,
               provider_type: effectiveProviderType,
-              api_key: apiKey || undefined,
-              base_url: apiBaseUrl || undefined,
+              api_key: keyUpdate,
+              base_url: normalizedBaseUrl || undefined,
               api_style: effectiveApiStyle,
               is_enabled: existingProvider.is_enabled,
             },
@@ -116,15 +137,16 @@ export function useProviderSave({
           name: effectiveName,
           provider_type: effectiveProviderType,
           api_key: apiKey || undefined,
-          base_url: apiBaseUrl || undefined,
+          base_url: normalizedBaseUrl || undefined,
           api_style: effectiveApiStyle,
           is_enabled: true,
         }
 
         const provider = await invoke<Provider>('create_provider', { req: providerReq })
-        logger.info('Created provider:', provider)
+        // Provider objects can contain credentials. Never write them to diagnostics.
+        logger.info('Created provider:', { id: provider.id, type: effectiveProviderType })
         providerId = provider.id
-        onProviderCreated?.(providerId)
+        if (isCustom) onProviderCreated?.(providerId)
       }
 
       for (const modelId of modelsToDelete) {
@@ -165,12 +187,13 @@ export function useProviderSave({
       }
       toast.success(t('providerSavedSuccessfully'))
       onOpenChange(false)
-    } catch (error) {
-      logger.error('Failed to save provider:', error)
-      toast.error(t('failedToSaveProvider'), {
-        description: error instanceof Error ? error.message : String(error),
-      })
+    } catch {
+      // Backend errors could contain URLs, query strings or provider credentials.
+      // Log the operation only, never the raw error or secret-bearing request.
+      logger.error('Failed to save provider configuration')
+      toast.error(t('failedToSaveProvider'))
     } finally {
+      saveInFlightRef.current = false
       setIsSaving(false)
     }
   }, [

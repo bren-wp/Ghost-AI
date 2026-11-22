@@ -348,7 +348,8 @@ impl AgentConfig {
         self
     }
 
-    /// Enable all built-in tools
+    /// Enable all built-in tools (optional builder convenience, covered by tests).
+    #[allow(dead_code)]
     pub fn with_builtin_tools(mut self) -> Self {
         self.enable_web_search = true;
         self.enable_web_fetch = true;

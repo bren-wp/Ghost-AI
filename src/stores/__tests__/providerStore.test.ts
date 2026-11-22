@@ -1,6 +1,7 @@
 // Ghost AI by Brendigo
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
+import { logger } from '@/lib/logger'
 import { useProviderStore } from '../providerStore'
 import type { Provider, CreateProviderRequest } from '@/types'
 
@@ -40,6 +41,26 @@ describe('useProviderStore', () => {
       isLoading: false,
       error: null,
     })
+  })
+
+  it('hides native errors that might contain a provider API key', async () => {
+    const secret = 'sk-secret-not-for-logs'
+    mockInvoke.mockRejectedValueOnce(new Error(`backend failed: ${secret}`))
+    await useProviderStore.getState().loadProviders()
+
+    expect(useProviderStore.getState().error).not.toContain(secret)
+    expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain(secret)
+
+    mockInvoke.mockRejectedValueOnce(new Error(`backend failed: ${secret}`))
+    const request: CreateProviderRequest = {
+      name: 'Local',
+      provider_type: 'custom_openai',
+      api_key: secret,
+      base_url: 'http://localhost:1234/v1',
+      is_enabled: true,
+    }
+    await expect(useProviderStore.getState().createProvider(request)).rejects.not.toThrow(secret)
+    expect(useProviderStore.getState().error).not.toContain(secret)
   })
 
   describe('initial state', () => {
@@ -83,7 +104,7 @@ describe('useProviderStore', () => {
 
       expect(useProviderStore.getState().providers).toEqual([])
       expect(useProviderStore.getState().isLoading).toBe(false)
-      expect(useProviderStore.getState().error).toContain(errorMessage)
+      expect(useProviderStore.getState().error).toBe('Unable to load AI providers. Please retry.')
     })
   })
 
@@ -115,7 +136,7 @@ describe('useProviderStore', () => {
       }
       await expect(useProviderStore.getState().createProvider(req)).rejects.toThrow()
 
-      expect(useProviderStore.getState().error).toContain(errorMessage)
+      expect(useProviderStore.getState().error).toBe('Unable to create AI provider. Please retry.')
     })
   })
 
@@ -153,7 +174,7 @@ describe('useProviderStore', () => {
       }
       await expect(useProviderStore.getState().updateProvider('provider-1', req)).rejects.toThrow()
 
-      expect(useProviderStore.getState().error).toContain(errorMessage)
+      expect(useProviderStore.getState().error).toBe('Unable to update AI provider. Please retry.')
     })
   })
 
@@ -182,7 +203,7 @@ describe('useProviderStore', () => {
 
       await expect(useProviderStore.getState().deleteProvider('provider-1')).rejects.toThrow()
 
-      expect(useProviderStore.getState().error).toContain(errorMessage)
+      expect(useProviderStore.getState().error).toBe('Unable to delete AI provider. Please retry.')
       // Provider should still be in the store since delete failed
       expect(useProviderStore.getState().providers).toHaveLength(1)
     })

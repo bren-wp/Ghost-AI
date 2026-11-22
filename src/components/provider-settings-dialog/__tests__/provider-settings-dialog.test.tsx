@@ -1,6 +1,6 @@
 // Ghost AI by Brendigo
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { invoke } from '@tauri-apps/api/core'
 import i18n from '@/lib/i18n'
 import { ProviderSettingsDialog } from '../provider-settings-dialog'
@@ -87,6 +87,27 @@ beforeEach(() => {
 })
 
 describe('ProviderSettingsDialog deep link', () => {
+  it('shows a safe retry state when provider loading fails', async () => {
+    let available = false
+    mockedInvoke.mockImplementation((async (command: string) => {
+      if (command === 'list_all_models') return []
+      if (command === 'list_providers') {
+        if (!available) throw new Error('database error containing sk-private-value')
+        return []
+      }
+      return null
+    }) as never)
+
+    renderDialog()
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Unable to load AI providers or models')
+    expect(alert).not.toHaveTextContent('sk-private-value')
+    available = true
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('button', { name: 'Save Configuration' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('focuses the provider and opens model selection when it has no models', async () => {
     mockBackend({ models: [], providers: [provider] })
 
@@ -98,6 +119,28 @@ describe('ProviderSettingsDialog deep link', () => {
       apiKey: 'sk-test',
       baseUrl: provider.base_url,
     })
+  })
+
+  it('preserves unsaved form edits when the model store refreshes in the background', async () => {
+    mockBackend({ models: [model], providers: [provider] })
+    renderDialog(provider.id)
+
+    const key = await screen.findByLabelText('API Key')
+    await waitFor(() => expect(key).toHaveValue('sk-test'))
+    const nameInput = screen.getByDisplayValue(model.name)
+
+    fireEvent.change(key, { target: { value: 'sk-unsaved-edit' } })
+    fireEvent.change(nameInput, { target: { value: 'Unsaved model name' } })
+
+    act(() => {
+      useModelStore.setState({
+        providers: [{ ...provider }],
+        models: [{ ...model, name: 'Refreshed backend model' }],
+      })
+    })
+
+    expect(screen.getByLabelText('API Key')).toHaveValue('sk-unsaved-edit')
+    expect(screen.getByDisplayValue('Unsaved model name')).toBeInTheDocument()
   })
 
   it('does not fetch when the focused provider already has a model', async () => {
@@ -159,8 +202,16 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
     )
   }
 
+  // Both entry points expose a native picker. Test the real interaction
+  // instead of looking for buttons removed by the responsive redesign.
+  function selectProvider(value: string) {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Select a provider' }), {
+      target: { value },
+    })
+  }
+
   function expectEmptyForm() {
-    expect(screen.getByLabelText('Provider Name')).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: /^Provider Name/ })).toHaveValue('')
     expect(screen.getByLabelText('API Key')).toHaveValue('')
     expect(screen.getByLabelText(/^API Base URL/)).toHaveValue('')
     expect(screen.getByRole('button', { name: 'Save Configuration' })).toBeDisabled()
@@ -171,10 +222,11 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
     mockBackend({ models: [model], providers: [provider] })
     renderSettings()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Acme/ }))
+    await screen.findByRole('option', { name: provider.name })
+    selectProvider(`custom:${provider.id}`)
     await waitFor(() => expect(screen.getByLabelText('API Key')).toHaveValue(provider.api_key))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Provider' }))
+    selectProvider('new')
 
     await waitFor(expectEmptyForm)
   })
@@ -197,8 +249,8 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
     renderSettings()
 
     await waitFor(() => expect(mockedInvoke).toHaveBeenCalledWith('list_providers'))
-    fireEvent.click(screen.getByRole('button', { name: 'Add Provider' }))
-    fireEvent.change(screen.getByLabelText('Provider Name'), { target: { value: provider.name } })
+    selectProvider('new')
+    fireEvent.change(screen.getByRole('textbox', { name: /^Provider Name/ }), { target: { value: provider.name } })
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: provider.api_key } })
     fireEvent.change(screen.getByLabelText(/^API Base URL/), {
       target: { value: provider.base_url },
@@ -218,7 +270,7 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add Provider' }))
+    selectProvider('new')
 
     await waitFor(expectEmptyForm)
   })

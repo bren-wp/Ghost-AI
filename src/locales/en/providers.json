@@ -96,5 +96,9 @@
   "addModelsBeforeChatting": "Add at least one model to start chatting.",
   "customProviderPlaceholder": "e.g. My Local LLM",
   "removeModel": "Remove Model",
-  "confirmRemoveModel": "Are you sure you want to remove {{name}}? You can add it again from the provider settings."
+  "confirmRemoveModel": "Are you sure you want to remove {{name}}? You can add it again from the provider settings.",
+  "unsecuredEndpointWarning": "This remote server uses HTTP. API keys and prompts could travel unencrypted. Prefer HTTPS.",
+  "copyModelId": "Copy Model ID",
+  "modelIdCopied": "Model ID copied",
+  "modelIdCopyFailed": "Unable to copy model ID. Check clipboard permissions."
 }

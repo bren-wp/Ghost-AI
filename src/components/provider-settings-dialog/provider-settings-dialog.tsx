@@ -26,6 +26,7 @@ import type { ProviderSettingsDialogProps } from './types'
 import { isCustomProvider, isCustomProviderType } from './types'
 import { useProviderSettings } from './useProviderSettings'
 import { ProviderSidebar } from './provider-sidebar'
+import { ProviderSelect } from './provider-select'
 import { ProviderForm } from './provider-form'
 import { ModelsTable } from './models-table'
 import { FetchModelsDialog } from './fetch-models-dialog'
@@ -33,6 +34,7 @@ import { AddModelDialog } from './add-model-dialog'
 import { EditModelDialog } from './edit-model-dialog'
 import { BUILTIN_PROVIDERS } from './constants'
 import { isSupportedFetchProvider, requiresApiKeyForFetch } from './constants'
+import { isValidProviderEndpoint } from './provider-endpoint'
 import { useModelStore } from '@/stores/modelStore'
 
 export function ProviderSettingsDialog({
@@ -90,6 +92,8 @@ export function ProviderSettingsDialog({
     groupedModels,
     savedWithoutModels,
     isDataLoaded,
+    loadError,
+    retryLoad,
   } = useProviderSettings(open, onOpenChange)
 
   const isCustom = isCustomProvider(selectedProvider)
@@ -116,7 +120,7 @@ export function ProviderSettingsDialog({
         existingProvider.name !== (isCustom ? providerName : selectedProvider.name) ||
         existingProvider.provider_type !== effectiveProviderType ||
         existingProvider.api_style !== effectiveApiStyle)) ||
-    (!existingProvider && (isCustom || apiKey.trim().length > 0))
+    (!existingProvider && (isCustom || !requiresApiKeyForFetch(selectedProvider.id) || apiKey.trim().length > 0))
 
   const appliedFocusRef = React.useRef<string | null>(null)
   const autoOpenedModelsRef = React.useRef<string | null>(null)
@@ -200,27 +204,25 @@ export function ProviderSettingsDialog({
     setSelectedProvider(provider)
   }
 
-  const handleCustomProviderSelect = (provider: typeof selectedProvider) => {
-    const storeProvider = storeProviders.find(
-      (p) => p.provider_type === provider.id && p.name === provider.name
-    )
-    if (storeProvider) {
-      setEditingCustomProviderId(storeProvider.id)
-    }
+  const handleCustomProviderSelect = (provider: typeof selectedProvider, storedProviderId?: string) => {
+    const storeProvider = storedProviderId
+      ? storeProviders.find((p) => p.id === storedProviderId)
+      : storeProviders.find((p) => p.provider_type === provider.id && p.name === provider.name)
+    setEditingCustomProviderId(storeProvider?.id ?? null)
     setSelectedProvider(provider)
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(96vw,900px)] max-w-[96vw] max-h-[92vh] overflow-hidden p-0 gap-0">
+      <DialogContent className="flex h-[min(92dvh,760px)] w-[min(96vw,960px)] max-w-[96vw] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:flex-row">
         <DialogTitle className="sr-only">{t('dialogTitle')}</DialogTitle>
         <DialogDescription className="sr-only">{t('dialogDescription')}</DialogDescription>
-        <SidebarProvider className="min-h-0">
+        <SidebarProvider className="min-h-0 min-w-0 flex-1">
           <ProviderSidebar
             selectedProvider={selectedProvider}
-            onSelectProvider={(p) => {
+            onSelectProvider={(p, storedId) => {
               if (p.isCustom) {
-                handleCustomProviderSelect(p)
+                handleCustomProviderSelect(p, storedId)
               } else {
                 handleSidebarSelect(p)
               }
@@ -228,8 +230,20 @@ export function ProviderSettingsDialog({
             storeProviders={storeProviders}
             editingCustomProviderId={editingCustomProviderId}
           />
-          <main className="flex h-[min(86vh,640px)] min-h-0 flex-1 flex-col overflow-hidden">
-            {!isDataLoaded ? (
+          <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <ProviderSelect
+              className="shrink-0 border-b border-border p-3 md:hidden"
+              selectedProvider={selectedProvider}
+              editingCustomProviderId={editingCustomProviderId}
+              storeProviders={storeProviders}
+              onSelectProvider={(provider, storedId) => provider.isCustom ? handleCustomProviderSelect(provider, storedId) : handleSidebarSelect(provider)}
+            />
+            {loadError ? (
+              <div role="alert" className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm">
+                <p className="text-destructive">{loadError}</p>
+                <Button type="button" variant="outline" onClick={retryLoad}>{t('common:retry')}</Button>
+              </div>
+            ) : !isDataLoaded ? (
               <div role="status" aria-live="polite" className="flex flex-1 items-center justify-center gap-3 text-sm text-muted-foreground">
                 <Loader2 className="size-5 animate-spin" aria-hidden="true" />
                 {t("common:loading")}
@@ -251,8 +265,8 @@ export function ProviderSettingsDialog({
                 </Breadcrumb>
               </div>
             </header>
-            <div className="flex-1 overflow-y-auto p-6 pt-0">
-              <div className="space-y-6">
+            <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pt-0 sm:p-6 sm:pt-0">
+              <div className="min-w-0 space-y-6">
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold">
                     {existingProvider ? t('common:edit') : t('common:add')} {displayName}
@@ -289,6 +303,7 @@ export function ProviderSettingsDialog({
                   models={models}
                   selectedProvider={selectedProvider}
                   apiKey={apiKey}
+                  apiBaseUrl={apiBaseUrl}
                   onOpenFetchModal={handleOpenFetchModal}
                   onOpenAddModelDialog={() => setAddModelDialogOpen(true)}
                   onUpdateModelName={handleUpdateModelName}
@@ -297,7 +312,7 @@ export function ProviderSettingsDialog({
                 />
               </div>
             </div>
-            <DialogFooter className="shrink-0 border-t p-4 sm:justify-end items-center gap-3">
+            <DialogFooter className="shrink-0 flex flex-wrap items-center gap-2 border-t p-3 sm:justify-end sm:p-4">
               {savedWithoutModels && (
                 <p className="mr-auto text-sm text-warning">{t('addModelsBeforeChatting')}</p>
               )}
@@ -307,7 +322,9 @@ export function ProviderSettingsDialog({
               <Button
                 onClick={handleSave}
                 disabled={
-                  isSaving || !hasChanges || (selectedProvider.id !== 'ollama' && !apiKey.trim())
+                  isSaving || !hasChanges || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim() && !existingProvider) ||
+                  (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) ||
+              (apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl))
                 }
               >
                 {isSaving ? (

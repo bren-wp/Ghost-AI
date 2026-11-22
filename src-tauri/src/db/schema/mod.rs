@@ -32,7 +32,7 @@ async fn get_user_version(pool: &SqlitePool) -> Result<i32> {
 
 async fn set_user_version(pool: &SqlitePool, version: i32) -> Result<()> {
     // PRAGMA statements cannot use bound parameters
-    sqlx::query(&format!("PRAGMA user_version = {}", version))
+    sqlx::query(sqlx::AssertSqlSafe(format!("PRAGMA user_version = {}", version)))
         .execute(pool)
         .await?;
     Ok(())
@@ -211,7 +211,7 @@ async fn ensure_search_result_items_column(pool: &SqlitePool) -> Result<()> {
 /// intermediate builds whose migration omitted these columns; idempotent.
 async fn ensure_conversation_timestamps(pool: &SqlitePool) -> Result<()> {
     for table in ["conversation_settings", "conversation_participants"] {
-        let columns = sqlx::query(&format!("PRAGMA table_info({table})"))
+        let columns = sqlx::query(sqlx::AssertSqlSafe(format!("PRAGMA table_info({table})")))
             .fetch_all(pool)
             .await?;
         let has_column = columns.iter().any(|row| {
@@ -219,9 +219,9 @@ async fn ensure_conversation_timestamps(pool: &SqlitePool) -> Result<()> {
                 .is_ok_and(|name| name == "updated_at")
         });
         if !has_column {
-            sqlx::query(&format!(
+            sqlx::query(sqlx::AssertSqlSafe(format!(
                 "ALTER TABLE {table} ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"
-            ))
+            )))
             .execute(pool)
             .await?;
             tracing::info!("Added updated_at column to {table} table");
@@ -276,24 +276,24 @@ async fn migrate_v10_to_v11(pool: &SqlitePool) -> Result<()> {
     // backfill from created_at directly. Remaining synced tables keep the ''
     // default; their rows are written fresh by the app.
     for table in ["tool_calls", "code_executions"] {
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             "ALTER TABLE {table} ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"
-        ))
+        )))
         .execute(pool)
         .await?;
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             "UPDATE {table} SET updated_at = COALESCE(completed_at, created_at)"
-        ))
+        )))
         .execute(pool)
         .await?;
     }
     for table in ["messages", "search_results"] {
-        sqlx::query(&format!(
+        sqlx::query(sqlx::AssertSqlSafe(format!(
             "ALTER TABLE {table} ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"
-        ))
+        )))
         .execute(pool)
         .await?;
-        sqlx::query(&format!("UPDATE {table} SET updated_at = created_at"))
+        sqlx::query(sqlx::AssertSqlSafe(format!("UPDATE {table} SET updated_at = created_at")))
             .execute(pool)
             .await?;
     }
@@ -305,7 +305,7 @@ async fn migrate_v10_to_v11(pool: &SqlitePool) -> Result<()> {
         column: &str,
         decl: &str,
     ) -> Result<()> {
-        let columns = sqlx::query(&format!("PRAGMA table_info({table})"))
+        let columns = sqlx::query(sqlx::AssertSqlSafe(format!("PRAGMA table_info({table})")))
             .fetch_all(pool)
             .await?;
         let exists = columns.iter().any(|row| {
@@ -313,7 +313,7 @@ async fn migrate_v10_to_v11(pool: &SqlitePool) -> Result<()> {
                 .is_ok_and(|name| name == column)
         });
         if !exists {
-            sqlx::query(&format!("ALTER TABLE {table} ADD COLUMN {column} {decl}"))
+            sqlx::query(sqlx::AssertSqlSafe(format!("ALTER TABLE {table} ADD COLUMN {column} {decl}")))
                 .execute(pool)
                 .await?;
         }
@@ -361,7 +361,7 @@ async fn migrate_v10_to_v11(pool: &SqlitePool) -> Result<()> {
         "assistant_tools",
         "assistant_skills",
     ] {
-        sqlx::query(&format!("ALTER TABLE {table} ADD COLUMN deleted_at TEXT"))
+        sqlx::query(sqlx::AssertSqlSafe(format!("ALTER TABLE {table} ADD COLUMN deleted_at TEXT")))
             .execute(pool)
             .await?;
     }
@@ -392,7 +392,7 @@ async fn migrate_v10_to_v11(pool: &SqlitePool) -> Result<()> {
         "knowledge_bases",
         "user_relationships",
     ] {
-        sqlx::query(&format!("DROP TABLE IF EXISTS {table}"))
+        sqlx::query(sqlx::AssertSqlSafe(format!("DROP TABLE IF EXISTS {table}")))
             .execute(pool)
             .await?;
     }
@@ -424,7 +424,7 @@ async fn migrate_v11_to_v12(pool: &SqlitePool) -> Result<()> {
 /// lockstep. Fresh installs no longer create them.
 async fn migrate_v12_to_v13(pool: &SqlitePool) -> Result<()> {
     for table in ["message_prompts", "message_tools"] {
-        sqlx::query(&format!("DROP TABLE IF EXISTS {table}"))
+        sqlx::query(sqlx::AssertSqlSafe(format!("DROP TABLE IF EXISTS {table}")))
             .execute(pool)
             .await?;
     }
@@ -785,7 +785,7 @@ mod tests {
     }
 
     async fn columns(pool: &SqlitePool, table: &str) -> Vec<String> {
-        let rows = sqlx::query(&format!("PRAGMA table_info({table})"))
+        let rows = sqlx::query(sqlx::AssertSqlSafe(format!("PRAGMA table_info({table})")))
             .fetch_all(pool)
             .await
             .unwrap();
@@ -841,10 +841,10 @@ mod tests {
         let pool = fresh_pool().await;
         init_schema(&pool).await.expect("init schema");
         for table in ["message_prompts", "message_tools"] {
-            sqlx::query(&format!(
+            sqlx::query(sqlx::AssertSqlSafe(format!(
                 "CREATE TABLE {table} (id TEXT PRIMARY KEY, message_id TEXT NOT NULL, \
                  created_at TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT '', deleted_at TEXT)"
-            ))
+            )))
             .execute(&pool)
             .await
             .unwrap();

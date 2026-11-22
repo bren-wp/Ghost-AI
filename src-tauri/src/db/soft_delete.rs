@@ -152,7 +152,7 @@ pub async fn tombstone_children_of_messages(
             table,
             &format!("message_id IN (SELECT id FROM messages WHERE {message_predicate})"),
         );
-        let mut query = sqlx::query(&sql).bind(now.clone());
+        let mut query = sqlx::query(sqlx::AssertSqlSafe(sql.as_str())).bind(now.clone());
         for param in params {
             query = query.bind(param);
         }
@@ -209,7 +209,7 @@ mod tests {
         ];
         for (table, where_clause) in cases {
             let sql = tombstone_update(table, where_clause);
-            sqlx::query(&sql)
+            sqlx::query(sqlx::AssertSqlSafe(sql.as_str()))
                 .fetch_all(&pool)
                 .await
                 .unwrap_or_else(|e| panic!("{table}: {e} — {sql}"));
@@ -242,7 +242,7 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        sqlx::query(&tombstone_update("tool_calls", "id = ?2"))
+        sqlx::query(sqlx::AssertSqlSafe(tombstone_update("tool_calls", "id = ?2")))
             .bind(now)
             .bind("tc1")
             .execute(&pool)

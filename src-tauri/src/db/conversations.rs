@@ -184,10 +184,10 @@ impl Database {
             ("conversation_participants", "conversation_id = ?2"),
             ("conversations", "id = ?2"),
         ] {
-            sqlx::query(&crate::db::soft_delete::tombstone_update(
+            sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
                 table,
                 where_clause,
-            ))
+            )))
             .bind(&now)
             .bind(id)
             .execute(self.pool.as_ref())
@@ -388,10 +388,10 @@ impl Database {
     }
 
     pub async fn remove_conversation_participant(&self, id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "conversation_participants",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())

@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import type { LLMProvider, ModelItem } from './types'
 import { isCustomProvider } from './types'
+import { requiresApiKeyForFetch } from './constants'
+import { isPlaintextRemoteEndpoint, isValidProviderEndpoint } from './provider-endpoint'
 
 type CheckStatus = 'idle' | 'checking' | 'success' | 'failed'
 
@@ -60,25 +62,32 @@ export function ProviderForm({
 }: ProviderFormProps) {
   const { t } = useTranslation('providers')
   const isCustom = isCustomProvider(selectedProvider)
+  const invalidEndpoint = apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl)
+  const plaintextRemoteEndpoint = isPlaintextRemoteEndpoint(apiBaseUrl)
 
   const [checkStatus, setCheckStatus] = React.useState<CheckStatus>('idle')
   const [checkError, setCheckError] = React.useState<string | null>(null)
   const [checkLatency, setCheckLatency] = React.useState<number | null>(null)
   const resetTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const requestGenerationRef = React.useRef(0)
 
   React.useEffect(() => {
+    requestGenerationRef.current += 1
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current)
     setCheckStatus('idle')
     setCheckError(null)
     setCheckLatency(null)
-  }, [selectedProvider.id])
+  }, [selectedProvider.id, apiKey, apiBaseUrl, compatibilityType, apiStyle, models])
 
   React.useEffect(() => {
     return () => {
+      requestGenerationRef.current += 1
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current)
     }
   }, [])
 
   const handleCheckApi = React.useCallback(async () => {
+    const generation = ++requestGenerationRef.current
     const providerType = isCustom
       ? compatibilityType === 'anthropic'
         ? 'custom_anthropic'
@@ -107,32 +116,40 @@ export function ProviderForm({
         apiStyle: isCustom && compatibilityType === 'openai' ? apiStyle : null,
       })
 
+      if (generation !== requestGenerationRef.current) return
       if (result.success) {
         setCheckStatus('success')
         setCheckLatency(result.latency_ms)
         resetTimerRef.current = setTimeout(() => {
-          setCheckStatus('idle')
-          setCheckLatency(null)
+          if (generation === requestGenerationRef.current) {
+            setCheckStatus('idle')
+            setCheckLatency(null)
+          }
         }, 5000)
       } else {
         setCheckStatus('failed')
-        setCheckError(result.error || 'Connection failed')
+        // Never surface provider responses verbatim: URLs, query parameters
+        // and unrelated credentials can appear in native transport errors.
+        setCheckError(t('connectionFailed'))
       }
-    } catch (e) {
+    } catch {
+      if (generation !== requestGenerationRef.current) return
       setCheckStatus('failed')
-      setCheckError(e instanceof Error ? e.message : String(e))
+      setCheckError(t('connectionFailed'))
     }
-  }, [selectedProvider, isCustom, compatibilityType, apiKey, apiBaseUrl, apiStyle, models])
+  }, [selectedProvider, isCustom, compatibilityType, apiKey, apiBaseUrl, apiStyle, models, t])
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       {isCustom && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="provider-name">{t('providerName')}</Label>
+            <Label htmlFor="provider-name">{t('providerName')} <span aria-hidden="true" className="text-destructive">*</span></Label>
             <Input
               id="provider-name"
               type="text"
+              required
+              aria-required="true"
               placeholder={t('customProviderPlaceholder')}
               value={providerName}
               onChange={(e) => onProviderNameChange(e.target.value)}
@@ -144,7 +161,7 @@ export function ProviderForm({
             <RadioGroup
               value={compatibilityType}
               onValueChange={onCompatibilityTypeChange}
-              className="flex gap-4"
+              className="flex flex-wrap gap-x-4 gap-y-2"
             >
               <div className="flex items-center gap-2">
                 <RadioGroupItem value="openai" id="compat-openai" />
@@ -164,7 +181,7 @@ export function ProviderForm({
           {compatibilityType === 'openai' && (
             <div className="space-y-2">
               <Label>{t('apiStyle')}</Label>
-              <RadioGroup value={apiStyle} onValueChange={onApiStyleChange} className="flex gap-4">
+              <RadioGroup value={apiStyle} onValueChange={onApiStyleChange} className="flex flex-wrap gap-x-4 gap-y-2">
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="chat_completions" id="api-style-cc" />
                   <Label htmlFor="api-style-cc" className="font-normal cursor-pointer">
@@ -186,8 +203,8 @@ export function ProviderForm({
 
       <div className="space-y-2">
         <Label htmlFor="api-key">{t('apiKey')}</Label>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <div className="relative min-w-[min(100%,220px)] flex-1">
             <Input
               id="api-key"
               type={showApiKey ? 'text' : 'password'}
@@ -202,6 +219,9 @@ export function ProviderForm({
               variant="ghost"
               size="icon"
               className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+              aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+              aria-pressed={showApiKey}
+              disabled={selectedProvider.id === 'ollama'}
               onClick={() => onShowApiKeyChange(!showApiKey)}
             >
               {showApiKey ? (
@@ -221,9 +241,9 @@ export function ProviderForm({
                   : 'outline'
             }
             size="sm"
-            className="h-9 shrink-0"
+            className="h-9 max-w-full shrink-0"
             onClick={handleCheckApi}
-            disabled={checkStatus === 'checking' || (!apiKey && selectedProvider.id !== 'ollama')}
+            disabled={checkStatus === 'checking' || invalidEndpoint || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())}
           >
             {checkStatus === 'checking' ? (
               <Loader2 className="size-4 animate-spin" />
@@ -243,7 +263,7 @@ export function ProviderForm({
           </Button>
         </div>
         {checkStatus === 'failed' && checkError && (
-          <div className="text-xs text-destructive space-y-1">
+          <div role="alert" className="text-xs text-destructive space-y-1">
             <p className="font-medium">{t('connectionFailed')}</p>
             <div className="px-2 py-1.5 bg-destructive/5 rounded max-h-24 overflow-y-auto">
               <p className="font-mono text-destructive/80 whitespace-pre-wrap break-all">
@@ -268,10 +288,24 @@ export function ProviderForm({
         <Input
           id="api-base-url"
           type="url"
+          required={isCustom}
+          aria-required={isCustom}
+          aria-invalid={invalidEndpoint}
+          aria-describedby={invalidEndpoint ? 'api-base-url-error' : undefined}
           placeholder="https://api.example.com/v1"
           value={apiBaseUrl}
           onChange={(e) => onApiBaseUrlChange(e.target.value)}
         />
+        {invalidEndpoint && (
+          <p id="api-base-url-error" role="alert" className="text-xs text-destructive">
+            {t('invalidBaseUrl')}
+          </p>
+        )}
+        {plaintextRemoteEndpoint && (
+          <p role="status" className="text-xs text-warning">
+            {t('unsecuredEndpointWarning')}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           {isCustom ? (
             t('apiBaseUrlRequired')

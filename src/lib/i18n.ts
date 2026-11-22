@@ -1,6 +1,7 @@
 // Ghost AI by Brendigo
-import i18n from 'i18next'
+import i18n, { type Resource } from 'i18next'
 import { initReactI18next } from 'react-i18next'
+import { localeOverrides } from './ghost-ai-locale-overrides'
 
 import common_en from '@/locales/en/common.json'
 import common_zhCN from '@/locales/zh-CN/common.json'
@@ -35,12 +36,46 @@ const LANGUAGE_KEY = 'ghost_ai_language'
 
 export const supportedLanguages = [
   { code: 'en', name: 'English' },
+  { code: 'hr', name: 'Hrvatski' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'es', name: 'Español' },
+  { code: 'fr', name: 'Français' },
+  { code: 'pt', name: 'Português' },
+  { code: 'it', name: 'Italiano' },
+  { code: 'nl', name: 'Nederlands' },
+  { code: 'pl', name: 'Polski' },
+  { code: 'cs', name: 'Čeština' },
+  { code: 'sk', name: 'Slovenčina' },
+  { code: 'sl', name: 'Slovenščina' },
+  { code: 'hu', name: 'Magyar' },
+  { code: 'ro', name: 'Română' },
+  { code: 'bg', name: 'Български' },
+  { code: 'el', name: 'Ελληνικά' },
+  { code: 'tr', name: 'Türkçe' },
+  { code: 'uk', name: 'Українська' },
+  { code: 'ru', name: 'Русский' },
+  { code: 'sr', name: 'Srpski' },
+  { code: 'bs', name: 'Bosanski' },
+  { code: 'da', name: 'Dansk' },
+  { code: 'sv', name: 'Svenska' },
+  { code: 'no', name: 'Norsk' },
+  { code: 'fi', name: 'Suomi' },
+  { code: 'et', name: 'Eesti' },
+  { code: 'lv', name: 'Latviešu' },
+  { code: 'lt', name: 'Lietuvių' },
+  { code: 'ja', name: '日本語' },
+  { code: 'ko', name: '한국어' },
   { code: 'zh-CN', name: '简体中文' },
+  { code: 'ar', name: 'العربية' },
+  { code: 'hi', name: 'हिन्दी' },
+  { code: 'id', name: 'Bahasa Indonesia' },
+  { code: 'vi', name: 'Tiếng Việt' },
+  { code: 'th', name: 'ไทย' },
 ] as const
 
 export type SupportedLanguage = (typeof supportedLanguages)[number]['code']
 
-const resources = {
+const resources: Resource = {
   en: {
     common: common_en,
     chat: chat_en,
@@ -75,25 +110,33 @@ const resources = {
   },
 }
 
+// Untranslated namespaces intentionally fall back to English rather than showing
+// machine-generated or misleading text. Core UI overrides are bundled separately.
+for (const { code } of supportedLanguages) {
+  if (!resources[code]) resources[code] = localeOverrides[code] ?? {}
+}
+
+export const hasBundledTranslation = (code: string) =>
+  code === 'en' || code === 'zh-CN' || Boolean(localeOverrides[code])
+
 const languageDetector = {
   type: 'languageDetector' as const,
   async: true,
   detect: (callback: (lng: string) => void) => {
-    const savedLanguage = localStorage.getItem(LANGUAGE_KEY)
-    if (savedLanguage && supportedLanguages.some((l) => l.code === savedLanguage)) {
-      callback(savedLanguage)
-      return
+    try {
+      const saved = localStorage.getItem(LANGUAGE_KEY)
+      if (saved && supportedLanguages.some((item) => item.code === saved)) {
+        callback(saved)
+        return
+      }
+    } catch {
+      // Private mode may deny access to localStorage.
     }
-    const browserLanguage = navigator.language
-    if (browserLanguage.startsWith('zh')) {
-      callback('zh-CN')
-    } else {
-      callback('en')
-    }
+    callback('en')
   },
   init: () => {},
   cacheUserLanguage: (lng: string) => {
-    localStorage.setItem(LANGUAGE_KEY, lng)
+    try { localStorage.setItem(LANGUAGE_KEY, lng) } catch { /* best effort */ }
   },
 }
 
@@ -131,9 +174,9 @@ export default i18n
 
 export const changeLanguage = async (language: SupportedLanguage) => {
   await i18n.changeLanguage(language)
-  localStorage.setItem(LANGUAGE_KEY, language)
+  try { localStorage.setItem(LANGUAGE_KEY, language) } catch { /* best effort */ }
 }
 
 export const getCurrentLanguage = (): SupportedLanguage => {
-  return i18n.language as SupportedLanguage
+  return supportedLanguages.find((item) => item.code === i18n.language)?.code ?? 'en'
 }

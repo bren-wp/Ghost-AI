@@ -15,6 +15,11 @@ A portable Windows executable can require companion resources, model catalogs or
 ## CI checks and current limits
 
 - Every pull request compiles and opens a production Windows executable staged with its packaged resources. The smoke check fails if the process exits, no main window becomes visible, or the window disappears immediately.
+
+- Windows starts its Tauri window hidden and reveals the branded dark content after React replaces the static splash. A native watchdog restores visibility after a timeout if the frontend fails; neither mechanism alone proves the absence of flashes on a real graphics stack.
+- CI attempts real main-window and Settings screenshots at 820×580, 940×640, 1160×760 and 1440×900. The screenshot artifact includes `coverage-report.txt`, which distinguishes captured images from virtual desktop sizes and dialog interactions that were **not verified**. A reviewer must examine image content; changed pixels are not definitive proof of a correct Settings dialog.
+- Pixel-perfect claims additionally require comparison with the reference images and interactive checks across all Settings sections, model-selection dialogs, accessibility/scaling modes, and actual hardware. Unit tests and screenshot files alone are insufficient.
+
 - Windows release jobs check installed, portable and update packages, and save diagnostics even when a check fails.
 - Linux and macOS release jobs currently build their packages, but do **not** yet prove a visible application window or operation on a clean user device. Their build failures must block publication rather than silently omit an artifact.
 - A release requires all expected platform files and a regenerated SHA-256 list covering the actual uploaded packages.
@@ -31,7 +36,7 @@ A Tauri-compatible manifest needs per-platform versions, HTTPS download URLs and
 - All dependencies scanned and locked before release.
 - Tests and linting pass on each target architecture.
 - Strict permissions, no broad shell access by default.
-- EULA display in installer, required third-party notices bundled.
+- No separate EULA acceptance screen in the desktop app or installer. The EULA, commercial terms, privacy policy and required third-party notices remain bundled and available in Settings > About. Removal of click-through acceptance requires legal review before commercial distribution.
 - Installer and update paths checked for rollback and tamper resistance.
 - Windows signing certificate and macOS signing/notarization are needed for trusted production distribution.
 - Product and screenshot claims must be verified against the built binary.

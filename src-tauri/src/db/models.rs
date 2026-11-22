@@ -2,7 +2,6 @@
 use anyhow::Result;
 use chrono::Utc;
 use sqlx::Row;
-use uuid;
 
 use super::Database;
 use crate::models::{CreateModelRequest, Model};
@@ -226,10 +225,10 @@ impl Database {
     }
 
     pub async fn delete_model(&self, id: &str) -> Result<()> {
-        sqlx::query(&crate::db::soft_delete::tombstone_update(
+        sqlx::query(sqlx::AssertSqlSafe(crate::db::soft_delete::tombstone_update(
             "models",
             "id = ?2 AND deleted_at IS NULL",
-        ))
+        )))
         .bind(chrono::Utc::now().to_rfc3339())
         .bind(id)
         .execute(self.pool.as_ref())
