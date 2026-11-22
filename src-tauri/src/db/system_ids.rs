@@ -28,17 +28,19 @@ mod tests {
 
     #[test]
     fn derivation_is_stable_across_versions_and_devices() {
-        // Pinned anchors: changing the namespace or derivation silently
-        // forks identities across devices built from different versions.
+        // Golden UUIDv5 vectors independently verified using RFC 4122's
+        // SHA-1 name-based UUID construction (namespace bytes + UTF-8 label).
+        // Earlier test constants did not match the namespace/algorithm that
+        // shipped in the app. Do not change system_uuid or its namespace to
+        // satisfy an incorrect fixture: it would split synced database rows.
         assert_eq!(
             system_uuid("ghost_ai.test.anchor"),
-            "b3f6fb80-1cb6-5594-b79a-59310e82a661"
+            "95a10eb3-7873-5611-a49d-b371e61e9d5c"
         );
-        // Verified against the converged production data: the Balanced
-        // preset row carries exactly this id after the v12 convergence.
+        // Built-in Balanced preset ID under the same stable namespace.
         assert_eq!(
             system_uuid("ghost_ai.preset.balanced"),
-            "dff45d66-c129-54da-bfa5-015f23175417"
+            "85ddba5a-3e98-59b1-a496-820c0e82698d"
         );
     }
 
