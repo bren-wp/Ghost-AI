@@ -122,6 +122,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build production Windows binary
         run: pnpm tauri build --no-bundle
+      - name: Verify provider encryption and database rollback on Windows
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib providers::tests:: -- --nocapture
       - name: Stage packaged resources as in Portable.zip
         shell: pwsh
         run: |
