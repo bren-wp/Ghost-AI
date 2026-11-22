@@ -212,6 +212,9 @@ export function ProviderForm({
               variant="ghost"
               size="icon"
               className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+              aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+              aria-pressed={showApiKey}
+              disabled={selectedProvider.id === 'ollama'}
               onClick={() => onShowApiKeyChange(!showApiKey)}
             >
               {showApiKey ? (
