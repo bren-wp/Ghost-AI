@@ -47,7 +47,7 @@ thiserror = "1"
 
 # Cryptography
 aes-gcm = "0.10"
-rand = "0.10"
+rand = "0.8"
 base64 = "0.21"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 
@@ -66,7 +66,7 @@ shell-words = "1"
 nanoid = "0.4"
 
 # LLM framework (0.42 facade: rig-core portable contracts + rig-agent runtime)
-rig = "0.46"
+rig = "0.42"
 # MCP SDK, used directly (no rig `rmcp` bridge: our mcp_tool_use is a plain
 # rig tool). Default features pull in server-side dependencies.
 rmcp = { version = "3.11", default-features = false, features = ["client", "transport-streamable-http-client-reqwest", "transport-child-process"] }
