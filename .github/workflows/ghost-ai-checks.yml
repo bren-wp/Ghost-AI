@@ -100,18 +100,50 @@ jobs:
           name: Ghost-AI-PR-Windows-Startup
           path: smoke/diagnostics/
           if-no-files-found: warn
-      - name: Capture real running application for layout review
-        id: screenshot
+      - name: Capture real app and Settings at supported desktop sizes
+        id: screenshots
         shell: pwsh
         continue-on-error: true
         run: |
-          ./scripts/ghost-ai-capture-screenshot.ps1 -Executable 'smoke/Portable/Ghost-AI.exe' -Output 'smoke/screenshots/ghost-ai-first-run.png'
-      - name: Preserve real Windows screenshot
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force 'smoke/screenshots' | Out-Null
+          $coverage = @()
+          $captured = 0
+          foreach ($size in @(
+            @{ Width = 820; Height = 580 },
+            @{ Width = 940; Height = 640 },
+            @{ Width = 1160; Height = 760 },
+            @{ Width = 1440; Height = 900 }
+          )) {
+            $label = "$($size.Width)x$($size.Height)"
+            foreach ($surface in @('main', 'settings')) {
+              try {
+                $parameters = @{
+                  Executable = 'smoke/Portable/Ghost-AI.exe'
+                  Output = "smoke/screenshots/ghost-ai-$surface-$label.png"
+                  ViewportWidth = $size.Width
+                  ViewportHeight = $size.Height
+                }
+                if ($surface -eq 'settings') { $parameters.OpenSettings = $true }
+                ./scripts/ghost-ai-capture-screenshot.ps1 @parameters
+                $coverage += "CAPTURED $surface $label"
+                $captured++
+              } catch {
+                $coverage += "NOT VERIFIED $surface $label - $($_.Exception.Message)"
+              }
+            }
+          }
+          $coverage | Set-Content -Path 'smoke/screenshots/coverage-report.txt'
+          $coverage | ForEach-Object { Write-Host $_ }
+          if ($captured -lt 2) {
+            throw 'Unable to capture main and Settings surfaces on this CI desktop'
+          }
+      - name: Preserve screenshot evidence and skipped-viewport report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Ghost-AI-PR-Windows-Screenshot
-          path: smoke/screenshots/*.png
+          name: Ghost-AI-PR-Windows-Screenshots
+          path: smoke/screenshots/
           if-no-files-found: warn
       - name: Block merge when the application does not open
         if: steps.startup.outcome != 'success'
