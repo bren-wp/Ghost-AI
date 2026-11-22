@@ -31,7 +31,7 @@ A Tauri-compatible manifest needs per-platform versions, HTTPS download URLs and
 - All dependencies scanned and locked before release.
 - Tests and linting pass on each target architecture.
 - Strict permissions, no broad shell access by default.
-- EULA display in installer, required third-party notices bundled.
+- No separate EULA acceptance screen in the desktop app or installer. The EULA, commercial terms, privacy policy and required third-party notices remain bundled and available in Settings > About. Removal of click-through acceptance requires legal review before commercial distribution.
 - Installer and update paths checked for rollback and tamper resistance.
 - Windows signing certificate and macOS signing/notarization are needed for trusted production distribution.
 - Product and screenshot claims must be verified against the built binary.
