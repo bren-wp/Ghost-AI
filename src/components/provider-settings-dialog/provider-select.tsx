@@ -11,7 +11,7 @@ interface ProviderSelectProps {
   selectedProvider: LLMProvider
   editingCustomProviderId?: string | null
   storeProviders: Provider[]
-  onSelectProvider: (provider: LLMProvider) => void
+  onSelectProvider: (provider: LLMProvider, storedProviderId?: string) => void
   className?: string
 }
 
@@ -50,7 +50,7 @@ export function ProviderSelect({
               name: provider.name,
               baseUrl: provider.base_url || '',
               isCustom: true,
-            })
+            }, provider.id)
           }
           const builtin = BUILTIN_PROVIDERS.find((item) => item.id === value)
           if (builtin) onSelectProvider(builtin)
