@@ -19,7 +19,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "^2.7.6", features = [] }
 
 [dependencies]
-tauri = { version = "=2.12.5", features = ["protocol-asset"] }
+tauri = { version = "=2.12.7", features = ["protocol-asset"] }
 tauri-plugin-opener = "=2.7.3"
 tauri-plugin-updater = "=2.14.1"
 tauri-plugin-process = "=2.4.0"
@@ -47,7 +47,7 @@ thiserror = "1"
 
 # Cryptography
 aes-gcm = "0.10"
-rand = "0.8"
+rand = "0.10"
 base64 = "0.21"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 
@@ -66,7 +66,7 @@ shell-words = "1"
 nanoid = "0.4"
 
 # LLM framework (0.42 facade: rig-core portable contracts + rig-agent runtime)
-rig = "0.42"
+rig = "0.46"
 # MCP SDK, used directly (no rig `rmcp` bridge: our mcp_tool_use is a plain
 # rig tool). Default features pull in server-side dependencies.
 rmcp = { version = "3.11", default-features = false, features = ["client", "transport-streamable-http-client-reqwest", "transport-child-process"] }
@@ -75,7 +75,7 @@ rmcp = { version = "3.11", default-features = false, features = ["client", "tran
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "ansi", "json"] }
 once_cell = "1.20"
-parking_lot = "0.12"
+parking_lot = "0.13"
 
 # Clipboard (native image copy)
 arboard = { version = "3", features = ["image-data"] }
@@ -86,7 +86,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # PDF text extraction
 
 # Web scraping
-scraper = "0.18"
+scraper = "0.29"
 htmd = "0.5"
 url = "2"
 urlencoding = "2"
@@ -118,5 +118,5 @@ objc2-web-kit = { version = "0.3", default-features = false, features = ["std", 
 [dev-dependencies]
 tempfile = "3"
 zstd = "0.13"
-rusqlite = { version = "0.41.1", features = ["bundled"] }
-tauri = { version = "=2.12.5", features = ["test"] }
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+tauri = { version = "=2.12.7", features = ["test"] }

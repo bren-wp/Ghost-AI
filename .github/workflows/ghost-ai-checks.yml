@@ -25,7 +25,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - name: Install pinned RustSec audit CLI
         shell: bash
@@ -40,11 +40,11 @@ jobs:
     name: App quality and legal checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: '10'
       - name: Install
@@ -71,7 +71,7 @@ jobs:
           pnpm audit --audit-level low > reports/npm-security-audit.txt 2>&1
       - name: Publish dependency inventory and security findings
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Dependency-Audit
           path: |
@@ -88,7 +88,7 @@ jobs:
       - name: Review first-party code for maintainability and risk
         run: python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
       - name: Save Ghost AI source review
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Code-Review
           path: reports/ghost-ai-code-audit.md
@@ -109,11 +109,11 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: '10'
       - uses: dtolnay/rust-toolchain@stable
@@ -150,7 +150,7 @@ jobs:
           ./scripts/ghost-ai-startup-diagnostics.ps1 -Executable 'smoke/Portable/Ghost-AI.exe' -OutputDirectory 'smoke/diagnostics' -ObserveSeconds 30
       - name: Save startup evidence even after failure
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-PR-Windows-Startup
           path: smoke/diagnostics/
@@ -163,7 +163,7 @@ jobs:
           ./scripts/ghost-ai-first-paint.ps1 -Executable 'smoke/Portable/Ghost-AI.exe' -OutputDirectory 'smoke/first-paint' -ObserveSeconds 18 -SampleIntervalMs 85
       - name: Preserve first-paint frames and diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-PR-Windows-First-Paint
           path: smoke/first-paint/
@@ -208,7 +208,7 @@ jobs:
           }
       - name: Preserve screenshot evidence and skipped-viewport report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-PR-Windows-Screenshots
           path: smoke/screenshots/
