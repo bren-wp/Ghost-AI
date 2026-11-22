@@ -23,18 +23,26 @@ jobs:
       checks: write
     steps:
       - uses: actions/checkout@v4
-      - name: Check RustSec advisory database
-        id: audit
+      - name: Audit desktop Rust dependency graph
+        id: desktop_audit
         continue-on-error: true
         uses: rustsec/audit-check@v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: src-tauri
-      - name: Highlight Rust dependency vulnerabilities
-        if: steps.audit.outcome == 'failure'
+      - name: Audit shared AI agent Rust dependency graph
+        id: agent_audit
+        continue-on-error: true
+        uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: vendor/agent
+      - name: Reject any Rust dependency security advisory
+        if: steps.desktop_audit.outcome != 'success' || steps.agent_audit.outcome != 'success'
         shell: bash
         run: |
-          echo "::warning::RustSec found advisories or the audit could not complete. Review the Rust advisory log and update Cargo.lock before release."
+          echo "::error::RustSec did not pass for both Cargo.lock workspaces. Do not ship a release with vulnerabilities or an incomplete audit."
+          exit 1
   frontend:
     name: App quality and legal checks
     runs-on: ubuntu-24.04
@@ -67,7 +75,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p reports
-          pnpm audit --audit-level high > reports/npm-security-audit.txt 2>&1
+          pnpm audit --audit-level low > reports/npm-security-audit.txt 2>&1
       - name: Publish dependency inventory and security findings
         if: always()
         uses: actions/upload-artifact@v4
@@ -77,11 +85,13 @@ jobs:
             reports/npm-outdated.txt
             reports/npm-security-audit.txt
           if-no-files-found: warn
-      - name: Highlight unresolved security audits
-        if: steps.npm_audit.outcome == 'failure'
+      - name: Reject any unresolved npm security audit findings
+        if: steps.npm_audit.outcome != 'success'
         shell: bash
         run: |
-          echo "::warning::High-severity npm advisory detected or audit registry unavailable. Review Ghost-AI-Dependency-Audit artifact before release."
+          echo "::error::npm audit is not clean (low, moderate, high, or critical advisories). Review Ghost-AI-Dependency-Audit before release."
+          tail -n 60 reports/npm-security-audit.txt || true
+          exit 1
       - name: Review first-party code for maintainability and risk
         run: python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
       - name: Save Ghost AI source review
