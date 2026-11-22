@@ -201,13 +201,11 @@ export function ProviderSettingsDialog({
     setSelectedProvider(provider)
   }
 
-  const handleCustomProviderSelect = (provider: typeof selectedProvider) => {
-    const storeProvider = storeProviders.find(
-      (p) => p.provider_type === provider.id && p.name === provider.name
-    )
-    if (storeProvider) {
-      setEditingCustomProviderId(storeProvider.id)
-    }
+  const handleCustomProviderSelect = (provider: typeof selectedProvider, storedProviderId?: string) => {
+    const storeProvider = storedProviderId
+      ? storeProviders.find((p) => p.id === storedProviderId)
+      : storeProviders.find((p) => p.provider_type === provider.id && p.name === provider.name)
+    setEditingCustomProviderId(storeProvider?.id ?? null)
     setSelectedProvider(provider)
   }
 
@@ -235,7 +233,7 @@ export function ProviderSettingsDialog({
               selectedProvider={selectedProvider}
               editingCustomProviderId={editingCustomProviderId}
               storeProviders={storeProviders}
-              onSelectProvider={(provider) => provider.isCustom ? handleCustomProviderSelect(provider) : handleSidebarSelect(provider)}
+              onSelectProvider={(provider, storedId) => provider.isCustom ? handleCustomProviderSelect(provider, storedId) : handleSidebarSelect(provider)}
             />
             {!isDataLoaded ? (
               <div role="status" aria-live="polite" className="flex flex-1 items-center justify-center gap-3 text-sm text-muted-foreground">
