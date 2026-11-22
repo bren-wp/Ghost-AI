@@ -43,7 +43,7 @@ export const useModelStore = create<ModelState>()(
       } catch {
         logger.error('[modelStore] Failed to load models')
         set((draft) => {
-          draft.error = 'Unable to complete the model operation. Please retry.'
+          draft.error = 'Unable to load models. Please retry.'
           draft.isLoading = false
         })
       }
@@ -64,7 +64,7 @@ export const useModelStore = create<ModelState>()(
       } catch {
         logger.error('[modelStore] Failed to load providers')
         set((draft) => {
-          draft.error = 'Unable to complete the model operation. Please retry.'
+          draft.error = 'Unable to load AI providers. Please retry.'
           draft.isLoading = false
         })
       }
@@ -91,7 +91,7 @@ export const useModelStore = create<ModelState>()(
       } catch {
         logger.error('[modelStore] Failed to load models and providers')
         set((draft) => {
-          draft.error = 'Unable to complete the model operation. Please retry.'
+          draft.error = 'Unable to load AI providers or models. Please retry.'
           draft.isLoading = false
         })
       }
@@ -114,7 +114,7 @@ export const useModelStore = create<ModelState>()(
         return model
       } catch (error) {
         set((draft) => {
-          draft.error = 'Unable to complete the model operation. Please retry.'
+          draft.error = 'Unable to update model. Please retry.'
           draft.isLoading = false
         })
         throw error
@@ -137,7 +137,7 @@ export const useModelStore = create<ModelState>()(
         })
       } catch (error) {
         set((draft) => {
-          draft.error = 'Unable to complete the model operation. Please retry.'
+          draft.error = 'Unable to delete model. Please retry.'
           draft.isLoading = false
         })
         throw error
