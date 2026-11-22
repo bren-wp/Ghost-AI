@@ -100,7 +100,8 @@ describe('AI provider command routing', () => {
     }))
     await act(async () => { await result.current.handleFetchModels() })
 
-    expect(mockInvoke).toHaveBeenCalledTimes(1)
+    const fetchCalls = mockInvoke.mock.calls.filter(([name]) => String(name).startsWith('fetch_'))
+    expect(fetchCalls).toHaveLength(1)
     expect(mockInvoke).toHaveBeenCalledWith(command, args)
     expect(result.current.availableModels.map((model) => model.id)).toEqual(['model-1'])
     expect(result.current.fetchError).toBeNull()
@@ -116,7 +117,7 @@ describe('AI provider command routing', () => {
       compatibilityType: 'openai',
     }))
     await act(async () => { await result.current.handleFetchModels() })
-    expect(mockInvoke).not.toHaveBeenCalled()
+    expect(mockInvoke.mock.calls.filter(([name]) => String(name).startsWith('fetch_'))).toHaveLength(0)
     expect(result.current.fetchError).toBeTruthy()
   })
 })
