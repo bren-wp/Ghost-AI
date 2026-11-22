@@ -55,6 +55,7 @@ jobs:
           python3 -m py_compile scripts/ghost-ai-code-audit.py scripts/ghost-ai-dead-code-audit.py
           python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
           python3 scripts/ghost-ai-dead-code-audit.py --output reports/ghost-ai-dead-code-audit.md
+          python3 scripts/ghost-ai-localization-audit.py --output reports/ghost-ai-localization-audit.md
       - name: Reject vulnerable frontend dependencies before publishing
         run: pnpm audit --audit-level low
       - uses: dtolnay/rust-toolchain@stable
