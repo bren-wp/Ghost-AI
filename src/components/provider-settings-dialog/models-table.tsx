@@ -47,10 +47,10 @@ export function ModelsTable({
   const { t } = useTranslation('providers')
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+    <div className="min-w-0 space-y-3">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <Label>{t('models')}</Label>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={onOpenAddModelDialog}>
             <Plus className="size-4 mr-2" />
             {t('addModel')}
@@ -70,8 +70,8 @@ export function ModelsTable({
           </Button>
         </div>
       </div>
-      <div className="rounded-md border">
-        <Table className="table-fixed">
+      <div className="min-w-0 max-w-full overflow-x-auto rounded-md border">
+        <Table className="min-w-[340px] table-fixed">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[45%]">{t('modelId')}</TableHead>
