@@ -103,8 +103,15 @@ export function useProviderSave({
       const effectiveApiStyle = compatibilityType === 'openai' && isCustom ? apiStyle : undefined
 
       if (existingProvider) {
+        // A missing/decryption-inaccessible stored key hydrates as an empty
+        // field but MUST NOT be interpreted as a request to delete ciphertext.
+        // Only clearing a previously readable non-empty key sends '' to the
+        // backend; a new non-empty key is explicitly rotated.
+        const storedKey = existingProvider.api_key ?? ''
+        const apiKeyChanged = storedKey !== apiKey
+        const keyUpdate = apiKeyChanged ? apiKey : undefined
         const needsUpdate =
-          existingProvider.api_key !== apiKey ||
+          apiKeyChanged ||
           (existingProvider.base_url || '') !== normalizedBaseUrl ||
           existingProvider.name !== effectiveName ||
           existingProvider.provider_type !== effectiveProviderType ||
@@ -116,7 +123,7 @@ export function useProviderSave({
             req: {
               name: effectiveName,
               provider_type: effectiveProviderType,
-              api_key: apiKey,
+              api_key: keyUpdate,
               base_url: normalizedBaseUrl || undefined,
               api_style: effectiveApiStyle,
               is_enabled: existingProvider.is_enabled,
@@ -137,9 +144,9 @@ export function useProviderSave({
 
         const provider = await invoke<Provider>('create_provider', { req: providerReq })
         // Provider objects can contain credentials. Never write them to diagnostics.
-      logger.info('Created provider:', { id: provider.id, type: effectiveProviderType })
+        logger.info('Created provider:', { id: provider.id, type: effectiveProviderType })
         providerId = provider.id
-        onProviderCreated?.(providerId)
+        if (isCustom) onProviderCreated?.(providerId)
       }
 
       for (const modelId of modelsToDelete) {

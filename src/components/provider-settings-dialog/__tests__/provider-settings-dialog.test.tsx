@@ -205,7 +205,7 @@ describe.each(['dialog', 'settings'] as const)('Add Provider in %s', (entryPoint
   // Both entry points expose a native picker. Test the real interaction
   // instead of looking for buttons removed by the responsive redesign.
   function selectProvider(value: string) {
-    fireEvent.change(screen.getByRole('combobox', { name: 'AI provider' }), {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Select a provider' }), {
       target: { value },
     })
   }

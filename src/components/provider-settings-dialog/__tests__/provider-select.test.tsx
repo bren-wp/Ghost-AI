@@ -1,54 +1,65 @@
 // Ghost AI by Brendigo
-import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import i18n from '@/lib/i18n'
 import { ProviderSelect } from '../provider-select'
-import { BUILTIN_PROVIDERS } from '../constants'
 import type { Provider } from '@/types'
 
-const custom: Provider = {
-  id: 'custom-1',
-  name: 'Internal endpoint',
-  provider_type: 'custom_openai',
-  api_key: '',
-  base_url: 'http://127.0.0.1:5555/v1',
-  api_style: 'chat_completions',
+const NOW = '2026-01-01T00:00:00Z'
+const storedBuiltin: Provider = {
+  id: 'builtin-anthropic-row',
+  name: 'Anthropic',
+  provider_type: 'anthropic',
+  base_url: 'https://api.anthropic.com',
   is_enabled: true,
-  created_at: '2026-11-22T00:00:00Z',
-  updated_at: '2026-11-22T00:00:00Z',
+  created_at: NOW,
+  updated_at: NOW,
+}
+const storedCustom: Provider = {
+  ...storedBuiltin,
+  id: 'custom-row',
+  name: 'My inference server',
+  provider_type: 'custom_openai',
+  base_url: 'http://localhost:1234/v1',
 }
 
-describe('responsive provider picker', () => {
-  it('switches built-in providers without opening a second sidebar', () => {
-    const onSelectProvider = vi.fn()
+afterEach(async () => { await i18n.changeLanguage('en') })
+
+describe('provider selection navigation', () => {
+  it('keeps a built-in selected even if a saved row ID is present', () => {
     render(
       <ProviderSelect
-        selectedProvider={BUILTIN_PROVIDERS[0]}
-        storeProviders={[]}
-        onSelectProvider={onSelectProvider}
-      />
+        selectedProvider={{ id: 'anthropic', name: 'Anthropic', baseUrl: 'https://api.anthropic.com' }}
+        editingCustomProviderId={storedBuiltin.id}
+        storeProviders={[storedBuiltin, storedCustom]}
+        onSelectProvider={vi.fn()}
+      />,
     )
-    fireEvent.change(screen.getByRole('combobox', { name: 'AI provider' }), {
-      target: { value: BUILTIN_PROVIDERS[1].id },
-    })
-    expect(onSelectProvider).toHaveBeenCalledWith(BUILTIN_PROVIDERS[1])
+    expect(screen.getByRole('combobox', { name: 'Select a provider' })).toHaveValue('anthropic')
   })
 
-  it('selects a saved custom provider with its endpoint', () => {
-    const onSelectProvider = vi.fn()
+  it('selects a stored custom provider by its real ID', () => {
     render(
       <ProviderSelect
-        selectedProvider={BUILTIN_PROVIDERS[0]}
-        storeProviders={[custom]}
-        onSelectProvider={onSelectProvider}
-      />
+        selectedProvider={{ id: 'custom_openai', name: 'My inference server', baseUrl: storedCustom.base_url!, isCustom: true }}
+        editingCustomProviderId={storedCustom.id}
+        storeProviders={[storedBuiltin, storedCustom]}
+        onSelectProvider={vi.fn()}
+      />,
     )
-    fireEvent.change(screen.getByRole('combobox', { name: 'AI provider' }), {
-      target: { value: 'custom:custom-1' },
-    })
-    expect(onSelectProvider).toHaveBeenCalledWith(expect.objectContaining({
-      name: custom.name,
-      baseUrl: custom.base_url,
-      isCustom: true,
-    }), custom.id)
+    expect(screen.getByRole('combobox', { name: 'Select a provider' })).toHaveValue('custom:custom-row')
+  })
+
+  it('uses the providers translation for the label and add action', async () => {
+    await i18n.changeLanguage('zh-CN')
+    render(
+      <ProviderSelect
+        selectedProvider={{ id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' }}
+        storeProviders={[]}
+        onSelectProvider={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('combobox', { name: '选择提供商' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: '+ 添加提供商' })).toBeInTheDocument()
   })
 })

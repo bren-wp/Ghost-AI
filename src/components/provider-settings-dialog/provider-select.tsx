@@ -2,6 +2,7 @@
 'use client'
 
 import { useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Provider } from '@/types'
 import type { LLMProvider } from './types'
 import { isCustomProviderType } from './types'
@@ -24,19 +25,25 @@ export function ProviderSelect({
   className = '',
 }: ProviderSelectProps) {
   const selectId = useId()
+  const { t } = useTranslation('providers')
   const customProviders = storeProviders.filter((item) => isCustomProviderType(item.provider_type))
-  const currentValue = editingCustomProviderId
-    ? `custom:${editingCustomProviderId}`
-    : selectedProvider.id === 'custom' ? 'new' : selectedProvider.id
+  // Only custom provider records have a custom: option. After saving a
+  // built-in provider, the editor can hold its database row ID as well.
+  // Never assign that ID to a missing select option (which visually reverts
+  // to OpenAI while the form still edits another provider).
+  const selectedCustom = customProviders.find((p) => p.id === editingCustomProviderId)
+  const currentValue = selectedCustom
+    ? `custom:${selectedCustom.id}`
+    : isCustomProviderType(selectedProvider.id) ? 'new' : selectedProvider.id
 
   return (
     <div className={`min-w-0 space-y-1 ${className}`}>
       <label htmlFor={selectId} className="block text-xs font-medium text-muted-foreground">
-        AI provider
+        {t('selectProvider')}
       </label>
       <select
         id={selectId}
-        aria-label="AI provider"
+        aria-label={t('selectProvider')}
         className="h-10 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         value={currentValue}
         onChange={(event) => {
@@ -62,7 +69,7 @@ export function ProviderSelect({
         {customProviders.map((provider) => (
           <option value={`custom:${provider.id}`} key={provider.id}>{provider.name}</option>
         ))}
-        <option value="new">+ Add custom provider</option>
+        <option value="new">+ {t('addProvider')}</option>
       </select>
     </div>
   )

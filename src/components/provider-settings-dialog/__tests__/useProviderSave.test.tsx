@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { logger } from '@/lib/logger'
 import i18n from '@/lib/i18n'
 import { useProviderSave } from '../useProviderSave'
-import type { ModelItem } from '../types'
+import type { LLMProvider, ModelItem } from '../types'
 import type { Provider } from '@/types'
 
 vi.mock('sonner', () => ({
@@ -45,6 +45,7 @@ function setup({
   providerName = 'Acme',
   apiKey = 'sk-test',
   apiBaseUrl = 'http://127.0.0.1:18080/llm/v1',
+  selected,
 }: {
   models: ModelItem[]
   modelsToDelete?: string[]
@@ -52,9 +53,11 @@ function setup({
   providerName?: string
   apiKey?: string
   apiBaseUrl?: string
+  selected?: LLMProvider
 }) {
   const onOpenChange = vi.fn()
   const onSavedWithoutModels = vi.fn()
+  const onProviderCreated = vi.fn()
   const { result } = renderHook(() =>
     useProviderSave({
       models,
@@ -67,20 +70,21 @@ function setup({
       providerName,
       apiStyle: 'chat_completions',
       compatibilityType: 'openai',
-      selectedProvider: existing
+      selectedProvider: selected ?? (existing
         ? {
             id: existing.provider_type,
             name: existing.name,
             baseUrl: existing.base_url ?? '',
             isCustom: true,
           }
-        : { id: 'custom', name: 'Custom', baseUrl: '', isCustom: true },
+        : { id: 'custom', name: 'Custom', baseUrl: '', isCustom: true }),
       loadExistingData: vi.fn(),
       onOpenChange,
+      onProviderCreated,
       onSavedWithoutModels,
     })
   )
-  return { result, onOpenChange, onSavedWithoutModels }
+  return { result, onOpenChange, onProviderCreated, onSavedWithoutModels }
 }
 
 beforeEach(() => {
@@ -142,6 +146,53 @@ describe('API key removal', () => {
       id: saved.id,
       req: expect.objectContaining({ api_key: '' }),
     }))
+  })
+})
+
+describe('API key preservation when the secure store is inaccessible', () => {
+  it('omits an unreadable API key while saving unrelated provider changes', async () => {
+    const saved = { ...existingProvider, api_key: undefined, name: 'Old name' }
+    vi.mocked(invoke).mockResolvedValue(saved)
+    const { result } = setup({ models: [], existing: saved, apiKey: '', providerName: 'New name' })
+    await act(async () => { await result.current.handleSave() })
+    expect(invoke).toHaveBeenCalledWith('update_provider', {
+      id: saved.id,
+      req: expect.objectContaining({ name: 'New name', api_key: undefined }),
+    })
+  })
+
+  it('does not write a blank key when only a model is added', async () => {
+    const unreadable = { ...existingProvider, api_key: null }
+    vi.mocked(invoke).mockResolvedValue(unreadable)
+    const { result } = setup({ models: [newModel('new-model')], existing: unreadable, apiKey: '' })
+    await act(async () => { await result.current.handleSave() })
+    expect(invoke).not.toHaveBeenCalledWith('update_provider', expect.anything())
+    expect(invoke).toHaveBeenCalledWith('create_model', {
+      req: expect.objectContaining({ model_id: 'new-model' }),
+    })
+  })
+
+  it('rotates an unreadable key only when a new non-empty key is provided', async () => {
+    const unreadable = { ...existingProvider, api_key: null }
+    vi.mocked(invoke).mockResolvedValue(unreadable)
+    const { result } = setup({ models: [], existing: unreadable, apiKey: 'sk-replacement' })
+    await act(async () => { await result.current.handleSave() })
+    expect(invoke).toHaveBeenCalledWith('update_provider', {
+      id: unreadable.id,
+      req: expect.objectContaining({ api_key: 'sk-replacement' }),
+    })
+  })
+
+  it('does not assign a custom editor ID after creating a built-in provider', async () => {
+    vi.mocked(invoke).mockResolvedValue({ ...existingProvider, id: 'saved-openai', provider_type: 'openai' })
+    const { result, onProviderCreated } = setup({
+      models: [],
+      existing: null,
+      selected: { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
+    })
+    await act(async () => { await result.current.handleSave() })
+    expect(invoke).toHaveBeenCalledWith('create_provider', expect.anything())
+    expect(onProviderCreated).not.toHaveBeenCalled()
   })
 })
 
