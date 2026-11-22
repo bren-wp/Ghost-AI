@@ -346,6 +346,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_provider_does_not_insert_row_when_encryption_fails() {
+        let _keys = crate::crypto::keys_test_guard();
+        crate::crypto::set_keys_for_tests([0x5a; 32], None);
+        let (db, _dir) = test_db().await;
+
+        crate::crypto::clear_current_key_for_tests();
+        let outcome = db
+            .create_provider(CreateProviderRequest {
+                api_key: Some("sk-would-be-lost".to_string()),
+                ..custom_req("Failed Encryption")
+            })
+            .await;
+        crate::crypto::set_keys_for_tests([0x5a; 32], None);
+
+        assert!(outcome.is_err(), "must refuse to create an unusable provider");
+        assert!(db.list_providers().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn failed_key_rotation_preserves_the_previous_encrypted_key() {
+        let _keys = crate::crypto::keys_test_guard();
+        crate::crypto::set_keys_for_tests([0x5a; 32], None);
+        let (db, _dir) = test_db().await;
+        let original = db
+            .create_provider(CreateProviderRequest {
+                api_key: Some("sk-existing-secret".to_string()),
+                ..custom_req("Secure Provider")
+            })
+            .await
+            .unwrap();
+
+        crate::crypto::clear_current_key_for_tests();
+        let outcome = db
+            .update_provider(
+                &original.id,
+                CreateProviderRequest {
+                    api_key: Some("sk-new-secret".to_string()),
+                    ..custom_req("Renamed Provider")
+                },
+            )
+            .await;
+        crate::crypto::set_keys_for_tests([0x5a; 32], None);
+
+        assert!(outcome.is_err(), "key rotation must fail closed");
+        let persisted = db.get_provider(&original.id).await.unwrap().unwrap();
+        assert_eq!(persisted.api_key.as_deref(), Some("sk-existing-secret"));
+        assert_eq!(persisted.name, "Secure Provider");
+    }
+
+    #[tokio::test]
     async fn create_provider_honors_disabled_flag() {
         let (db, _dir) = test_db().await;
         let mut req = custom_req("Disabled Co");

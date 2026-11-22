@@ -324,6 +324,13 @@ pub(crate) fn set_keys_for_tests(current: [u8; 32], previous: Option<[u8; 32]>) 
     let _ = KEYCHAIN_AVAILABLE.set(true);
 }
 
+/// Simulate a transient unavailable encryption key while the caller holds
+/// keys_test_guard. Used to prove provider updates cannot erase credentials.
+#[cfg(test)]
+pub(crate) fn clear_current_key_for_tests() {
+    *ENCRYPTION_KEY_CACHE.write() = None;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
