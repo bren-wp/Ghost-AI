@@ -2,6 +2,10 @@
 
 ## v0.1.3 — CI hardening and dependency consolidation (release candidate; not yet published)
 
+- Consolidates pending dependency upgrades, reverting incompatible rand/rig API bumps until full migration is available.
+- Hardens MCP OAuth server discovery against issuer mismatches and remote HTTP, and bounds untrusted WebView HTML delivery size/queue.
+- Adds full static frontend/Rust dead-code candidate reports and first-party security review coverage.
+- Distributes Windows Setup/Portable/Update, Linux DEB/AppImage and macOS DMG/portable app ZIP after passing required cross-platform tests.
 - Consolidates pending dependency upgrades into one auditable change set; compatibility must be confirmed by the final CI runs.
 - Restores frozen pnpm/Cargo lockfile consistency and retains audited package overrides.
 - Runs quality checks on merged `main`, executes all Windows Rust library tests and requires complete viewport screenshot evidence.

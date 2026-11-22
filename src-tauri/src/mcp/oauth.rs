@@ -27,8 +27,7 @@ pub struct ProtectedResourceMetadata {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct AuthorizationServerMetadata {
-    // Preserve RFC 8414 metadata for future issuer validation.
-    #[allow(dead_code)]
+    // RFC 8414 issuer identity is checked during discovery.
     pub issuer: String,
     pub authorization_endpoint: String,
     pub token_endpoint: String,
