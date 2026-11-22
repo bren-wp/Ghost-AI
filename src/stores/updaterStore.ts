@@ -61,7 +61,8 @@ export const useUpdaterStore = create<UpdaterStore>()(
     downloadedBytes: 0,
     totalBytes: 0,
     error: null,
-    autoCheckEnabled: true,
+    // Privacy-first default: no network call until the user opts in.
+    autoCheckEnabled: false,
     skippedVersion: null,
 
     loadPreferences: async () => {
@@ -73,8 +74,8 @@ export const useUpdaterStore = create<UpdaterStore>()(
           getVersion(),
         ])
         set((draft) => {
-          // Absent setting means default-on (documented in Settings > About).
-          draft.autoCheckEnabled = autoCheck !== 'false'
+          // Missing or unreadable consent never authorizes background network activity.
+          draft.autoCheckEnabled = autoCheck === 'true'
           draft.skippedVersion = skipped
           draft.currentVersion = version
         })
@@ -197,12 +198,13 @@ export const useUpdaterStore = create<UpdaterStore>()(
     },
 
     setAutoCheck: async (enabled: boolean) => {
-      set((draft) => {
-        draft.autoCheckEnabled = enabled
-      })
       const { saveSetting } = useSettingsStore.getState()
       try {
+        // Do not enable automatic outbound requests until consent is persisted.
         await saveSetting(AUTO_CHECK_KEY, enabled ? 'true' : 'false')
+        set((draft) => {
+          draft.autoCheckEnabled = enabled
+        })
       } catch (error) {
         logger.error('Failed to save auto-check preference:', error)
       }

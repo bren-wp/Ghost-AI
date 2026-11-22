@@ -87,7 +87,7 @@ describe('useUpdaterStore', () => {
       downloadedBytes: 0,
       totalBytes: 0,
       error: null,
-      autoCheckEnabled: true,
+      autoCheckEnabled: false,
       skippedVersion: null,
     })
   })
@@ -126,10 +126,10 @@ describe('useUpdaterStore', () => {
   })
 
   describe('loadPreferences', () => {
-    it('defaults auto-check to on when the setting is absent', async () => {
+    it('defaults auto-check to off when the setting is absent', async () => {
       await useUpdaterStore.getState().loadPreferences()
       const state = useUpdaterStore.getState()
-      expect(state.autoCheckEnabled).toBe(true)
+      expect(state.autoCheckEnabled).toBe(false)
       expect(state.currentVersion).toBe('0.8.3')
       expect(state.skippedVersion).toBeNull()
     })
@@ -145,13 +145,29 @@ describe('useUpdaterStore', () => {
   })
 
   describe('runStartupCheck', () => {
+    it('never makes automatic network requests without an explicit saved opt-in', async () => {
+      mockCheck.mockResolvedValue(null)
+      await useUpdaterStore.getState().runStartupCheck()
+      expect(mockCheck).not.toHaveBeenCalled()
+      expect(useUpdaterStore.getState().autoCheckEnabled).toBe(false)
+    })
+
+    it('manual update checks still work without opt-in', async () => {
+      mockCheck.mockResolvedValue(null)
+      await useUpdaterStore.getState().loadPreferences()
+      await useUpdaterStore.getState().checkForUpdates({ silent: false })
+      expect(mockCheck).toHaveBeenCalledTimes(1)
+      expect(useUpdaterStore.getState().autoCheckEnabled).toBe(false)
+    })
+
     it('skips the network check when auto-check is off', async () => {
       settingsBykey['updater.auto_check'] = 'false'
       await useUpdaterStore.getState().runStartupCheck()
       expect(mockCheck).not.toHaveBeenCalled()
     })
 
-    it('checks silently when auto-check is on', async () => {
+    it('checks silently after the user has explicitly opted in', async () => {
+      settingsBykey['updater.auto_check'] = 'true'
       mockCheck.mockResolvedValue(null)
       await useUpdaterStore.getState().runStartupCheck()
       expect(mockCheck).toHaveBeenCalledTimes(1)
@@ -225,8 +241,12 @@ describe('useUpdaterStore', () => {
 
   describe('setAutoCheck + skipCurrentVersion', () => {
     it('persists preferences through the settings table', async () => {
+      await useUpdaterStore.getState().setAutoCheck(true)
+      expect(settingsBykey['updater.auto_check']).toBe('true')
+      expect(useUpdaterStore.getState().autoCheckEnabled).toBe(true)
       await useUpdaterStore.getState().setAutoCheck(false)
       expect(settingsBykey['updater.auto_check']).toBe('false')
+      expect(useUpdaterStore.getState().autoCheckEnabled).toBe(false)
 
       useUpdaterStore.setState({ update: makeUpdate('0.9.0') })
       await useUpdaterStore.getState().skipCurrentVersion()
