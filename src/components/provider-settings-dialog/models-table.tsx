@@ -21,7 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { ModelItem, LLMProvider } from './types'
-import { isSupportedFetchProvider } from './constants'
+import { isSupportedFetchProvider, requiresApiKeyForFetch } from './constants'
 
 interface ModelsTableProps {
   models: ModelItem[]
@@ -62,7 +62,7 @@ export function ModelsTable({
             onClick={onOpenFetchModal}
             disabled={
               !isSupportedFetchProvider(selectedProvider.id) ||
-              (selectedProvider.id !== 'ollama' && !apiKey)
+              (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())
             }
           >
             <ListChecks className="size-4 mr-2" />
