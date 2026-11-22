@@ -7,6 +7,7 @@ import type { CreateProviderRequest, CreateModelRequest, Provider } from '@/type
 import type { LLMProvider, ModelItem } from './types'
 import { isCustomProvider } from './types'
 import { logger } from '@/lib/logger'
+import { isValidProviderEndpoint } from './provider-endpoint'
 
 export interface UseProviderSaveReturn {
   isSaving: boolean
@@ -72,6 +73,10 @@ export function useProviderSave({
     const isCustom = isCustomProvider(selectedProvider)
     if (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) {
       toast.error(t('providers:requiredField'))
+      return
+    }
+    if (apiBaseUrl.trim() && !isValidProviderEndpoint(apiBaseUrl)) {
+      toast.error(t('providers:invalidBaseUrl'))
       return
     }
     saveInFlightRef.current = true
