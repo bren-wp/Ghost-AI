@@ -125,7 +125,7 @@ export function ProviderForm({
   }, [selectedProvider, isCustom, compatibilityType, apiKey, apiBaseUrl, apiStyle, models])
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       {isCustom && (
         <>
           <div className="space-y-2">
@@ -144,7 +144,7 @@ export function ProviderForm({
             <RadioGroup
               value={compatibilityType}
               onValueChange={onCompatibilityTypeChange}
-              className="flex gap-4"
+              className="flex flex-wrap gap-x-4 gap-y-2"
             >
               <div className="flex items-center gap-2">
                 <RadioGroupItem value="openai" id="compat-openai" />
@@ -164,7 +164,7 @@ export function ProviderForm({
           {compatibilityType === 'openai' && (
             <div className="space-y-2">
               <Label>{t('apiStyle')}</Label>
-              <RadioGroup value={apiStyle} onValueChange={onApiStyleChange} className="flex gap-4">
+              <RadioGroup value={apiStyle} onValueChange={onApiStyleChange} className="flex flex-wrap gap-x-4 gap-y-2">
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="chat_completions" id="api-style-cc" />
                   <Label htmlFor="api-style-cc" className="font-normal cursor-pointer">
@@ -186,8 +186,8 @@ export function ProviderForm({
 
       <div className="space-y-2">
         <Label htmlFor="api-key">{t('apiKey')}</Label>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <div className="relative min-w-[min(100%,220px)] flex-1">
             <Input
               id="api-key"
               type={showApiKey ? 'text' : 'password'}
@@ -221,7 +221,7 @@ export function ProviderForm({
                   : 'outline'
             }
             size="sm"
-            className="h-9 shrink-0"
+            className="h-9 max-w-full shrink-0"
             onClick={handleCheckApi}
             disabled={checkStatus === 'checking' || (!apiKey && selectedProvider.id !== 'ollama')}
           >
