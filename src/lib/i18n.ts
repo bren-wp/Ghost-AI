@@ -1,5 +1,5 @@
 // Ghost AI by Brendigo
-import i18n from 'i18next'
+import i18n, { type Resource } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { localeOverrides } from './ghost-ai-locale-overrides'
 
@@ -75,7 +75,7 @@ export const supportedLanguages = [
 
 export type SupportedLanguage = (typeof supportedLanguages)[number]['code']
 
-const resources: Record<string, Record<string, Record<string, unknown>>> = {
+const resources: Resource = {
   en: {
     common: common_en,
     chat: chat_en,
