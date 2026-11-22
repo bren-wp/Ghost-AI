@@ -193,7 +193,7 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
           <Button
             onClick={handleSave}
             disabled={
-              isSaving || !hasChanges || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim()) ||
+              isSaving || !hasChanges || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim() && !existingProvider) ||
               (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) ||
               (apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl))
             }
