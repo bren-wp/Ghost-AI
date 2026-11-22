@@ -155,6 +155,8 @@ export function useProviderSettings(
     existingProvider: providerData.existingProvider,
     storeProviders: providerData.storeProviders,
     isDataLoaded: providerData.isDataLoaded,
+    loadError: providerData.loadError,
+    retryLoad: providerData.loadExistingData,
 
     // Fetch models
     fetchModalOpen: fetchModels.fetchModalOpen,
