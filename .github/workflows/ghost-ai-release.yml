@@ -48,6 +48,16 @@ jobs:
         run: pnpm test
       - name: Manifest security tests
         run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Reject vulnerable frontend dependencies before publishing
+        run: pnpm audit --audit-level low
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned RustSec audit CLI
+        run: cargo install cargo-audit --locked --version 0.23.0
+      - name: Reject vulnerable Rust dependencies before publishing
+        shell: bash
+        run: |
+          cargo audit --file src-tauri/Cargo.lock
+          cargo audit --file vendor/agent/Cargo.lock
 
   windows:
     name: Windows setup, portable, update
@@ -74,6 +84,8 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
+      - name: Execute full Windows Rust library regression suite
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
       - name: Configure trusted updater
         run: python scripts/configure_updater.py
       - name: Prepare Ghost AI installation artwork
