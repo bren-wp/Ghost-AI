@@ -48,6 +48,13 @@ jobs:
         run: pnpm test
       - name: Manifest security tests
         run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Audit source boundaries and potential dead modules before release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/ghost-ai-code-audit.py scripts/ghost-ai-dead-code-audit.py
+          python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
+          python3 scripts/ghost-ai-dead-code-audit.py --output reports/ghost-ai-dead-code-audit.md
       - name: Reject vulnerable frontend dependencies before publishing
         run: pnpm audit --audit-level low
       - uses: dtolnay/rust-toolchain@stable
@@ -240,6 +247,8 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
+      - name: Test all Rust library paths on Linux
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
       - run: python3 scripts/configure_updater.py
       - name: Build Linux
         run: pnpm tauri build --bundles appimage,deb
@@ -278,6 +287,8 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
+      - name: Test all Rust library paths on macOS
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
       - run: python3 scripts/configure_updater.py
       - name: Build macOS
         run: pnpm tauri build --bundles app,dmg
