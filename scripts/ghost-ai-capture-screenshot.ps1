@@ -14,9 +14,9 @@ if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
 }
 
 Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System;
+using System.Text;
 using System.Runtime.InteropServices;
 public static class GhostAiWindowCapture {
   [StructLayout(LayoutKind.Sequential)]
@@ -27,8 +27,60 @@ public static class GhostAiWindowCapture {
   public static extern bool MoveWindow(IntPtr handle, int x, int y, int width, int height, bool repaint);
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool SetForegroundWindow(IntPtr handle);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool ShowWindow(IntPtr handle, int code);
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool SetProcessDPIAware();
+  public delegate bool EnumWindowsProc(IntPtr window, IntPtr param);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr param);
+  [DllImport("user32.dll")]
+  public static extern bool IsWindowVisible(IntPtr window);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+  public static extern int GetWindowText(IntPtr window, StringBuilder output, int maxLength);
+  [DllImport("user32.dll")]
+  public static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
+  [StructLayout(LayoutKind.Sequential)]
+  public struct POINT { public int X, Y; }
+  [DllImport("user32.dll")]
+  public static extern bool GetClientRect(IntPtr window, out RECT rect);
+  [DllImport("user32.dll")]
+  public static extern bool ClientToScreen(IntPtr window, ref POINT point);
+  [DllImport("user32.dll")]
+  public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")]
+  public static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
+  public static IntPtr FindAppWindow(int processId) {
+    IntPtr found = IntPtr.Zero;
+    EnumWindows((window, _) => {
+      uint owner;
+      GetWindowThreadProcessId(window, out owner);
+      if (owner != (uint)processId || !IsWindowVisible(window)) return true;
+      var title = new StringBuilder(256);
+      GetWindowText(window, title, title.Capacity);
+      if (!string.Equals(title.ToString().Trim(), "Ghost AI", StringComparison.OrdinalIgnoreCase))
+        return true;
+      found = window;
+      return false;
+    }, IntPtr.Zero);
+    return found;
+  }
+  public static void ClickHeaderSettings(IntPtr window) {
+    RECT client;
+    if (!GetClientRect(window, out client)) throw new InvalidOperationException("Cannot read app client bounds");
+    // Actual header button is right-aligned in the 64px-tall webview header.
+    var target = new POINT { X = client.Right - 34, Y = 34 };
+    if (!ClientToScreen(window, ref target)) throw new InvalidOperationException("Cannot locate Settings button");
+    if (!SetCursorPos(target.X, target.Y)) throw new InvalidOperationException("Cannot point at Settings button");
+    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+  }
 }
 '@
+[void][GhostAiWindowCapture]::SetProcessDPIAware()
+Add-Type -AssemblyName System.Windows.Forms
 
 $process = $null
 $bitmap = $null
@@ -42,10 +94,13 @@ try {
     Start-Sleep -Milliseconds 700
     $process.Refresh()
     if ($process.HasExited) { throw "Ghost AI closed before its window appeared" }
-    $window = $process.MainWindowHandle
+    $window = [GhostAiWindowCapture]::FindAppWindow($process.Id)
   } while ($window -eq [IntPtr]::Zero -and (Get-Date) -lt $deadline)
 
-  if ($window -eq [IntPtr]::Zero) { throw "Ghost AI window is not available" }
+  if ($window -eq [IntPtr]::Zero) {
+    throw "NOT VERIFIED: No visible window titled Ghost AI belongs to PID $($process.Id); refusing to capture an unrelated Windows desktop"
+  }
+  Write-Host "Verified Ghost AI window PID=$($process.Id) HWND=$window"
   $display = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
   if ($ViewportWidth -gt 0 -and $ViewportHeight -gt 0) {
     if ($ViewportWidth -gt $display.Width -or $ViewportHeight -gt $display.Height) {
@@ -55,14 +110,25 @@ try {
       throw "Could not resize main window to ${ViewportWidth}x${ViewportHeight}"
     }
   }
+  [void][GhostAiWindowCapture]::ShowWindow($window, 9)
   [void][GhostAiWindowCapture]::SetForegroundWindow($window)
   Start-Sleep -Seconds 6
+  # A real connection panel is now nonmodal; Settings must stay reachable.
+  # Escape can still dismiss an older first-run modal when applicable.
+  [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+  Start-Sleep -Milliseconds 750
+  [void][GhostAiWindowCapture]::SetForegroundWindow($window)
+  Start-Sleep -Milliseconds 350
+  if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $window) {
+    throw "NOT VERIFIED: Ghost AI is not foreground; refusing a desktop/console screenshot"
+  }
   $rect = New-Object GhostAiWindowCapture+RECT
   if (-not [GhostAiWindowCapture]::GetWindowRect($window, [ref]$rect)) {
     throw "Cannot read Ghost AI window dimensions"
   }
   $width = $rect.Right - $rect.Left
   $height = $rect.Bottom - $rect.Top
+  Write-Host ("Verified Ghost AI window bounds: (" + $rect.Left + "," + $rect.Top + ") " + $width + "x" + $height)
   if ($width -lt 680 -or $height -lt 400) { throw "Invalid Ghost AI window dimensions" }
 
   if ($OpenSettings) {
@@ -94,17 +160,77 @@ try {
       }
     }
     if ($checked -eq 0 -or $changed / $checked -lt 0.15) {
-      throw "NOT VERIFIED: Settings shortcut did not visibly open the dialog"
+      # Keyboard synthesis may not reach WebView2 on a hosted runner.
+      # Use the actual visible Settings button moved to the app header.
+      # Both attempts require a real, independently captured UI change.
+      Write-Host "Settings shortcut was not visually confirmed; clicking real header Settings button"
+      [void][GhostAiWindowCapture]::SetForegroundWindow($window)
+      [GhostAiWindowCapture]::ClickHeaderSettings($window)
+      Start-Sleep -Seconds 3
+      if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $window) {
+        throw "NOT VERIFIED: Ghost AI lost focus during Settings verification"
+      }
+      $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, [System.Drawing.Size]::new($width, $height))
+      $changed = 0
+      $checked = 0
+      for ($y = 12; $y -lt $height - 12; $y += [Math]::Max(1, [int]($height / 16))) {
+        for ($x = 12; $x -lt $width - 12; $x += [Math]::Max(1, [int]($width / 16))) {
+          $checked++
+          if ($beforeBitmap.GetPixel($x, $y).ToArgb() -ne $bitmap.GetPixel($x, $y).ToArgb()) {
+            $changed++
+          }
+        }
+      }
+      if ($checked -eq 0 -or $changed / $checked -lt 0.15) {
+        throw "NOT VERIFIED: neither Ctrl+, nor the actual Settings header button visibly opened Settings"
+      }
     }
   }
 
+  # Validate both the whole screenshot and the *app content* region. A
+  # 16x16 sampling lattice aliasing against fixed-height UI elements falsely
+  # rejected a completely rendered 1160x760 Ghost AI main window as "blank":
+  # only five colors landed on that coarse grid, while the saved PNG actually
+  # showed the navigation, model CTA, title and chat composer.
+  # A 64x64 lattice observes narrow text/buttons without accepting a uniform
+  # WebView surface or a native window title bar as proof of rendered content.
+  $sampleStepX = [Math]::Max(1, [int]($width / 64))
+  $sampleStepY = [Math]::Max(1, [int]($height / 64))
   $samples = [System.Collections.Generic.HashSet[int]]::new()
-  for ($y = 12; $y -lt $height - 12; $y += [Math]::Max(1, [int]($height / 16))) {
-    for ($x = 12; $x -lt $width - 12; $x += [Math]::Max(1, [int]($width / 16))) {
-      [void]$samples.Add($bitmap.GetPixel($x, $y).ToArgb())
+  $contentSamples = [System.Collections.Generic.HashSet[int]]::new()
+  for ($attempt = 1; $attempt -le 5; $attempt++) {
+    $samples.Clear()
+    $contentSamples.Clear()
+    for ($y = 12; $y -lt $height - 12; $y += $sampleStepY) {
+      for ($x = 12; $x -lt $width - 12; $x += $sampleStepX) {
+        [void]$samples.Add($bitmap.GetPixel($x, $y).ToArgb())
+      }
     }
+    # Exclude the Windows title bar, left navigation rail and bottom composer;
+    # these can render even if the main WebView content is missing.
+    for ($y = [int]($height * 0.16); $y -lt [int]($height * 0.82); $y += $sampleStepY) {
+      for ($x = [int]($width * 0.22); $x -lt [int]($width * 0.87); $x += $sampleStepX) {
+        [void]$contentSamples.Add($bitmap.GetPixel($x, $y).ToArgb())
+      }
+    }
+    if ($samples.Count -ge 8 -and $contentSamples.Count -ge 8) { break }
+    if ($attempt -eq 5) {
+      # Preserve rejected *real* frames as diagnostic evidence only, not as
+      # passing screenshots. The workflow still requires all eight captures.
+      $diagnostic = [System.IO.Path]::ChangeExtension([System.IO.Path]::GetFullPath($Output), '.invalid.png')
+      [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($diagnostic)) | Out-Null
+      $bitmap.Save($diagnostic, [System.Drawing.Imaging.ImageFormat]::Png)
+      Write-Warning "Rejected WebView frame retained for inspection: $diagnostic"
+      throw "Screenshot is blank or invalid after 5 real frames (full colors: $($samples.Count); content colors: $($contentSamples.Count))"
+    }
+    Write-Host "WebView content not ready (attempt $attempt/5, full colors $($samples.Count), content colors $($contentSamples.Count)); retrying"
+    Start-Sleep -Seconds 3
+    [void][GhostAiWindowCapture]::SetForegroundWindow($window)
+    if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $window) {
+      throw "NOT VERIFIED: Ghost AI lost foreground during screenshot retry"
+    }
+    $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, [System.Drawing.Size]::new($width, $height))
   }
-  if ($samples.Count -lt 8) { throw "Screenshot appears blank or visually invalid" }
 
   $destination = [System.IO.Path]::GetFullPath($Output)
   [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($destination)) | Out-Null

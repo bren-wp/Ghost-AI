@@ -350,7 +350,7 @@ mod tests {
     async fn test_run_fetch_returns_stdout_html() {
         let dir = std::env::temp_dir().join("ghost_ai-obscura-test-stub");
         std::fs::create_dir_all(&dir).unwrap();
-        let stub = dir.join("obscura-stub");
+        let stub = dir.join(if cfg!(windows) { "obscura-stub.cmd" } else { "obscura-stub" });
         #[cfg(unix)]
         {
             std::fs::write(
@@ -361,8 +361,8 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
-        #[cfg(not(unix))]
-        std::fs::write(&stub, "@echo <html>stub</html>").unwrap();
+        #[cfg(windows)]
+        std::fs::write(&stub, "@echo off\r\necho ^<html^>stub^</html^>\r\n").unwrap();
 
         let html = run_fetch(&stub, "https://example.com", Duration::from_secs(10))
             .await
@@ -374,15 +374,15 @@ mod tests {
     async fn test_run_fetch_times_out() {
         let dir = std::env::temp_dir().join("ghost_ai-obscura-test-stub");
         std::fs::create_dir_all(&dir).unwrap();
-        let stub = dir.join("obscura-sleep-stub");
+        let stub = dir.join(if cfg!(windows) { "obscura-sleep-stub.cmd" } else { "obscura-sleep-stub" });
         #[cfg(unix)]
         {
             std::fs::write(&stub, "#!/bin/sh\nsleep 30\n").unwrap();
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
-        #[cfg(not(unix))]
-        std::fs::write(&stub, "@ping -n 30 127.0.0.1 > nul").unwrap();
+        #[cfg(windows)]
+        std::fs::write(&stub, "@echo off\r\nping -n 30 127.0.0.1 > nul\r\n").unwrap();
 
         let start = std::time::Instant::now();
         let result = run_fetch(&stub, "https://example.com", Duration::from_secs(5)).await;

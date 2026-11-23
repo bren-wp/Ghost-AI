@@ -8,14 +8,18 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_ROOTS = ("src", "src-tauri/src", "scripts")
-SOURCE_EXTENSIONS = {".ts", ".tsx", ".js", ".jsx", ".rs", ".py", ".ps1"}
+SOURCE_ROOTS = ("src", "src-tauri/src", "vendor/agent/crates", "scripts", ".github/workflows")
+SOURCE_EXTENSIONS = {".ts", ".tsx", ".js", ".jsx", ".rs", ".py", ".ps1", ".sh", ".nsi", ".yml", ".yaml"}
 SKIPPED = {"__tests__", "node_modules", "vendor", "target", "dist", "generated", "assets"}
 SIGNALS = {
     "dynamic code execution": re.compile(r"\beval\s*\(|\bnew\s+Function\s*\(", re.I),
     "HTML injection boundary": re.compile(r"dangerouslySetInnerHTML|\.innerHTML\s*=", re.I),
     "shell execution boundary": re.compile(r"\bshell\s*:\s*true\b|Command::new\(\s*\"(?:sh|bash|cmd|powershell)\"", re.I),
     "non-HTTPS endpoint": re.compile(r"http://(?!localhost\b|127\.0\.0\.1\b|asset\.localhost\b|ipc\.localhost\b)", re.I),
+    "permissive CORS header boundary": re.compile(r"Access-Control-Allow-Origin.{0,16}\*", re.I),
+    "potential TLS validation bypass": re.compile(r"danger_accept_invalid_certs|accept_invalid_certs|danger_disable_certificate_validation|verify\s*[:=]\s*false", re.I),
+    "Rust unsafe boundary": re.compile(r"\bunsafe\s*(?:\{|impl\b|fn\b|trait\b)", re.I),
+    "embedded credential candidate": re.compile(r"""(?:api[_-]?key|client[_-]?secret|access[_-]?token|private[_-]?key)\s*[:=]\s*["'][a-zA-Z0-9_-]{24,}["']""", re.I),
 }
 
 
@@ -83,9 +87,7 @@ def main() -> None:
     else:
         markdown.append("All scanned files include the first-party header.")
     markdown.extend(["", "## Review candidates", "", "| Signal | Source | Line |", "| --- | --- | ---: |"])
-    markdown.extend(f"| {kind} | `{name}` | {line} |" for kind, name, line in signals[:160])
-    if len(signals) > 160:
-        markdown.append(f"\nAdditional items not displayed: {len(signals)-160}")
+    markdown.extend(f"| {kind} | `{name}` | {line} |" for kind, name, line in signals)
     markdown.extend(["", "## What is not certified", "",
         "This report does not certify vulnerability absence, dependency safety, UI pixel "
         "matching, full dead-code coverage, or release signing.", ""])

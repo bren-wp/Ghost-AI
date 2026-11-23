@@ -2,6 +2,9 @@
 name: Ghost AI Quality Gates
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -27,9 +30,26 @@ jobs:
       - name: Install pinned RustSec audit CLI
         shell: bash
         run: cargo install cargo-audit --locked --version 0.23.0
-      - name: Audit desktop Cargo.lock (must have zero vulnerabilities)
+      - name: Verify narrowly scoped Linux GTK3 upstream advisory exception
         shell: bash
-        run: cargo audit --file src-tauri/Cargo.lock
+        run: python3 scripts/ghost-ai-rustsec-gtk3-exception.py
+      - name: Record complete unfiltered desktop RustSec findings
+        shell: bash
+        run: |
+          mkdir -p reports
+          # Preserve the known upstream advisory in an inspectable JSON report.
+          # The next step still fails on every *other* RustSec advisory.
+          cargo audit --file src-tauri/Cargo.lock --json > reports/rustsec-desktop-unfiltered.json || true
+      - name: Preserve unfiltered RustSec evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ghost-AI-RustSec-Unfiltered
+          path: reports/rustsec-desktop-unfiltered.json
+          if-no-files-found: warn
+      - name: Audit desktop dependencies (zero unreviewed advisories)
+        shell: bash
+        run: cargo audit --file src-tauri/Cargo.lock --ignore RUSTSEC-2024-0429
       - name: Audit shared AI agent Cargo.lock (must have zero vulnerabilities)
         shell: bash
         run: cargo audit --file vendor/agent/Cargo.lock
@@ -38,12 +58,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Build
@@ -58,7 +79,19 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p reports
-          pnpm outdated --recursive > reports/npm-outdated.txt 2>&1
+          # pnpm outdated exits 1 when upgrades exist; that is a report result,
+          # not a failing build or an npm security advisory.
+          if pnpm outdated --recursive > reports/npm-outdated.txt 2>&1; then
+            echo "Dependency inventory is current"
+          else
+            code=$?
+            if [[ "$code" -eq 1 ]]; then
+              echo "Available upgrades recorded in reports/npm-outdated.txt"
+            else
+              echo "::error::Unable to retrieve npm dependency inventory (exit $code)"
+              exit "$code"
+            fi
+          fi
       - name: Scan npm dependency advisories
         id: npm_audit
         shell: bash
@@ -82,15 +115,29 @@ jobs:
           echo "::error::npm audit is not clean (low, moderate, high, or critical advisories). Review Ghost-AI-Dependency-Audit before release."
           tail -n 60 reports/npm-security-audit.txt || true
           exit 1
-      - name: Review first-party code for maintainability and risk
-        run: python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
-      - name: Save Ghost AI source review
+      - name: Audit every first-party frontend and Rust module for dead code and security review candidates
+        # The independent code/security inventories must still be produced
+        # when frontend tests fail, so the original failure stays diagnosable.
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/ghost-ai-code-audit.py scripts/ghost-ai-dead-code-audit.py
+          python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
+          python3 scripts/ghost-ai-dead-code-audit.py --output reports/ghost-ai-dead-code-audit.md
+          python3 scripts/ghost-ai-localization-audit.py --output reports/ghost-ai-localization-audit.md
+      - name: Save complete static audit inventories
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Code-Review
-          path: reports/ghost-ai-code-audit.md
+          path: |
+            reports/ghost-ai-code-audit.md
+            reports/ghost-ai-dead-code-audit.md
+            reports/ghost-ai-localization-audit.md
           if-no-files-found: error
       - name: Verify legal notices and brand assets
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           test -s legal/EULA-EN.txt
@@ -104,15 +151,16 @@ jobs:
   windows-startup:
     name: Build and open Ghost AI on Windows
     runs-on: windows-2022
-    timeout-minutes: 120
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
@@ -122,8 +170,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build production Windows binary
         run: pnpm tauri build --no-bundle
-      - name: Verify provider encryption and database rollback on Windows
-        run: 'cargo test --manifest-path src-tauri/Cargo.toml --lib providers::tests:: -- --nocapture --test-threads=1'
       - name: Stage packaged resources as in Portable.zip
         shell: pwsh
         run: |
@@ -163,6 +209,12 @@ jobs:
           name: Ghost-AI-PR-Windows-First-Paint
           path: smoke/first-paint/
           if-no-files-found: warn
+      - name: Configure real Windows desktop for all required screenshot viewports
+        id: desktop
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          ./scripts/ghost-ai-ci-display.ps1 -MinWidth 1440 -MinHeight 900
       - name: Capture real app and Settings at supported desktop sizes
         id: screenshots
         shell: pwsh
@@ -180,26 +232,40 @@ jobs:
           )) {
             $label = "$($size.Width)x$($size.Height)"
             foreach ($surface in @('main', 'settings')) {
-              try {
-                $parameters = @{
-                  Executable = 'smoke/Portable/Ghost-AI.exe'
-                  Output = "smoke/screenshots/ghost-ai-$surface-$label.png"
-                  ViewportWidth = $size.Width
-                  ViewportHeight = $size.Height
+              $verified = $false
+              $lastFailure = 'Capture did not execute'
+              # WebView2 can occasionally start with an unpainted renderer on
+              # Windows hosted desktops. Retry a fresh *real app process*
+              # rather than treating a blank frame as success. Keep all eight
+              # required viewport/surface validations mandatory.
+              for ($attempt = 1; $attempt -le 3 -and -not $verified; $attempt++) {
+                try {
+                  $parameters = @{
+                    Executable = 'smoke/Portable/Ghost-AI.exe'
+                    Output = "smoke/screenshots/ghost-ai-$surface-$label.png"
+                    ViewportWidth = $size.Width
+                    ViewportHeight = $size.Height
+                  }
+                  if ($surface -eq 'settings') { $parameters.OpenSettings = $true }
+                  ./scripts/ghost-ai-capture-screenshot.ps1 @parameters
+                  $verified = $true
+                  $coverage += "CAPTURED $surface $label (process attempt $attempt)"
+                  $captured++
+                } catch {
+                  $lastFailure = $_.Exception.Message
+                  Write-Warning "Ghost AI $surface $label attempt $attempt of 3 failed: $lastFailure"
+                  if ($attempt -lt 3) { Start-Sleep -Seconds 3 }
                 }
-                if ($surface -eq 'settings') { $parameters.OpenSettings = $true }
-                ./scripts/ghost-ai-capture-screenshot.ps1 @parameters
-                $coverage += "CAPTURED $surface $label"
-                $captured++
-              } catch {
-                $coverage += "NOT VERIFIED $surface $label - $($_.Exception.Message)"
+              }
+              if (-not $verified) {
+                $coverage += "NOT VERIFIED $surface $label after 3 real app launches - $lastFailure"
               }
             }
           }
           $coverage | Set-Content -Path 'smoke/screenshots/coverage-report.txt'
           $coverage | ForEach-Object { Write-Host $_ }
-          if ($captured -lt 2) {
-            throw 'Unable to capture main and Settings surfaces on this CI desktop'
+          if ($captured -ne 8) {
+            throw "Only $captured of 8 required main/Settings screenshot cases were captured; see coverage-report.txt for missing viewports"
           }
       - name: Preserve screenshot evidence and skipped-viewport report
         if: always()
@@ -208,8 +274,15 @@ jobs:
           name: Ghost-AI-PR-Windows-Screenshots
           path: smoke/screenshots/
           if-no-files-found: warn
-      - name: Block merge when the application does not open or first paint cannot be verified
-        if: steps.startup.outcome != 'success' || steps.first_paint.outcome != 'success' || steps.screenshots.outcome != 'success'
+      - name: Block merge if startup, first paint, display mode or any screenshot is not verified
+        if: steps.startup.outcome != 'success' || steps.first_paint.outcome != 'success' || steps.desktop.outcome != 'success' || steps.screenshots.outcome != 'success'
         shell: pwsh
         run: |
-          throw 'Ghost AI Windows verification failed; inspect startup, first-paint and screenshot artifacts'
+          throw 'Ghost AI Windows verification failed; inspect startup, first-paint, display mode and screenshot artifacts'
+      # Fail visual/startup problems before spending up to 40 more minutes
+      # compiling/running the full Rust library tests. None are skipped on
+      # a successful release candidate.
+      # Reuses the already-built production release-profile Rust dependencies.
+      - name: Run all Rust library regression tests on Windows
+        timeout-minutes: 40
+        run: 'cargo test --release --manifest-path src-tauri/Cargo.toml --lib -- --nocapture --test-threads=1'

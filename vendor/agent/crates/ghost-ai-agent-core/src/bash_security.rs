@@ -1703,12 +1703,34 @@ pub fn extract_deletion_targets(command: &str) -> Vec<String> {
 /// operand itself, or for a glob/expansion operand the directory before
 /// the first metacharacter (conservative: that directory's contents are
 /// at stake).
+// Windows canonical paths contain a literal question mark in their
+// verbatim prefix. That marker must not suppress sandbox escape checks.
+fn metachar_scan_offset(target: &str) -> usize {
+    if cfg!(windows) && (target.starts_with(r"\\?\") || target.starts_with("//?/")) {
+        4
+    } else {
+        0
+    }
+}
+
 fn deletion_subject(target: &str, cwd: Option<&str>) -> std::path::PathBuf {
-    let meta = target.find(['*', '?', '[', '$', '{', '`']);
+    let offset = metachar_scan_offset(target);
+    let meta = target[offset..]
+        .find(['*', '?', '[', '$', '{', '`'])
+        .map(|index| index + offset);
     let literal = match meta {
-        Some(index) => match target[..index].rfind('/') {
-            Some(slash) => &target[..=slash],
-            None => ".",
+        Some(index) => {
+            // Glob directories on Windows can be separated by backslashes;
+            // otherwise the deletion guard would inspect the cwd instead.
+            let slash = if cfg!(windows) {
+                target[..index].rfind(['/', '\\'])
+            } else {
+                target[..index].rfind('/')
+            };
+            match slash {
+                Some(slash) => &target[..=slash],
+                None => ".",
+            }
         },
         None => target,
     };
@@ -1776,7 +1798,7 @@ pub fn outside_write_targets(
     let mut outside = Vec::new();
     for target in &targets {
         // `$VAR`, globs, and substitutions cannot be placed statically.
-        if target.contains(['$', '*', '?', '`']) {
+        if target[metachar_scan_offset(target)..].contains(['$', '*', '?', '`']) {
             continue;
         }
         let spelled = resolve_target(target, cwd);
@@ -3375,6 +3397,40 @@ mod tests {
             );
         }
         assert!(outside_write_targets("echo > /etc/x", None, None, &[]).is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_verbatim_paths_must_not_bypass_write_or_deletion_checks() {
+        let root = tempfile::tempdir().unwrap();
+        let ws = root.path().join("workspace");
+        let out = root.path().join("outside");
+        std::fs::create_dir_all(&ws).unwrap();
+        std::fs::create_dir_all(&out).unwrap();
+        let ws = ws.canonicalize().unwrap();
+        let out = out.canonicalize().unwrap();
+        let destination = out.join("ghost-ai-security-test.txt");
+        assert!(destination.to_string_lossy().starts_with(r"\\?\"));
+        let checked = outside_write_targets(
+            &format!("cp x {}", destination.display()),
+            Some(&ws), ws.to_str(), &[],
+        );
+        assert_eq!(checked, vec![destination.clone()]);
+        std::fs::write(&destination, "test").unwrap();
+        assert_eq!(
+            outside_deletion_target(
+                &format!("rm {}", destination.display()),
+                Some(&ws), ws.to_str(), &[],
+            ),
+            Some(destination),
+        );
+        assert!(
+            outside_deletion_target(
+                &format!("rm {}/*.txt", out.display()),
+                Some(&ws), ws.to_str(), &[],
+            ).is_some(),
+            "a Windows glob in an outside directory must require approval"
+        );
     }
 
     #[test]

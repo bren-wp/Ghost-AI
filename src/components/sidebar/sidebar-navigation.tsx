@@ -2,7 +2,6 @@
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
@@ -27,7 +26,6 @@ interface SidebarNavigationProps {
   navItems: NavItem[]
   activeItem: NavItem
   onItemClick: (item: NavItem) => void
-  onSettingsClick: () => void
   user: { name: string; email: string; avatar: string }
 }
 
@@ -35,11 +33,7 @@ export function SidebarNavigation({
   navItems,
   activeItem,
   onItemClick,
-  onSettingsClick,
 }: SidebarNavigationProps) {
-  const settingsItem = navItems.find((item) => item.id === 'settings')
-  const mainItems = navItems.filter((item) => item.id !== 'settings')
-
   const renderItem = (item: NavItem) => (
     <SidebarMenuItem key={item.id}>
       <SidebarMenuButton
@@ -47,13 +41,7 @@ export function SidebarNavigation({
           children: item.title,
           hidden: false,
         }}
-        onClick={() => {
-          if (item.id === 'settings') {
-            onSettingsClick()
-          } else {
-            onItemClick(item)
-          }
-        }}
+        onClick={() => onItemClick(item)}
         isActive={activeItem?.id === item.id}
         className="px-2.5 md:px-2"
       >
@@ -68,15 +56,10 @@ export function SidebarNavigation({
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent className="px-1.5 md:px-0">
-            <SidebarMenu>{mainItems.map(renderItem)}</SidebarMenu>
+            <SidebarMenu>{navItems.map(renderItem)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      {settingsItem && (
-        <SidebarFooter className="px-1.5 md:px-2">
-          <SidebarMenu>{renderItem(settingsItem)}</SidebarMenu>
-        </SidebarFooter>
-      )}
     </Sidebar>
   )
 }

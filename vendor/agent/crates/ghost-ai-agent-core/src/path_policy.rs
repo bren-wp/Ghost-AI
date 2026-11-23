@@ -740,7 +740,20 @@ pub fn check_write(path: &Path, _project_root: Option<&Path>) -> Result<(), Stri
 
 fn check_write_blocklist(path: &Path) -> Result<(), String> {
     let normalized = normalize_path(path);
-    let path_str = normalized.to_string_lossy();
+    // Normalize separators before comparing with the Unix-style policy
+    // patterns. Windows Path::display() uses backslashes; without this,
+    // protected home files and .git hooks could evade the deny list.
+    let raw = normalized.to_string_lossy().replace('\\', "/");
+    let raw = if cfg!(windows) {
+        raw.strip_prefix("//?/").unwrap_or(&raw).to_string()
+    } else {
+        raw
+    };
+    let path_str = if cfg!(windows) {
+        raw.to_ascii_lowercase()
+    } else {
+        raw
+    };
 
     // Layer 1a: absolute path blocklist
     for blocked in WRITE_BLOCKED_ABSOLUTE {
@@ -752,11 +765,17 @@ fn check_write_blocklist(path: &Path) -> Result<(), String> {
         }
     }
 
-    // Layer 1b: home-relative blocklist
+    // Layer 1b: home-relative blocklist. Match a complete directory
+    // component, not a string prefix (C:/Users/user != C:/Users/username).
     if let Some(home) = home_dir() {
-        let home_str = home.to_string_lossy();
-        if let Some(rel) = path_str.strip_prefix(home_str.as_ref()) {
-            let rel = rel.trim_start_matches('/');
+        let home = normalize_path(&home).to_string_lossy().replace('\\', "/");
+        let home = if cfg!(windows) {
+            home.strip_prefix("//?/").unwrap_or(&home).to_ascii_lowercase()
+        } else {
+            home
+        };
+        let root = format!("{}/", home.trim_end_matches('/'));
+        if let Some(rel) = path_str.strip_prefix(&root) {
             for blocked in WRITE_BLOCKED_HOME {
                 if rel == blocked.trim_end_matches('/') || rel.starts_with(blocked) {
                     return Err(format!("Write blocked: protected user file (~/{blocked})"));
@@ -1283,6 +1302,27 @@ mod tests {
         let home = home_dir().unwrap();
         let path_str = format!("{}{}", home.display(), "/.ssh/id_rsa");
         assert!(check_blocked_path(&path_str).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_home_and_repo_guards_are_not_bypassed_by_backslashes() {
+        let home = home_dir().expect("test runner must have a home directory");
+        for protected in [".bashrc", ".gitconfig", ".ssh/id_rsa"] {
+            assert!(
+                check_blocked_path(&format!("~/{protected}")).is_err(),
+                "tilde path must be blocked: {protected}"
+            );
+            assert!(
+                check_write(&home.join(protected), None).is_err(),
+                "Windows-style home path must be blocked: {protected}"
+            );
+        }
+        let repo = tempfile::tempdir().unwrap();
+        assert!(
+            check_write(&repo.path().join(".git/hooks/pre-commit"), None).is_err(),
+            "Windows .git/hooks path must be blocked"
+        );
     }
 
     #[test]

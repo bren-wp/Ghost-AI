@@ -29,7 +29,9 @@ void i18n
 // jsdom's File may lack text()/arrayBuffer(); build files whose read methods
 // always work, backed by the known source content.
 function makeFile(content: string | Uint8Array, name: string, mimeType = ''): File {
-  const file = new File([content], name, { type: mimeType })
+  // TypeScript 6 enforces that File/Blob binary parts use ArrayBuffer-backed data.
+  // Copy the bytes so no shared/resizable backing buffer is passed to File.
+  const file = new File([typeof content === 'string' ? content : new Uint8Array(content).buffer], name, { type: mimeType })
   const asText = () => (typeof content === 'string' ? content : new TextDecoder().decode(content))
   if (typeof file.text !== 'function') {
     Object.defineProperty(file, 'text', { value: async () => asText(), configurable: true })

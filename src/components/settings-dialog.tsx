@@ -1312,9 +1312,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             ))}
           </select>
           <p className="text-xs leading-5 text-muted-foreground">
-            English is the default interface language. Croatian, German, Spanish, French, Portuguese and Italian
-            include an initial set of translated controls. Other languages currently use English for untranslated
-            interface text until full localization is reviewed.
+            {t('languageDescription')}
           </p>
         </section>
       )

@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Bot, BotIcon, CheckCircle2, Loader2 } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 import { useModelStore } from '@/stores/modelStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -168,13 +168,21 @@ export function OnboardingDialog() {
 
   return (
     <>
-      <Dialog open={isDialogOpen && step !== 'complete'} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg" showCloseButton={step !== 'sync'}>
+      {/* A nonmodal setup dialog lets Settings remain usable from the
+          persistent header, without dismissing a real user's chosen flow.
+          The Dialog context is required by the embedded sync step. */}
+      <Dialog open={isDialogOpen && step !== 'complete'} onOpenChange={setDialogOpen} modal={false}>
+        <DialogContent
+          className="sm:max-w-lg"
+          aria-modal={false}
+          showOverlay={false}
+          showCloseButton={step !== 'sync'}
+        >
           {step !== 'sync' && (
             <>
               <DialogTitle className="sr-only">{t('welcome')}</DialogTitle>
               <DialogDescription className="sr-only">
-                Set up an AI provider to get started
+                {t('configureProviderDesc')}
               </DialogDescription>
             </>
           )}

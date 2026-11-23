@@ -125,8 +125,14 @@ describe('ProviderSettingsDialog deep link', () => {
     mockBackend({ models: [model], providers: [provider] })
     renderDialog(provider.id)
 
-    const key = await screen.findByLabelText('API Key')
-    await waitFor(() => expect(key).toHaveValue('sk-test'))
+    // The dialog initially renders the default provider before applying its
+    // deep link. Re-query the actual focused provider field on every retry:
+    // an element captured too early can belong to the previous form.
+    await waitFor(() => {
+      expect(screen.getByLabelText('API Key')).toHaveValue('sk-test')
+      expect(screen.getByDisplayValue(model.name)).toBeInTheDocument()
+    })
+    const key = screen.getByLabelText('API Key')
     const nameInput = screen.getByDisplayValue(model.name)
 
     fireEvent.change(key, { target: { value: 'sk-unsaved-edit' } })
@@ -184,10 +190,14 @@ describe('ProviderSettingsDialog deep link', () => {
     const save = await screen.findByRole('button', { name: 'Save Configuration' })
     expect(save).toBeDisabled()
 
-    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-test' } })
+    const key = screen.getByLabelText('API Key')
+    fireEvent.change(key, { target: { value: 'sk-test' } })
+    expect(key).toHaveValue('sk-test')
 
+    // Re-query after React's async provider-hydration render; a captured DOM
+    // node may have been replaced if the dialog finished loading.
     await waitFor(() => {
-      expect(save).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Save Configuration' })).toBeEnabled()
     })
   })
 })

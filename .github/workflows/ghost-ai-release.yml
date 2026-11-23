@@ -13,6 +13,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   validate:
@@ -22,12 +23,13 @@ jobs:
       release_tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - name: Verify matching release versions
         id: version
         shell: bash
@@ -48,12 +50,33 @@ jobs:
         run: pnpm test
       - name: Manifest security tests
         run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Audit source boundaries and potential dead modules before release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/ghost-ai-code-audit.py scripts/ghost-ai-dead-code-audit.py
+          python3 scripts/ghost-ai-code-audit.py --output reports/ghost-ai-code-audit.md
+          python3 scripts/ghost-ai-dead-code-audit.py --output reports/ghost-ai-dead-code-audit.md
+          python3 scripts/ghost-ai-localization-audit.py --output reports/ghost-ai-localization-audit.md
+      - name: Reject vulnerable frontend dependencies before publishing
+        run: pnpm audit --audit-level low
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned RustSec audit CLI
+        run: cargo install cargo-audit --locked --version 0.23.0
+      - name: Reject unreviewed Rust vulnerabilities before publishing
+        shell: bash
+        run: |
+          # Tauri 2.x GTK3 pins glib 0.18.5 on Linux. The documented
+          # RUSTSEC-2024-0429 exception is revalidated on every release.
+          python3 scripts/ghost-ai-rustsec-gtk3-exception.py
+          cargo audit --file src-tauri/Cargo.lock --ignore RUSTSEC-2024-0429
+          cargo audit --file vendor/agent/Cargo.lock
 
   windows:
     name: Windows setup, portable, update
     runs-on: windows-2022
     needs: validate
-    timeout-minutes: 120
+    timeout-minutes: 85
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -61,12 +84,13 @@ jobs:
       VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
@@ -83,6 +107,12 @@ jobs:
           python scripts/ghost_installer_art.py
       - name: Build Windows
         run: pnpm tauri build --bundles nsis
+      # Reuse the release-profile Rust dependencies from the production build
+      # rather than recompiling the entire tree again in debug profile.
+      # The PR Quality Gates independently execute the complete debug-mode test suite.
+      - name: Execute all production-profile Windows Rust library tests
+        timeout-minutes: 40
+        run: cargo test --release --manifest-path src-tauri/Cargo.toml --lib -- --nocapture --test-threads=1
       - name: Package Ghost AI Windows
         shell: pwsh
         run: |
@@ -202,7 +232,7 @@ jobs:
           if-no-files-found: error
 
   linux:
-    name: Linux AppImage and DEB
+    name: Linux installer (DEB) and portable (AppImage)
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -217,17 +247,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
+      - name: Test all Rust library paths on Linux
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
       - run: python3 scripts/configure_updater.py
       - name: Build Linux
         run: pnpm tauri build --bundles appimage,deb
@@ -244,7 +277,7 @@ jobs:
           if-no-files-found: error
 
   macos:
-    name: macOS DMG and App
+    name: macOS installer (DMG) and portable (.app.zip)
     needs: validate
     runs-on: macos-latest
     timeout-minutes: 120
@@ -255,24 +288,36 @@ jobs:
       VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '22'
       - uses: pnpm/action-setup@v6
         with:
           version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
+      - name: Test all Rust library paths on macOS
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib -- --test-threads=1
       - run: python3 scripts/configure_updater.py
       - name: Build macOS
         run: pnpm tauri build --bundles app,dmg
-      - name: Package macOS
+      - name: Package macOS installer and portable app bundle
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p release
-          cp src-tauri/target/release/bundle/dmg/*.dmg "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-macOS.dmg"
+          tag="${{ needs.validate.outputs.release_tag }}"
+          cp src-tauri/target/release/bundle/dmg/*.dmg "release/Ghost-AI-$tag-macOS.dmg"
+          app=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' -type d -print -quit)
+          test -n "$app" && test -s "$app/Contents/Info.plist" || { echo 'Missing macOS .app bundle'; exit 1; }
+          # ditto preserves macOS app metadata, unlike a generic ZIP packer.
+          ditto -c -k --sequesterRsrc --keepParent "$app" "release/Ghost-AI-$tag-macOS-Portable.zip"
+          unzip -t "release/Ghost-AI-$tag-macOS-Portable.zip" >/dev/null
+          test -s "release/Ghost-AI-$tag-macOS-Portable.zip"
           find src-tauri/target/release/bundle -type f \( -name '*.app.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
       - uses: actions/upload-artifact@v7
         with:
@@ -286,6 +331,63 @@ jobs:
     needs: [validate, windows, linux, macos]
     if: always() && needs.validate.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && needs.macos.result == 'success'
     steps:
+      # Release builds alone are insufficient: the same commit must pass the
+      # separate Windows startup, first-paint and 8 real viewport checks.
+      # Never publish a release when its Quality Gates fail or are missing.
+      - name: Require successful same-SHA Quality Gates before publication
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ needs.validate.outputs.release_tag }}"
+          quality_branch="release/$tag"
+          for attempt in $(seq 1 45); do
+            response=$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ghost-ai-checks.yml/runs" -f head_sha="$GITHUB_SHA" -f per_page=100)
+            status=$(jq -r --arg sha "$GITHUB_SHA" --arg branch "$quality_branch" '
+              [.workflow_runs[] | select(.head_sha == $sha and .head_branch == $branch)]
+              | sort_by(.id) | last
+              | if . == null then "missing" else (.status + " " + (.conclusion // "")) end
+            ' <<<"$response")
+            case "$status" in
+              "completed success")
+                echo "Quality Gates passed on $quality_branch at $GITHUB_SHA"
+                break
+                ;;
+              completed\ *)
+                echo "::error::Quality Gates finished unsuccessfully for $GITHUB_SHA ($status)"
+                exit 1
+                ;;
+              *)
+                echo "Quality Gates for $GITHUB_SHA: $status ($attempt/45)"
+                if [[ "$attempt" -eq 45 ]]; then
+                  echo "::error::No completed successful Quality Gates for exact release SHA"
+                  exit 1
+                fi
+                sleep 45
+                ;;
+            esac
+          done
+      - name: Refuse to overwrite an already-published version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ needs.validate.outputs.release_tag }}"
+          status=$(curl --silent --show-error --location --output release-lookup.json \
+            --write-out '%{http_code}' \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$tag")
+          if [[ "$status" == "200" ]]; then
+            echo "::error::$tag is already published. Increment the version and create a new release branch."
+            exit 1
+          fi
+          if [[ "$status" != "404" ]]; then
+            echo "::error::Could not securely verify release uniqueness (HTTP $status)"
+            exit 1
+          fi
       - uses: actions/download-artifact@v8
         with:
           name: Ghost-AI-Windows
@@ -302,12 +404,12 @@ jobs:
         shell: bash
         run: |
           tag="${{ needs.validate.outputs.release_tag }}"
-          for suffix in Setup.exe Portable.exe Portable.zip Update.exe Linux.AppImage Linux.deb macOS.dmg; do
+          for suffix in Setup.exe Portable.exe Portable.zip Update.exe Linux.AppImage Linux.deb macOS.dmg macOS-Portable.zip; do
             test -s "release/Ghost-AI-$tag-$suffix" || { echo "Missing release asset: $suffix"; exit 1; }
           done
           cd release
           sha256sum Ghost-AI-* > SHA256SUMS.txt
-          test "$(wc -l < SHA256SUMS.txt)" -ge 7
+          test "$(wc -l < SHA256SUMS.txt)" -ge 8
       - name: Publish release
         uses: softprops/action-gh-release@v3
         with:
