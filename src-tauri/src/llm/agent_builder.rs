@@ -477,7 +477,9 @@ pub fn create_ollama_agent(
     let http_client = create_http_client();
     let client = ollama::Client::<reqwest::Client>::builder()
         .api_key(Nothing)
-        .base_url(base_url.unwrap_or(ollama_provider::DEFAULT_BASE_URL))
+        .base_url(super::models::ollama_native_base_url(
+            base_url.unwrap_or(ollama_provider::DEFAULT_BASE_URL),
+        ))
         .http_client(http_client)
         .build()?;
 

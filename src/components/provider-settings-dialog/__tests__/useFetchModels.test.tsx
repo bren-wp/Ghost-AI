@@ -34,6 +34,33 @@ describe('model discovery reliability', () => {
     expect(result.current.availableModels.map((model) => model.id)).toEqual(['local-1'])
   })
 
+  it('trims pasted credentials and endpoint before issuing model discovery', async () => {
+    invokeMock.mockResolvedValue([{ id: 'chat-model', name: 'Chat model' }])
+    const { result } = renderHook(() => useFetchModels({
+      selectedProvider: openAI,
+      apiKey: '  sk-test  ',
+      apiBaseUrl: '  https://api.openai.com/v1  ',
+      compatibilityType: 'openai',
+    }))
+    await act(async () => { await result.current.handleFetchModels() })
+    expect(invokeMock).toHaveBeenCalledWith('fetch_openai_models', {
+      apiKey: 'sk-test',
+      baseUrl: 'https://api.openai.com/v1',
+    })
+  })
+
+  it.each(['azure', 'gemini'])('does not send an unsupported discovery request for %s', async (id) => {
+    const { result } = renderHook(() => useFetchModels({
+      selectedProvider: { id, name: id, baseUrl: 'https://api.example.com' },
+      apiKey: 'sk-test',
+      apiBaseUrl: 'https://api.example.com',
+      compatibilityType: 'openai',
+    }))
+    await act(async () => { await result.current.handleFetchModels() })
+    expect(invokeMock.mock.calls.filter(([name]) => String(name).startsWith('fetch_'))).toHaveLength(0)
+    expect(result.current.fetchError).toBeTruthy()
+  })
+
   it('ignores an old request after changing AI provider', async () => {
     let resolveOld!: (models: { id: string; name: string }[]) => void
     const oldRequest = new Promise<{ id: string; name: string }[]>((resolve) => {

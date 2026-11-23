@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react'
 import { invoke } from '@tauri-apps/api/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useFetchModels } from '../useFetchModels'
+import { BUILTIN_PROVIDERS, isSupportedFetchProvider } from '../constants'
 import type { LLMProvider } from '../types'
 import '@/lib/i18n'
 
@@ -85,6 +86,32 @@ const scenarios: ModelFetchCase[] = [
     args: { apiKey: 'sk-custom', baseUrl: 'https://local.example.com/anthropic' },
   },
 ]
+
+// Cover every visible provider that advertises automatic model discovery.
+// Keep dedicated protocol cases above explicit rather than deriving them from
+// the hook implementation.
+const coveredProviders = new Set(scenarios.map(({ provider }) => provider.id))
+for (const provider of BUILTIN_PROVIDERS) {
+  if (!isSupportedFetchProvider(provider.id) || coveredProviders.has(provider.id)) continue
+  scenarios.push({
+    provider,
+    key: 'sk-test',
+    compatibility: 'openai',
+    command: 'fetch_provider_models',
+    args: { providerType: provider.id, apiKey: 'sk-test', baseUrl: provider.baseUrl },
+  })
+}
+for (const provider of BUILTIN_PROVIDERS.filter(({ id }) =>
+  ['lmstudio', 'gpustack', 'ovms'].includes(id)
+)) {
+  scenarios.push({
+    provider,
+    key: 'local-protected-key',
+    compatibility: 'openai',
+    command: 'fetch_provider_models',
+    args: { providerType: provider.id, apiKey: 'local-protected-key', baseUrl: provider.baseUrl },
+  })
+}
 
 beforeEach(() => mockInvoke.mockReset())
 
