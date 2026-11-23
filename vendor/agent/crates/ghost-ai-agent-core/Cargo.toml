@@ -20,7 +20,7 @@ ignore = "0.4"
 pdf-extract = "0.12.1"
 # Repair fallback for PDFs whose xref/trailer is malformed enough that
 # pdf-extract's pinned lopdf rejects them (newer lopdf recovers by scanning).
-lopdf = { version = "0.45", default-features = false }
+lopdf = { version = "0.47", default-features = false }
 # Office formats: OOXML is ZIP + XML. calamine reads spreadsheets;
 # quick-xml parses docx/pptx text without a full OOXML model.
 calamine = "0.38.0"
