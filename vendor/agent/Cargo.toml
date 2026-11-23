@@ -30,7 +30,7 @@ zstd = "0.13"
 rand = "0.8"
 scraper = "0.29"
 reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "gzip", "deflate", "brotli", "zstd"] }
-rig = { version = "0.42", default-features = false, features = ["reqwest", "derive", "agent"] }
+rig = { version = "0.46", default-features = false, features = ["reqwest", "derive", "agent"] }
 # Default features pull in server-side dependencies; TLS comes from our own
 # reqwest features (the HTTP client is built by us and handed to rmcp).
 rmcp = { version = "3.11", default-features = false, features = ["client", "transport-streamable-http-client-reqwest"] }
