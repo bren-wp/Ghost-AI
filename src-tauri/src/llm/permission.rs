@@ -2075,12 +2075,16 @@ mod tests {
         decision: ApprovalDecision,
         ordinal: usize,
     ) {
-        let request_id = loop {
-            if let Some(payload) = requested_payloads(captured).get(ordinal) {
-                break payload["request_id"].as_str().unwrap().to_string();
+        let request_id = tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                if let Some(payload) = requested_payloads(captured).get(ordinal) {
+                    break payload["request_id"].as_str().unwrap().to_string();
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
             }
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        };
+        })
+        .await
+        .expect("Expected remembered approval event not emitted within 10 seconds");
         assert!(registry.answer(
             &request_id,
             ApprovalAnswer {

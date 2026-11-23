@@ -1719,9 +1719,18 @@ fn deletion_subject(target: &str, cwd: Option<&str>) -> std::path::PathBuf {
         .find(['*', '?', '[', '$', '{', '`'])
         .map(|index| index + offset);
     let literal = match meta {
-        Some(index) => match target[..index].rfind('/') {
-            Some(slash) => &target[..=slash],
-            None => ".",
+        Some(index) => {
+            // Glob directories on Windows can be separated by backslashes;
+            // otherwise the deletion guard would inspect the cwd instead.
+            let slash = if cfg!(windows) {
+                target[..index].rfind(['/', '\\'])
+            } else {
+                target[..index].rfind('/')
+            };
+            match slash {
+                Some(slash) => &target[..=slash],
+                None => ".",
+            }
         },
         None => target,
     };
@@ -3414,6 +3423,13 @@ mod tests {
                 Some(&ws), ws.to_str(), &[],
             ),
             Some(destination),
+        );
+        assert!(
+            outside_deletion_target(
+                &format!("rm {}/*.txt", out.display()),
+                Some(&ws), ws.to_str(), &[],
+            ).is_some(),
+            "a Windows glob in an outside directory must require approval"
         );
     }
 
