@@ -367,12 +367,15 @@ fn is_known_non_conversational_model(model_id: &str) -> bool {
         || id.contains("-audio-preview")
 }
 
-fn ollama_tags_url(base_url: &str) -> String {
-    // Users often enter Ollama's OpenAI-compatible /v1 endpoint. Native
-    // model listing lives at /api/tags instead; preserve reverse-proxy prefixes.
+/// Both native model discovery and chat use the Ollama server root.
+/// A supplied OpenAI-compatible /v1 suffix is not part of that root.
+pub(super) fn ollama_native_base_url(base_url: &str) -> &str {
     let base = base_url.trim().trim_end_matches('/');
-    let root = base.strip_suffix("/v1").unwrap_or(base);
-    format!("{root}/api/tags")
+    base.strip_suffix("/v1").unwrap_or(base)
+}
+
+fn ollama_tags_url(base_url: &str) -> String {
+    format!("{}/api/tags", ollama_native_base_url(base_url))
 }
 
 /// Fetch available models from Ollama
@@ -518,6 +521,13 @@ mod tests {
             "whisper-1", "gpt-realtime-2", "omni-moderation-latest", "tts-1"] {
             assert!(is_known_non_conversational_model(name), "should filter {name}");
         }
+    }
+
+    #[test]
+    fn ollama_native_root_normalization_preserves_proxy_paths() {
+        assert_eq!(ollama_native_base_url(" http://localhost:11434/v1/ "), "http://localhost:11434");
+        assert_eq!(ollama_native_base_url("https://proxy.example/ollama/v1/"), "https://proxy.example/ollama");
+        assert_eq!(ollama_native_base_url("http://localhost:11434"), "http://localhost:11434");
     }
 
     #[test]
