@@ -7,6 +7,7 @@ use crate::llm::agent_builder::{
 pub use crate::llm::models::ModelInfo;
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 const MODEL_DISCOVERY_FAILED: &str =
     "Unable to load models. Verify the provider URL, API key and network connection.";
@@ -119,6 +120,8 @@ pub async fn check_provider_api(
     let prompt = build_user_message("hi", &[], &[]);
     let cancel_token = CancellationToken::new();
     let cancel_clone = cancel_token.clone();
+    let saw_text = Arc::new(AtomicBool::new(false));
+    let saw_text_in_callback = Arc::clone(&saw_text);
 
     let result = tokio::time::timeout(
         std::time::Duration::from_secs(30),
@@ -127,11 +130,10 @@ pub async fn check_provider_api(
             prompt,
             vec![],
             cancel_token,
-            move |_chunk, chunk_type| {
-                if matches!(
-                    chunk_type,
-                    StreamChunkType::Text | StreamChunkType::Reasoning
-                ) {
+            move |chunk, chunk_type| {
+                // Reasoning-only streams do not prove the model can answer a user.
+                if matches!(chunk_type, StreamChunkType::Text) && !chunk.trim().is_empty() {
+                    saw_text_in_callback.store(true, Ordering::SeqCst);
                     cancel_clone.cancel();
                 }
                 true
@@ -144,16 +146,21 @@ pub async fn check_provider_api(
     let latency_ms = start.elapsed().as_millis() as u64;
 
     match result {
-        Ok(Ok(_)) => Ok(CheckApiResult {
-            success: true,
-            latency_ms,
-            error: None,
-        }),
+        Ok(Ok(reply)) => {
+            let answered = saw_text.load(Ordering::SeqCst) || !reply.content.trim().is_empty();
+            Ok(CheckApiResult {
+                success: answered,
+                latency_ms,
+                error: if answered { None } else { Some(MODEL_TEST_FAILED.to_string()) },
+            })
+        },
         Ok(Err(e)) => {
             // Successful first-chunk cancellation is an expected outcome;
             // all other native errors must stay inside the Rust boundary.
             let err_str = e.to_string();
-            if err_str.contains("cancelled") || err_str.contains("canceled") {
+            if saw_text.load(Ordering::SeqCst)
+                && (err_str.contains("cancelled") || err_str.contains("canceled"))
+            {
                 Ok(CheckApiResult {
                     success: true,
                     latency_ms,
