@@ -211,7 +211,7 @@ export function ProviderForm({
           </div>
         </div>
       ) : (
-      <div className="space-y-2">
+        <div className="space-y-2">
         <Label htmlFor="api-key">{t('apiKey')}</Label>
         <div className="flex min-w-0 flex-wrap items-start gap-2">
           <div className="relative min-w-[min(100%,240px)] flex-1">
@@ -288,8 +288,7 @@ export function ProviderForm({
         {checkStatus !== 'failed' && checkStatus !== 'success' && (
           <p className="text-xs text-muted-foreground">{t('yourApiKeyWillBeStored')}</p>
         )}
-      </div>
-
+        </div>
       )}
 
       <div className="space-y-2">
@@ -307,6 +306,7 @@ export function ProviderForm({
           placeholder="https://api.example.com/v1"
           value={apiBaseUrl}
           onChange={(e) => onApiBaseUrlChange(e.target.value)}
+          className="h-10 rounded-xl border-[#405474] bg-[#0D1726]"
         />
         {invalidEndpoint && (
           <p id="api-base-url-error" role="alert" className="text-xs text-destructive">
