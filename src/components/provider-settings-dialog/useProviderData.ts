@@ -49,6 +49,13 @@ export function useProviderData({
   const storeProviders = useModelStore((state) => state.providers)
   const storeModels = useModelStore((state) => state.models)
   const [isDataLoaded, setIsDataLoaded] = React.useState(false)
+  // The backend load and form hydration are separate React effects. Do not
+  // expose an editable form until the selected provider's credentials and
+  // models have actually been hydrated, or quick edits can be overwritten.
+  const [hydratedSelection, setHydratedSelection] = React.useState<{
+    provider: LLMProvider
+    editingId: string | null
+  } | null>(null)
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [existingProvider, setExistingProvider] = React.useState<Provider | null>(null)
   const activeLoadRef = React.useRef(0)
@@ -98,6 +105,7 @@ export function useProviderData({
   React.useEffect(() => {
     if (!isDataLoaded) {
       lastHydratedRef.current = null
+      setHydratedSelection(null)
       return
     }
     const last = lastHydratedRef.current
@@ -157,6 +165,7 @@ export function useProviderData({
       setCompatibilityType('openai')
       setModels([])
     }
+    setHydratedSelection({ provider: selectedProvider, editingId: editingCustomProviderId })
   }, [
     selectedProvider,
     editingCustomProviderId,
@@ -177,7 +186,10 @@ export function useProviderData({
   return {
     existingProvider,
     storeProviders,
-    isDataLoaded,
+    isDataLoaded:
+      isDataLoaded &&
+      hydratedSelection?.provider === selectedProvider &&
+      hydratedSelection?.editingId === editingCustomProviderId,
     loadError,
     loadExistingData,
   }
