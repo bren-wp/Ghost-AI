@@ -5,6 +5,7 @@ import type { LLMProvider, ModelInfo } from './types'
 import { logger } from '@/lib/logger'
 import i18n from '@/lib/i18n'
 import { isValidProviderEndpoint } from './provider-endpoint'
+import { isSupportedFetchProvider } from './constants'
 
 export interface UseFetchModelsReturn {
   availableModels: ModelInfo[]
@@ -41,10 +42,12 @@ class ProviderInputError extends Error {}
  */
 export function useFetchModels({
   selectedProvider,
-  apiKey,
-  apiBaseUrl,
+  apiKey: rawApiKey,
+  apiBaseUrl: rawApiBaseUrl,
   compatibilityType,
 }: UseFetchModelsParams): UseFetchModelsReturn {
+  const apiKey = rawApiKey.trim()
+  const apiBaseUrl = rawApiBaseUrl.trim()
   const [availableModels, setAvailableModels] = React.useState<ModelInfo[]>([])
   const [isLoading, setIsLoading] = React.useState(false)
   const [fetchError, setFetchError] = React.useState<string | null>(null)
@@ -66,7 +69,7 @@ export function useFetchModels({
     setIsLoading(false)
     setAvailableModels([])
     setFetchError(null)
-  }, [selectedProvider.id, apiKey, apiBaseUrl, compatibilityType])
+  }, [selectedProvider.id, selectedProvider.baseUrl, apiKey, apiBaseUrl, compatibilityType])
 
   // Invalidate pending requests when the editor closes or unmounts.
   React.useEffect(() => () => {
@@ -85,6 +88,11 @@ export function useFetchModels({
         throw new ProviderInputError(i18n.t('providers:invalidBaseUrl'))
       }
       const providerId = selectedProvider.id
+      if (!isSupportedFetchProvider(providerId)) {
+        throw new ProviderInputError(
+          i18n.t('providers:fetchModels.modelFetchingNotSupported', { provider: selectedProvider.name })
+        )
+      }
       let fetchedModels: ModelInfo[] = []
 
       if (providerId === 'openai') {
