@@ -1,8 +1,9 @@
 // Ghost AI by Brendigo
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowRight, Bot, BotIcon, CheckCircle2, Loader2, X } from 'lucide-react'
+import { ArrowRight, Bot, BotIcon, CheckCircle2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 import { useModelStore } from '@/stores/modelStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -167,28 +168,27 @@ export function OnboardingDialog() {
 
   return (
     <>
-      {isDialogOpen && step !== 'complete' && (
-        <section
-          role="region"
-          aria-label={t('welcome')}
-          className="mx-4 mt-3 max-h-[40vh] shrink-0 overflow-y-auto rounded-2xl border bg-card p-4 shadow-sm"
+      {/* A nonmodal setup dialog lets Settings remain usable from the
+          persistent header, without dismissing a real user's chosen flow.
+          The Dialog context is required by the embedded sync step. */}
+      <Dialog open={isDialogOpen && step !== 'complete'} onOpenChange={setDialogOpen} modal={false}>
+        <DialogContent
+          className="sm:max-w-lg"
+          aria-modal={false}
+          showOverlay={false}
+          showCloseButton={step !== 'sync'}
         >
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold">{t('welcome')}</h2>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-7 shrink-0"
-              aria-label={t('common:close')}
-              onClick={() => setDialogOpen(false)}
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
+          {step !== 'sync' && (
+            <>
+              <DialogTitle className="sr-only">{t('welcome')}</DialogTitle>
+              <DialogDescription className="sr-only">
+                {t('configureProviderDesc')}
+              </DialogDescription>
+            </>
+          )}
           {renderContent()}
-        </section>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <ProviderSettingsDialog open={providerDialogOpen} onOpenChange={handleProviderDialogClose} />
     </>

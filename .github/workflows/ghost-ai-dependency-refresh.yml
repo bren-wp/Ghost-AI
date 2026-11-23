@@ -1,6 +1,6 @@
 # Ghost AI by Brendigo
-# One-shot compatible dependency refresh for PR #40.
-# Major upgrades are audited separately: do not force incompatible lockfiles.
+# PR #40 compatible/latest-toolchain candidate. Build and tests must pass
+# before any dependency manifests or lockfiles are committed to the PR.
 name: Ghost AI dependency refresh (PR40)
 
 on:
