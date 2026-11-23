@@ -21,11 +21,11 @@ jobs:
     outputs:
       release_tag: ${{ steps.version.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: '10'
       - name: Verify matching release versions
@@ -60,11 +60,11 @@ jobs:
       GHOST_AI_UPDATER_PUBLIC_KEY: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY }}
       VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: '10'
       - uses: dtolnay/rust-toolchain@stable
@@ -136,7 +136,7 @@ jobs:
           ./scripts/ghost-ai-startup-diagnostics.ps1 -Executable 'release/Portable/Ghost-AI.exe' -OutputDirectory release-startup-diagnostics -ObserveSeconds 25
       - name: Preserve Windows startup diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Windows-Startup-Diagnostics
           path: release-startup-diagnostics/
@@ -154,7 +154,7 @@ jobs:
           ./scripts/ghost-ai-test-portable.ps1 -Launcher "release/Ghost-AI-$tag-Portable.exe" -OutputDirectory 'release-portable-diagnostics'
       - name: Preserve portable launcher evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Windows-Portable-Diagnostics
           path: release-portable-diagnostics/
@@ -172,7 +172,7 @@ jobs:
           ./scripts/ghost-ai-test-installation.ps1 -Setup "release/Ghost-AI-$tag-Setup.exe" -Update "release/Ghost-AI-$tag-Update.exe" -OutputDirectory 'release-installer-diagnostics'
       - name: Preserve installer and update diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Windows-Setup-Update-Diagnostics
           path: release-installer-diagnostics/
@@ -187,13 +187,13 @@ jobs:
         run: |
           pwsh -NoProfile -File scripts/ghost-ai-capture-screenshot.ps1 -Executable 'release/Portable/Ghost-AI.exe' -Output 'screenshots/ghost-ai-first-run.png'
       - name: Save real Ghost AI screenshots for visual review
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: GhostAI-Screenshots
           path: screenshots/*.png
           if-no-files-found: ignore
       - name: Publish Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Windows
           path: |
@@ -212,15 +212,15 @@ jobs:
       GHOST_AI_UPDATER_PUBLIC_KEY: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY }}
       VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Linux desktop dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: '10'
       - uses: dtolnay/rust-toolchain@stable
@@ -237,7 +237,7 @@ jobs:
           cp src-tauri/target/release/bundle/appimage/*.AppImage "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Linux.AppImage"
           cp src-tauri/target/release/bundle/deb/*.deb "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-Linux.deb"
           find src-tauri/target/release/bundle -type f \( -name '*.AppImage.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-Linux
           path: release/*
@@ -254,11 +254,11 @@ jobs:
       GHOST_AI_UPDATER_PUBLIC_KEY: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY }}
       VITE_GHOST_AI_UPDATES: ${{ secrets.GHOST_AI_UPDATER_PUBLIC_KEY != '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: '10'
       - uses: dtolnay/rust-toolchain@stable
@@ -274,7 +274,7 @@ jobs:
           mkdir -p release
           cp src-tauri/target/release/bundle/dmg/*.dmg "release/Ghost-AI-${{ needs.validate.outputs.release_tag }}-macOS.dmg"
           find src-tauri/target/release/bundle -type f \( -name '*.app.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Ghost-AI-macOS
           path: release/*
@@ -286,15 +286,15 @@ jobs:
     needs: [validate, windows, linux, macos]
     if: always() && needs.validate.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && needs.macos.result == 'success'
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: Ghost-AI-Windows
           path: release
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: Ghost-AI-Linux
           path: release
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: Ghost-AI-macOS
           path: release
@@ -309,7 +309,7 @@ jobs:
           sha256sum Ghost-AI-* > SHA256SUMS.txt
           test "$(wc -l < SHA256SUMS.txt)" -ge 7
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.validate.outputs.release_tag }}
           target_commitish: ${{ github.sha }}
