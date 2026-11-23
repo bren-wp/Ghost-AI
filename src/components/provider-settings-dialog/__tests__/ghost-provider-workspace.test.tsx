@@ -114,4 +114,25 @@ describe('Ghost AI provider workspace', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
     expect(screen.getByText('llama-model-4')).toBeInTheDocument()
   })
+
+  it('does not hide remaining models behind an invisible search field', () => {
+    const props = {
+      selectedProvider: ollama,
+      apiKey: '',
+      apiBaseUrl: ollama.baseUrl,
+      onOpenFetchModal: noop,
+      onOpenAddModelDialog: noop,
+      onUpdateModelName: noop,
+      onDeleteModel: noop,
+      onModelSettings: noop,
+    }
+    const { rerender } = render(<ModelsTable {...props} models={models} />)
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search configured models...' }), {
+      target: { value: 'llama-model-4' },
+    })
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
+    rerender(<ModelsTable {...props} models={models.slice(0, 4)} />)
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+  })
 })

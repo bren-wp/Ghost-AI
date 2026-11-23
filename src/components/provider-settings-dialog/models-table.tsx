@@ -1,7 +1,7 @@
 // Ghost AI by Brendigo
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, ListChecks, MoreHorizontal, Plus, Search, Server } from 'lucide-react'
 import { toast } from 'sonner'
@@ -42,9 +42,16 @@ export function ModelsTable({
 }: ModelsTableProps) {
   const { t } = useTranslation('providers')
   const [search, setSearch] = useState('')
+  useEffect(() => {
+    setSearch('')
+  }, [selectedProvider.id, selectedProvider.name, selectedProvider.baseUrl])
+  useEffect(() => {
+    if (models.length < 5) setSearch('')
+  }, [models.length])
+  const activeSearch = models.length >= 5 ? search.trim().toLocaleLowerCase() : ''
   const visibleModels = models.filter((model) =>
     [model.modelId, model.displayName].some((value) =>
-      value.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
+      value.toLocaleLowerCase().includes(activeSearch)
     )
   )
   const canDiscoverModels =

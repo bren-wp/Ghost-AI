@@ -72,6 +72,7 @@ export function useProviderSave({
     if (saveInFlightRef.current) return
     const isCustom = isCustomProvider(selectedProvider)
     const normalizedBaseUrl = apiBaseUrl.trim()
+    const normalizedApiKey = apiKey.trim()
     if (isCustom && (!providerName.trim() || !normalizedBaseUrl)) {
       toast.error(t('providers:requiredField'))
       return
@@ -79,6 +80,20 @@ export function useProviderSave({
     if (normalizedBaseUrl && !isValidProviderEndpoint(normalizedBaseUrl)) {
       toast.error(t('providers:invalidBaseUrl'))
       return
+    }
+    const activeModels = models.filter((model) => !modelsToDelete.includes(model.id))
+    const seenIds = new Set<string>()
+    for (const model of activeModels) {
+      const id = model.modelId.trim()
+      if (!id) {
+        toast.error(t('providers:modelIdRequired'))
+        return
+      }
+      if (seenIds.has(id)) {
+        toast.error(t('providers:modelAlreadyExists'))
+        return
+      }
+      seenIds.add(id)
     }
     saveInFlightRef.current = true
     const newModels = models.filter((m) => !m.isExisting)
@@ -108,8 +123,8 @@ export function useProviderSave({
         // Only clearing a previously readable non-empty key sends '' to the
         // backend; a new non-empty key is explicitly rotated.
         const storedKey = existingProvider.api_key ?? ''
-        const apiKeyChanged = storedKey !== apiKey
-        const keyUpdate = apiKeyChanged ? apiKey : undefined
+        const apiKeyChanged = storedKey !== normalizedApiKey
+        const keyUpdate = apiKeyChanged ? normalizedApiKey : undefined
         const needsUpdate =
           apiKeyChanged ||
           (existingProvider.base_url || '') !== normalizedBaseUrl ||
@@ -136,7 +151,7 @@ export function useProviderSave({
         const providerReq: CreateProviderRequest = {
           name: effectiveName,
           provider_type: effectiveProviderType,
-          api_key: apiKey || undefined,
+          api_key: normalizedApiKey || undefined,
           base_url: normalizedBaseUrl || undefined,
           api_style: effectiveApiStyle,
           is_enabled: true,
