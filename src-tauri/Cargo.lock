@@ -3711,7 +3711,7 @@ dependencies = [
  "block2",
  "chrono",
  "core-foundation 0.10.1",
- "dirs 5.0.1",
+ "dirs 7.0.0",
  "futures",
  "ghost-ai-agent-core",
  "headless_chrome",
