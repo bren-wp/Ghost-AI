@@ -103,11 +103,12 @@ pub async fn fetch_openai_models(
 
     let data: OpenAIModelsResponse = response.json().await?;
 
-    // Filter for chat models only
+    // Retain reasoning and fine-tuned conversation models, not just GPT-prefixed IDs.
+    // The model catalog evolves independently from the desktop application.
     let models: Vec<ModelInfo> = data
         .data
         .into_iter()
-        .filter(|m| m.id.starts_with("gpt-"))
+        .filter(|m| !is_known_non_conversational_model(&m.id))
         .map(|m| {
             let display_name = format_model_display_name(&m.id);
             ModelInfo {
@@ -353,15 +354,32 @@ fn is_embedding_model(model_name: &str) -> bool {
         || lower_name.contains("mxbai-embed")
 }
 
+/// Exclude API families that cannot be called by Ghost AI's text/agent wire.
+/// Do not allowlist model-name prefixes: that hid valid reasoning models like
+/// o3 as well as future names from the live provider model catalog.
+fn is_known_non_conversational_model(model_id: &str) -> bool {
+    let id = model_id.to_ascii_lowercase();
+    is_embedding_model(&id)
+        || ["davinci-", "babbage-", "dall-e", "tts-", "whisper-", "omni-moderation",
+            "text-moderation", "gpt-image", "gpt-audio", "gpt-realtime", "gpt-live",
+            "gpt-transcribe", "gpt-4o-transcribe", "gpt-4o-realtime"]
+            .iter().any(|prefix| id.starts_with(prefix))
+        || id.contains("-audio-preview")
+}
+
+fn ollama_tags_url(base_url: &str) -> String {
+    // Users often enter Ollama's OpenAI-compatible /v1 endpoint. Native
+    // model listing lives at /api/tags instead; preserve reverse-proxy prefixes.
+    let base = base_url.trim().trim_end_matches('/');
+    let root = base.strip_suffix("/v1").unwrap_or(base);
+    format!("{root}/api/tags")
+}
+
 /// Fetch available models from Ollama
 pub async fn fetch_ollama_models(base_url: String) -> Result<Vec<ModelInfo>> {
     let client = create_http_client();
 
-    let url = if base_url.ends_with('/') {
-        format!("{}api/tags", base_url)
-    } else {
-        format!("{}/api/tags", base_url)
-    };
+    let url = ollama_tags_url(&base_url);
 
     let response = client.get(&url).send().await?;
 
@@ -491,11 +509,31 @@ mod tests {
         }
     }
 
+    #[test]
+    fn exposes_reasoning_and_fine_tuned_models_without_enabling_audio_only_endpoints() {
+        for name in ["o1", "o3", "o4-mini", "gpt-6.1-terra", "ft:gpt-4o:my-org:custom"] {
+            assert!(!is_known_non_conversational_model(name), "should allow {name}");
+        }
+        for name in ["text-embedding-3-small", "davinci-002", "gpt-image-1",
+            "whisper-1", "gpt-realtime-2", "omni-moderation-latest", "tts-1"] {
+            assert!(is_known_non_conversational_model(name), "should filter {name}");
+        }
+    }
+
+    #[test]
+    fn ollama_tags_endpoint_supports_native_and_openai_compatible_urls() {
+        assert_eq!(ollama_tags_url("http://localhost:11434"), "http://localhost:11434/api/tags");
+        assert_eq!(ollama_tags_url("http://localhost:11434/v1/"), "http://localhost:11434/api/tags");
+        assert_eq!(ollama_tags_url("https://proxy.example/ollama/v1"), "https://proxy.example/ollama/api/tags");
+    }
+
     #[tokio::test]
     async fn fetch_openai_models_keeps_gpt_models_and_sends_bearer_auth() {
         let body = r#"{"data":[
             {"id":"gpt-4o"},
             {"id":"gpt-4o-mini"},
+            {"id":"o3"},
+            {"id":"ft:gpt-4o:custom"},
             {"id":"text-embedding-3-small"},
             {"id":"davinci-002"}
         ]}"#;
@@ -505,11 +543,13 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(models.len(), 2);
+        assert_eq!(models.len(), 4);
         assert_eq!(models[0].id, "gpt-4o");
         assert_eq!(models[0].name, "GPT 4o");
         assert_eq!(models[1].id, "gpt-4o-mini");
         assert_eq!(models[1].name, "GPT 4o Mini");
+        assert_eq!(models[2].id, "o3");
+        assert_eq!(models[3].id, "ft:gpt-4o:custom");
         for m in &models {
             assert!(m.description.is_none());
             assert!(m.context_length.is_none());
