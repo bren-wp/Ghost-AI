@@ -187,29 +187,43 @@ try {
     }
   }
 
-  # WebView2 can paint its initial blank surface after the native window
-  # appears, particularly on hosted Windows runners. Require *real* rendered
-  # content, but allow bounded repaints rather than failing a single frame.
-  # Never upload or count an invalid capture as a successful screenshot.
+  # Validate both the whole screenshot and the *app content* region. A
+  # 16x16 sampling lattice aliasing against fixed-height UI elements falsely
+  # rejected a completely rendered 1160x760 Ghost AI main window as "blank":
+  # only five colors landed on that coarse grid, while the saved PNG actually
+  # showed the navigation, model CTA, title and chat composer.
+  # A 64x64 lattice observes narrow text/buttons without accepting a uniform
+  # WebView surface or a native window title bar as proof of rendered content.
+  $sampleStepX = [Math]::Max(1, [int]($width / 64))
+  $sampleStepY = [Math]::Max(1, [int]($height / 64))
   $samples = [System.Collections.Generic.HashSet[int]]::new()
+  $contentSamples = [System.Collections.Generic.HashSet[int]]::new()
   for ($attempt = 1; $attempt -le 5; $attempt++) {
     $samples.Clear()
-    for ($y = 12; $y -lt $height - 12; $y += [Math]::Max(1, [int]($height / 16))) {
-      for ($x = 12; $x -lt $width - 12; $x += [Math]::Max(1, [int]($width / 16))) {
+    $contentSamples.Clear()
+    for ($y = 12; $y -lt $height - 12; $y += $sampleStepY) {
+      for ($x = 12; $x -lt $width - 12; $x += $sampleStepX) {
         [void]$samples.Add($bitmap.GetPixel($x, $y).ToArgb())
       }
     }
-    if ($samples.Count -ge 8) { break }
+    # Exclude the Windows title bar, left navigation rail and bottom composer;
+    # these can render even if the main WebView content is missing.
+    for ($y = [int]($height * 0.16); $y -lt [int]($height * 0.82); $y += $sampleStepY) {
+      for ($x = [int]($width * 0.22); $x -lt [int]($width * 0.87); $x += $sampleStepX) {
+        [void]$contentSamples.Add($bitmap.GetPixel($x, $y).ToArgb())
+      }
+    }
+    if ($samples.Count -ge 8 -and $contentSamples.Count -ge 8) { break }
     if ($attempt -eq 5) {
-      # Retain the rejected frame as diagnostic evidence, never as a passing
-      # screenshot. The workflow uploads the entire smoke/screenshots folder.
+      # Preserve rejected *real* frames as diagnostic evidence only, not as
+      # passing screenshots. The workflow still requires all eight captures.
       $diagnostic = [System.IO.Path]::ChangeExtension([System.IO.Path]::GetFullPath($Output), '.invalid.png')
       [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($diagnostic)) | Out-Null
       $bitmap.Save($diagnostic, [System.Drawing.Imaging.ImageFormat]::Png)
       Write-Warning "Rejected WebView frame retained for inspection: $diagnostic"
-      throw "Screenshot appears blank or visually invalid after 5 real frame captures (distinct samples: $($samples.Count))"
+      throw "Screenshot is blank or invalid after 5 real frames (full colors: $($samples.Count); content colors: $($contentSamples.Count))"
     }
-    Write-Host "WebView content not painted yet (attempt $attempt/5, colors $($samples.Count)); retrying real window capture"
+    Write-Host "WebView content not ready (attempt $attempt/5, full colors $($samples.Count), content colors $($contentSamples.Count)); retrying"
     Start-Sleep -Seconds 3
     [void][GhostAiWindowCapture]::SetForegroundWindow($window)
     if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $window) {
