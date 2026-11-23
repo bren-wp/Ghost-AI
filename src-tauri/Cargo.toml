@@ -87,7 +87,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 
 # Web scraping
 scraper = "0.29"
-htmd = "0.5"
+htmd = "0.6"
 url = "2"
 urlencoding = "2"
 readability = { version = "0.3", default-features = false }
