@@ -99,6 +99,9 @@ jobs:
           tail -n 60 reports/npm-security-audit.txt || true
           exit 1
       - name: Audit every first-party frontend and Rust module for dead code and security review candidates
+        # The independent code/security inventories must still be produced
+        # when frontend tests fail, so the original failure stays diagnosable.
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
@@ -117,6 +120,7 @@ jobs:
             reports/ghost-ai-localization-audit.md
           if-no-files-found: error
       - name: Verify legal notices and brand assets
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           test -s legal/EULA-EN.txt
