@@ -22,11 +22,6 @@ interface CheckApiResult {
   error: string | null
 }
 
-/** The model the API check sends "hi" to: the last model in the list. */
-function getTestModelId(models: ModelItem[]): string | null {
-  return models.length > 0 ? models[models.length - 1].modelId : null
-}
-
 interface ProviderFormProps {
   apiKey: string
   onApiKeyChange: (key: string) => void
@@ -62,10 +57,16 @@ export function ProviderForm({
 }: ProviderFormProps) {
   const { t } = useTranslation('providers')
   const isCustom = isCustomProvider(selectedProvider)
-  const isKeylessLocal = ['ollama', 'lmstudio', 'gpustack', 'ovms'].includes(selectedProvider.id)
+  const isKeylessLocal = selectedProvider.id === 'ollama'
+  const supportsOptionalKey = !isKeylessLocal && !requiresApiKeyForFetch(selectedProvider.id)
   const invalidEndpoint = apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl)
   const plaintextRemoteEndpoint = isPlaintextRemoteEndpoint(apiBaseUrl)
 
+  const [selectedTestModel, setSelectedTestModel] = React.useState('')
+  // Fall back to the previous last-model behavior until the user explicitly
+  // selects a model. A removed model must never be sent to the API.
+  const testModel = models.find((model) => model.id === selectedTestModel) ?? models.at(-1)
+  const testModelId = testModel?.modelId.trim() || null
   const [checkStatus, setCheckStatus] = React.useState<CheckStatus>('idle')
   const [checkError, setCheckError] = React.useState<string | null>(null)
   const [checkLatency, setCheckLatency] = React.useState<number | null>(null)
@@ -78,7 +79,7 @@ export function ProviderForm({
     setCheckStatus('idle')
     setCheckError(null)
     setCheckLatency(null)
-  }, [selectedProvider.id, apiKey, apiBaseUrl, compatibilityType, apiStyle, models])
+  }, [selectedProvider.id, apiKey, apiBaseUrl, compatibilityType, apiStyle, testModelId])
 
   React.useEffect(() => {
     return () => {
@@ -95,7 +96,6 @@ export function ProviderForm({
         : 'custom_openai'
       : selectedProvider.id
 
-    const testModelId = getTestModelId(models)
     if (!testModelId) {
       setCheckStatus('failed')
       setCheckError(t('noModelForTesting'))
@@ -112,8 +112,8 @@ export function ProviderForm({
       const result = await invoke<CheckApiResult>('check_provider_api', {
         providerType,
         modelId: testModelId,
-        apiKey: apiKey || null,
-        baseUrl: apiBaseUrl || null,
+        apiKey: apiKey.trim() || null,
+        baseUrl: apiBaseUrl.trim() || null,
         apiStyle: isCustom && compatibilityType === 'openai' ? apiStyle : null,
       })
 
@@ -138,7 +138,7 @@ export function ProviderForm({
       setCheckStatus('failed')
       setCheckError(t('connectionFailed'))
     }
-  }, [selectedProvider, isCustom, compatibilityType, apiKey, apiBaseUrl, apiStyle, models, t])
+  }, [selectedProvider, isCustom, compatibilityType, apiKey, apiBaseUrl, apiStyle, testModelId, t])
 
   return (
     <div className="min-w-0 space-y-4">
@@ -211,6 +211,24 @@ export function ProviderForm({
         </>
       )}
 
+      {models.length > 1 && (
+        <div className="space-y-2">
+          <Label htmlFor="provider-test-model">{t('testModel')}</Label>
+          <select
+            id="provider-test-model"
+            value={testModel?.id ?? ''}
+            onChange={(event) => setSelectedTestModel(event.target.value)}
+            className="h-10 w-full min-w-0 rounded-xl border border-[#405474] bg-[#0D1726] px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-[#00E5FF]"
+          >
+            {models.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.displayName || model.modelId}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {isKeylessLocal ? (
         <div className="flex items-start gap-3 rounded-xl border border-[#00E5FF]/25 bg-[#00E5FF]/5 p-3 text-sm">
           <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[#00E5FF]" />
@@ -223,7 +241,9 @@ export function ProviderForm({
         </div>
       ) : (
         <div className="space-y-2">
-          <Label htmlFor="api-key">{t('apiKey')}</Label>
+          <Label htmlFor="api-key">
+            {supportsOptionalKey ? t('optionalApiKey') : t('apiKey')}
+          </Label>
           <div className="flex min-w-0 flex-wrap items-start gap-2">
             <div className="relative min-w-[min(100%,240px)] flex-1">
               <Input
@@ -233,7 +253,6 @@ export function ProviderForm({
                 value={apiKey}
                 onChange={(e) => onApiKeyChange(e.target.value)}
                 className="h-10 rounded-xl border-[#405474] bg-[#0D1726] pr-10"
-                disabled={selectedProvider.id === 'ollama'}
               />
               <Button
                 type="button"
@@ -242,7 +261,6 @@ export function ProviderForm({
                 className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                 aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
                 aria-pressed={showApiKey}
-                disabled={selectedProvider.id === 'ollama'}
                 onClick={() => onShowApiKeyChange(!showApiKey)}
               >
                 {showApiKey ? (
@@ -267,7 +285,7 @@ export function ProviderForm({
               disabled={
                 checkStatus === 'checking' ||
                 invalidEndpoint ||
-                models.length === 0 ||
+                !testModelId ||
                 (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())
               }
             >
@@ -288,6 +306,9 @@ export function ProviderForm({
               )}
             </Button>
           </div>
+          {!testModelId && (
+            <p className="text-xs text-muted-foreground">{t('noModelForTesting')}</p>
+          )}
           {checkStatus === 'failed' && checkError && (
             <div role="alert" className="text-xs text-destructive space-y-1">
               <p className="font-medium">{t('connectionFailed')}</p>
@@ -302,7 +323,9 @@ export function ProviderForm({
             <p className="text-xs text-success">{t('connectionSuccessful')}</p>
           )}
           {checkStatus !== 'failed' && checkStatus !== 'success' && (
-            <p className="text-xs text-muted-foreground">{t('yourApiKeyWillBeStored')}</p>
+            <p className="text-xs text-muted-foreground">
+              {supportsOptionalKey ? t('optionalLocalApiKeyDescription') : t('yourApiKeyWillBeStored')}
+            </p>
           )}
         </div>
       )}
@@ -362,7 +385,7 @@ export function ProviderForm({
             type="button"
             variant={checkStatus === 'failed' ? 'destructive' : 'outline'}
             onClick={handleCheckApi}
-            disabled={checkStatus === 'checking' || invalidEndpoint || models.length === 0}
+            disabled={checkStatus === 'checking' || invalidEndpoint || !testModelId}
             className="border-[#00E5FF]/40 bg-[#00E5FF]/10 text-[#B5F5FC] hover:bg-[#00E5FF]/20"
           >
             {checkStatus === 'checking' ? (
