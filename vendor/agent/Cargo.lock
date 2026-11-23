@@ -3004,7 +3004,7 @@ dependencies = [
  "pdf-extract",
  "png 0.17.16",
  "quick-xml",
- "rand 0.8.8",
+ "rand 0.10.4",
  "readability",
  "regex",
  "reqwest 0.13.5",
