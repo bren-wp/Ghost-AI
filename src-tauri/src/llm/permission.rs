@@ -3013,7 +3013,7 @@ mod tests {
         // Verbatim Windows paths must be classified as external writes before
         // the permission event is expected; this assertion fails fast.
         assert_eq!(
-            bash_security::outside_write_targets(
+            ghost_ai_agent_core::bash_security::outside_write_targets(
                 &command,
                 Some(&std::env::temp_dir()),
                 std::env::temp_dir().to_str(),
