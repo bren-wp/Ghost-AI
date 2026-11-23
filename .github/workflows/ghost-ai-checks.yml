@@ -215,19 +215,33 @@ jobs:
           )) {
             $label = "$($size.Width)x$($size.Height)"
             foreach ($surface in @('main', 'settings')) {
-              try {
-                $parameters = @{
-                  Executable = 'smoke/Portable/Ghost-AI.exe'
-                  Output = "smoke/screenshots/ghost-ai-$surface-$label.png"
-                  ViewportWidth = $size.Width
-                  ViewportHeight = $size.Height
+              $verified = $false
+              $lastFailure = 'Capture did not execute'
+              # WebView2 can occasionally start with an unpainted renderer on
+              # Windows hosted desktops. Retry a fresh *real app process*
+              # rather than treating a blank frame as success. Keep all eight
+              # required viewport/surface validations mandatory.
+              for ($attempt = 1; $attempt -le 3 -and -not $verified; $attempt++) {
+                try {
+                  $parameters = @{
+                    Executable = 'smoke/Portable/Ghost-AI.exe'
+                    Output = "smoke/screenshots/ghost-ai-$surface-$label.png"
+                    ViewportWidth = $size.Width
+                    ViewportHeight = $size.Height
+                  }
+                  if ($surface -eq 'settings') { $parameters.OpenSettings = $true }
+                  ./scripts/ghost-ai-capture-screenshot.ps1 @parameters
+                  $verified = $true
+                  $coverage += "CAPTURED $surface $label (process attempt $attempt)"
+                  $captured++
+                } catch {
+                  $lastFailure = $_.Exception.Message
+                  Write-Warning "Ghost AI $surface $label attempt $attempt of 3 failed: $lastFailure"
+                  if ($attempt -lt 3) { Start-Sleep -Seconds 3 }
                 }
-                if ($surface -eq 'settings') { $parameters.OpenSettings = $true }
-                ./scripts/ghost-ai-capture-screenshot.ps1 @parameters
-                $coverage += "CAPTURED $surface $label"
-                $captured++
-              } catch {
-                $coverage += "NOT VERIFIED $surface $label - $($_.Exception.Message)"
+              }
+              if (-not $verified) {
+                $coverage += "NOT VERIFIED $surface $label after 3 real app launches - $lastFailure"
               }
             }
           }
