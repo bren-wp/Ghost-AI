@@ -36,11 +36,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install from pinned current locks
         run: pnpm install --frozen-lockfile
-      - name: Upgrade every npm dependency within declared compatible ranges
+      - name: Upgrade compatible npm versions and verified major migration candidates
         shell: bash
         run: |
           set -euo pipefail
           pnpm up
+          # These majors support the project's existing ESLint 8, TypeScript 6
+          # and Vite 6 configurations. Regenerate the lock; never hand-edit it.
+          pnpm add -D '@typescript-eslint/eslint-plugin@^8.73.0' '@typescript-eslint/parser@^8.73.0' '@vitejs/plugin-react@^6.3.0'
           pnpm install --frozen-lockfile
       - name: Upgrade both Cargo workspaces within declared compatible ranges
         shell: bash
