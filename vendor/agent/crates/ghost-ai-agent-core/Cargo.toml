@@ -26,7 +26,7 @@ lopdf = { version = "0.45", default-features = false }
 calamine = "0.38.0"
 quick-xml = { version = "0.42", default-features = false }
 zip = { version = "9", default-features = false, features = ["deflate"] }
-tree-sitter = "0.25"
+tree-sitter = "0.27"
 tree-sitter-bash = "0.25"
 async-stream.workspace = true
 encoding_rs.workspace = true
