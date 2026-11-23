@@ -1,0 +1,113 @@
+# Temporary branch-only maintainer workflow; remove once refresh is reconciled.
+name: Ghost AI compatible dependency refresh
+on:
+  push:
+    branches: [feat/ghost-ai-provider-workspace-20261123]
+    paths: [.github/workflows/ghost-ai-safe-dependency-refresh.yml]
+permissions:
+  contents: write
+jobs:
+  refresh:
+    if: github.repository == 'bren-wp/Ghost-AI'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/ghost-ai-provider-workspace-20261123
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri -> target
+            vendor/agent -> target
+      - name: Configure isolated bot commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Inventory current and latest npm versions (including potential majors)
+        shell: bash
+        run: |
+          mkdir -p reports
+          pnpm install --frozen-lockfile
+          pnpm outdated --recursive | tee reports/npm-outdated-before.txt || true
+      - name: Refresh all compatible npm packages without forced major migrations
+        shell: bash
+        run: |
+          pnpm up --recursive
+          pnpm install --frozen-lockfile
+      - name: Require production frontend build, full tests, and clean npm audit
+        shell: bash
+        run: |
+          pnpm build
+          pnpm test
+          pnpm audit --audit-level low
+      - name: Commit verified npm lockfile upgrades only
+        shell: bash
+        run: |
+          git add package.json pnpm-lock.yaml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(deps): refresh compatible npm packages with verified frontend tests"
+            git push origin HEAD:refs/heads/feat/ghost-ai-provider-workspace-20261123
+          else
+            echo "npm packages already current within compatible version ranges"
+          fi
+      - name: Install Linux desktop build prerequisites
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev
+      - name: Refresh compatible Cargo versions in BOTH workspaces
+        shell: bash
+        run: |
+          cargo update --manifest-path src-tauri/Cargo.toml
+          cargo update --manifest-path vendor/agent/Cargo.toml
+          cargo metadata --manifest-path src-tauri/Cargo.toml --locked --format-version 1 --no-deps > /dev/null
+          cargo metadata --manifest-path vendor/agent/Cargo.toml --locked --format-version 1 --no-deps > /dev/null
+      - name: Require both Rust workspaces compile with frozen locks
+        shell: bash
+        timeout-minutes: 50
+        run: |
+          cargo check --manifest-path vendor/agent/Cargo.toml --workspace --locked
+          cargo check --manifest-path src-tauri/Cargo.toml --lib --locked
+      - name: Require RustSec advisory gates
+        shell: bash
+        timeout-minutes: 20
+        run: |
+          cargo install cargo-audit --locked --version 0.23.0
+          python3 scripts/ghost-ai-rustsec-gtk3-exception.py
+          cargo audit --file src-tauri/Cargo.lock --ignore RUSTSEC-2024-0429
+          cargo audit --file vendor/agent/Cargo.lock
+      - name: Commit verified compatible Cargo lockfile upgrades only
+        shell: bash
+        run: |
+          git add src-tauri/Cargo.lock vendor/agent/Cargo.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(deps): refresh compatible Rust dependencies with Linux compilation and security gates"
+            git push origin HEAD:refs/heads/feat/ghost-ai-provider-workspace-20261123
+          else
+            echo "Rust lockfiles already current within compatible version ranges"
+          fi
+      - name: Inventory remaining major upgrades
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p reports
+          pnpm outdated --recursive > reports/npm-outdated-after.txt 2>&1 || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: Ghost-AI-Dependency-Refresh-Inventory
+          path: |
+            reports/npm-outdated-before.txt
+            reports/npm-outdated-after.txt
+          if-no-files-found: warn
