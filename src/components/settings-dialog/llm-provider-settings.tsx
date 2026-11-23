@@ -155,7 +155,7 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
                 <h4 className="text-base font-semibold text-white">{t('connectionSettings')}</h4>
                 <p className="mt-1 text-xs text-[#B2C3D8]">{t('connectionSectionDescription')}</p>
               </div>
-            <ProviderForm
+              <ProviderForm
               apiKey={apiKey}
               onApiKeyChange={setApiKey}
               showApiKey={showApiKey}
@@ -174,7 +174,7 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
 
             </section>
             <section aria-label={t('models')} className="min-w-0 rounded-2xl border border-[#30415D] bg-[#111C2D] p-4 sm:p-6">
-            <ModelsTable
+              <ModelsTable
               models={models}
               selectedProvider={selectedProvider}
               apiKey={apiKey}
@@ -186,7 +186,8 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
               onModelSettings={handleModelSettings}
             />
 
-            </section>          </div>
+            </section>
+          </div>
         </div>
 
         {/* Footer with Save Button */}
