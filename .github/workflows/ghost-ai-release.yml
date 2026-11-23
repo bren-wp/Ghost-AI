@@ -13,6 +13,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   validate:
@@ -327,6 +328,63 @@ jobs:
     needs: [validate, windows, linux, macos]
     if: always() && needs.validate.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && needs.macos.result == 'success'
     steps:
+      # Release builds alone are insufficient: the same commit must pass the
+      # separate Windows startup, first-paint and 8 real viewport checks.
+      # Never publish a release when its Quality Gates fail or are missing.
+      - name: Require successful same-SHA Quality Gates before publication
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ needs.validate.outputs.release_tag }}"
+          quality_branch="release/$tag"
+          for attempt in $(seq 1 45); do
+            response=$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ghost-ai-checks.yml/runs" -f head_sha="$GITHUB_SHA" -f per_page=100)
+            status=$(jq -r --arg sha "$GITHUB_SHA" --arg branch "$quality_branch" '
+              [.workflow_runs[] | select(.head_sha == $sha and .head_branch == $branch)]
+              | sort_by(.id) | last
+              | if . == null then "missing" else (.status + " " + (.conclusion // "")) end
+            ' <<<"$response")
+            case "$status" in
+              "completed success")
+                echo "Quality Gates passed on $quality_branch at $GITHUB_SHA"
+                break
+                ;;
+              completed\ *)
+                echo "::error::Quality Gates finished unsuccessfully for $GITHUB_SHA ($status)"
+                exit 1
+                ;;
+              *)
+                echo "Quality Gates for $GITHUB_SHA: $status ($attempt/45)"
+                if [[ "$attempt" -eq 45 ]]; then
+                  echo "::error::No completed successful Quality Gates for exact release SHA"
+                  exit 1
+                fi
+                sleep 45
+                ;;
+            esac
+          done
+      - name: Refuse to overwrite an already-published version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ needs.validate.outputs.release_tag }}"
+          status=$(curl --silent --show-error --location --output release-lookup.json \
+            --write-out '%{http_code}' \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$tag")
+          if [[ "$status" == "200" ]]; then
+            echo "::error::$tag is already published. Increment the version and create a new release branch."
+            exit 1
+          fi
+          if [[ "$status" != "404" ]]; then
+            echo "::error::Could not securely verify release uniqueness (HTTP $status)"
+            exit 1
+          fi
       - uses: actions/download-artifact@v8
         with:
           name: Ghost-AI-Windows
