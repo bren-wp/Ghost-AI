@@ -1,6 +1,7 @@
 # Ghost AI by Brendigo
-# Keep dependency upgrades visible and reviewable. Never auto-merge.
-# Major API migrations must pass full desktop/agent tests and release gates.
+# Disable automated version-update pull requests at maintainer request.
+# Dependency maintenance is performed in reviewed, tested changes.
+# Security alerts and independent npm/RustSec CI audit gates remain enabled.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -10,7 +11,7 @@ updates:
       day: monday
       time: "03:00"
       timezone: Europe/Zagreb
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       ghost-ai-npm-compatible:
         applies-to: version-updates
@@ -27,7 +28,7 @@ updates:
       day: monday
       time: "03:30"
       timezone: Europe/Zagreb
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       ghost-ai-desktop-compatible:
         applies-to: version-updates
@@ -44,7 +45,7 @@ updates:
       day: monday
       time: "03:45"
       timezone: Europe/Zagreb
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       ghost-ai-agent-compatible:
         applies-to: version-updates
@@ -61,7 +62,7 @@ updates:
       day: monday
       time: "04:00"
       timezone: Europe/Zagreb
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       ghost-ai-actions:
         patterns: ["*"]
