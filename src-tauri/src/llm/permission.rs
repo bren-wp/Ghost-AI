@@ -1694,19 +1694,25 @@ mod tests {
         decision: ApprovalDecision,
         expect_ordinal: usize,
     ) {
-        let request_id = loop {
-            let found = captured
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|(event, _)| event.as_str() == PERMISSION_REQUESTED_EVENT)
-                .nth(expect_ordinal)
-                .map(|(_, payload)| payload["request_id"].as_str().unwrap().to_string());
-            if let Some(id) = found {
-                break id;
+        // An unissued prompt must fail immediately during tests; otherwise a
+        // cross-platform permission regression can freeze Windows CI for hours.
+        let request_id = tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                let found = captured
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|(event, _)| event.as_str() == PERMISSION_REQUESTED_EVENT)
+                    .nth(expect_ordinal)
+                    .map(|(_, payload)| payload["request_id"].as_str().unwrap().to_string());
+                if let Some(id) = found {
+                    break id;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
             }
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        };
+        })
+        .await
+        .expect("Expected approval event not emitted within 10 seconds");
         assert!(registry.resolve(&request_id, decision));
     }
 
@@ -3000,6 +3006,18 @@ mod tests {
             deltas.clone(),
         );
         let command = format!("cp a {}/f", outside.display());
+        // Verbatim Windows paths must be classified as external writes before
+        // the permission event is expected; this assertion fails fast.
+        assert_eq!(
+            bash_security::outside_write_targets(
+                &command,
+                Some(&std::env::temp_dir()),
+                std::env::temp_dir().to_str(),
+                &[],
+            ),
+            vec![outside.join("f")],
+            "an out-of-scope write must require approval on all platforms",
+        );
         let task = tokio::spawn({
             let gate = f.gate.clone();
             let command = command.clone();
