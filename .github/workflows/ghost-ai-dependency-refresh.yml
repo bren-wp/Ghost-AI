@@ -36,14 +36,23 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install from pinned current locks
         run: pnpm install --frozen-lockfile
-      - name: Upgrade compatible npm versions and verified major migration candidates
+      - name: Update compatible npm packages and the complete latest Vite test toolchain
         shell: bash
         run: |
           set -euo pipefail
           pnpm up
-          # These majors support the project's existing ESLint 8, TypeScript 6
-          # and Vite 6 configurations. Regenerate the lock; never hand-edit it.
-          pnpm add -D '@typescript-eslint/eslint-plugin@^8.73.0' '@typescript-eslint/parser@^8.73.0' '@vitejs/plugin-react@^6.3.0'
+          # React plugin 6 imports vite/internal, which does not exist in Vite 6.
+          # Upgrade Vite, the React plugin and Vitest together; do not
+          # create an incompatible mixed-version lockfile.
+          pnpm add -D \
+            '@typescript-eslint/eslint-plugin@^8.73.0' \
+            '@typescript-eslint/parser@^8.73.0' \
+            'vite@^8.3.8' \
+            '@vitejs/plugin-react@^6.3.0' \
+            'vitest@^5.1.1' \
+            '@vitest/coverage-v8@^5.1.1' \
+            'jsdom@^31.0.1' \
+            '@testing-library/jest-dom@^8.0.0'
           pnpm install --frozen-lockfile
       - name: Upgrade both Cargo workspaces within declared compatible ranges
         shell: bash
