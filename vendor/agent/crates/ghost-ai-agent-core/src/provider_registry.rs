@@ -190,7 +190,19 @@ pub fn builtin_providers() -> Vec<BuiltinProvider> {
             default_base_url: "https://api.cerebras.ai/v1".into(),
             requires_api_key: true,
         },
+        P {
+            id: "zenmux".into(),
+            name: "ZenMux".into(),
+            default_base_url: "https://zenmux.ai/api/v1".into(),
+            requires_api_key: true,
+        },
         // Chinese AI
+        P {
+            id: "zai".into(),
+            name: "Z.ai".into(),
+            default_base_url: "https://api.z.ai/api/paas/v4".into(),
+            requires_api_key: true,
+        },
         P {
             id: "zhipu".into(),
             name: "Zhipu AI".into(),
@@ -225,6 +237,12 @@ pub fn builtin_providers() -> Vec<BuiltinProvider> {
             id: "doubao".into(),
             name: "Doubao".into(),
             default_base_url: "https://ark.cn-beijing.volces.com/api/v3".into(),
+            requires_api_key: true,
+        },
+        P {
+            id: "tokenhub".into(),
+            name: "Tencent Cloud TokenHub".into(),
+            default_base_url: "https://tokenhub.tencentmaas.com/v1".into(),
             requires_api_key: true,
         },
         P {
@@ -300,12 +318,14 @@ pub fn builtin_providers() -> Vec<BuiltinProvider> {
 /// Provider types that support auto-fetching models via API.
 ///
 /// Custom OpenAI-compatible providers (`custom`, `custom_openai`) are
-/// included; `custom_anthropic` is not (Anthropic has no list-models API).
+/// included; `custom_anthropic` uses Anthropic's cursor-paginated /v1/models.
 /// Azure and Gemini are excluded (different auth flow / SDK).
 pub fn is_supported_fetch_provider(provider_type: &str) -> bool {
     matches!(
         provider_type,
         "openai"
+            | "anthropic"
+            | "custom_anthropic"
             | "openrouter"
             | "ollama"
             | "deepseek"
@@ -328,12 +348,15 @@ pub fn is_supported_fetch_provider(provider_type: &str) -> bool {
             | "nvidia"
             | "huggingface"
             | "cerebras"
+            | "zenmux"
+            | "zai"
             | "zhipu"
             | "yi"
             | "baichuan"
             | "dashscope"
             | "stepfun"
             | "doubao"
+            | "tokenhub"
             | "hunyuan"
             | "tencent_cloud_ti"
             | "baidu_cloud"
@@ -379,13 +402,33 @@ mod tests {
     fn fetch_support_excludes_azure_and_gemini() {
         assert!(!is_supported_fetch_provider("azure"));
         assert!(!is_supported_fetch_provider("gemini"));
-        assert!(!is_supported_fetch_provider("custom_anthropic"));
+        assert!(is_supported_fetch_provider("custom_anthropic"));
+        assert!(is_supported_fetch_provider("anthropic"));
     }
 
     #[test]
     fn fetch_support_includes_custom_openai() {
         assert!(is_supported_fetch_provider("custom"));
         assert!(is_supported_fetch_provider("custom_openai"));
+    }
+
+    #[test]
+    fn every_builtin_provider_has_an_llm_route_and_consistent_credentials() {
+        for provider in builtin_providers() {
+            let route = crate::provider_catalog::resolve(&provider.id)
+                .unwrap_or_else(|| panic!("{} is exposed but has no LLM route", provider.id));
+            assert_eq!(route.key_required, provider.requires_api_key, "{}", provider.id);
+            if provider.id != "azure" {
+                assert_eq!(route.default_base_url.or(Some(provider.default_base_url.as_str())).is_some(), true);
+            }
+        }
+    }
+
+    #[test]
+    fn newly_registered_providers_can_fetch_models() {
+        for id in ["zenmux", "zai", "tokenhub", "anthropic", "custom_anthropic"] {
+            assert!(is_supported_fetch_provider(id), "discovery missing for {id}");
+        }
     }
 
     #[test]
