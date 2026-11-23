@@ -234,6 +234,28 @@ describe('useProviderSave security and reliability', () => {
     })
   })
 
+  it('normalizes pasted API credentials before saving', async () => {
+    vi.mocked(invoke).mockResolvedValue(existingProvider)
+    const { result } = setup({ models: [], existing: null, apiKey: '  sk-test  ' })
+    await act(async () => {
+      await result.current.handleSave()
+    })
+    expect(invoke).toHaveBeenCalledWith('create_provider', {
+      req: expect.objectContaining({ api_key: 'sk-test' }),
+    })
+  })
+
+  it('rejects duplicate active model identifiers before mutating the provider', async () => {
+    const { result } = setup({
+      models: [newModel('one'), { ...newModel('two'), modelId: ' one ' }],
+      existing: null,
+    })
+    await act(async () => {
+      await result.current.handleSave()
+    })
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
   it('blocks malformed endpoints before calling native providers', async () => {
     const { result } = setup({ models: [], existing: null, apiBaseUrl: 'file:///secrets' })
     await act(async () => { await result.current.handleSave() })
