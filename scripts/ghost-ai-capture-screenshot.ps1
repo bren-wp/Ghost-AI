@@ -57,6 +57,13 @@ try {
   }
   [void][GhostAiWindowCapture]::SetForegroundWindow($window)
   Start-Sleep -Seconds 6
+  # An unconfigured first run intentionally opens the "Connect an AI model"
+  # onboarding modal. Global Settings shortcuts correctly do nothing behind
+  # a blocking dialog. Dismiss onboarding exactly as a user would; do not
+  # suppress the onboarding flow in the production app or fake a screenshot.
+  [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+  Start-Sleep -Milliseconds 1200
+  [void][GhostAiWindowCapture]::SetForegroundWindow($window)
   $rect = New-Object GhostAiWindowCapture+RECT
   if (-not [GhostAiWindowCapture]::GetWindowRect($window, [ref]$rect)) {
     throw "Cannot read Ghost AI window dimensions"
