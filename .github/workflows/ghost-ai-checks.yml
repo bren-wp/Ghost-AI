@@ -149,13 +149,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build production Windows binary
         run: pnpm tauri build --no-bundle
-      # Reuse the production Rust dependencies from the immediately preceding
-      # Tauri release build instead of recompiling the tree in debug mode.
-      # Run the COMPLETE library suite; release CI additionally runs debug
-      # library suites on Linux/macOS. Do not skip failing tests.
-      - name: Run all Rust library regression tests on Windows
-        timeout-minutes: 40
-        run: 'cargo test --release --manifest-path src-tauri/Cargo.toml --lib -- --nocapture --test-threads=1'
       - name: Stage packaged resources as in Portable.zip
         shell: pwsh
         run: |
@@ -195,6 +188,12 @@ jobs:
           name: Ghost-AI-PR-Windows-First-Paint
           path: smoke/first-paint/
           if-no-files-found: warn
+      - name: Configure real Windows desktop for all required screenshot viewports
+        id: desktop
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          ./scripts/ghost-ai-ci-display.ps1 -MinWidth 1440 -MinHeight 900
       - name: Capture real app and Settings at supported desktop sizes
         id: screenshots
         shell: pwsh
@@ -240,8 +239,15 @@ jobs:
           name: Ghost-AI-PR-Windows-Screenshots
           path: smoke/screenshots/
           if-no-files-found: warn
-      - name: Block merge when the application does not open or first paint cannot be verified
-        if: steps.startup.outcome != 'success' || steps.first_paint.outcome != 'success' || steps.screenshots.outcome != 'success'
+      - name: Block merge if startup, first paint, display mode or any screenshot is not verified
+        if: steps.startup.outcome != 'success' || steps.first_paint.outcome != 'success' || steps.desktop.outcome != 'success' || steps.screenshots.outcome != 'success'
         shell: pwsh
         run: |
-          throw 'Ghost AI Windows verification failed; inspect startup, first-paint and screenshot artifacts'
+          throw 'Ghost AI Windows verification failed; inspect startup, first-paint, display mode and screenshot artifacts'
+      # Fail visual/startup problems before spending up to 40 more minutes
+      # compiling/running the full Rust library tests. None are skipped on
+      # a successful release candidate.
+      # Reuses the already-built production release-profile Rust dependencies.
+      - name: Run all Rust library regression tests on Windows
+        timeout-minutes: 40
+        run: 'cargo test --release --manifest-path src-tauri/Cargo.toml --lib -- --nocapture --test-threads=1'
