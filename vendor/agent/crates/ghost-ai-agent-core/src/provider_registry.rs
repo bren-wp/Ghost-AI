@@ -418,9 +418,6 @@ mod tests {
             let route = crate::provider_catalog::resolve(&provider.id)
                 .unwrap_or_else(|| panic!("{} is exposed but has no LLM route", provider.id));
             assert_eq!(route.key_required, provider.requires_api_key, "{}", provider.id);
-            if provider.id != "azure" {
-                assert_eq!(route.default_base_url.or(Some(provider.default_base_url.as_str())).is_some(), true);
-            }
         }
     }
 
