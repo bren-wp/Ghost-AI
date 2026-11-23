@@ -4,7 +4,6 @@
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { ProviderForm } from '@/components/provider-settings-dialog/provider-form'
 import { ModelsTable } from '@/components/provider-settings-dialog/models-table'
 import { FetchModelsDialog } from '@/components/provider-settings-dialog/fetch-models-dialog'
@@ -99,7 +98,8 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
         existingProvider.name !== (isCustom ? providerName : selectedProvider.name) ||
         existingProvider.provider_type !== effectiveProviderType ||
         existingProvider.api_style !== effectiveApiStyle)) ||
-    (!existingProvider && (isCustom || !requiresApiKeyForFetch(selectedProvider.id) || apiKey.trim().length > 0))
+    (!existingProvider &&
+      (isCustom || !requiresApiKeyForFetch(selectedProvider.id) || apiKey.trim().length > 0))
 
   const handleSelectProvider = (provider: LLMProvider, storedProviderId?: string) => {
     if (provider.isCustom) {
@@ -116,9 +116,9 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <div className="shrink-0 border-b border-border bg-card/50 px-4 py-3 sm:px-6">
+      <div className="shrink-0 border-b border-[#30415D] bg-[#0B1423] px-4 py-4 sm:px-6">
         <ProviderSelect
-          className="max-w-lg"
+          className="max-w-xl"
           selectedProvider={selectedProvider}
           editingCustomProviderId={editingCustomProviderId}
           storeProviders={storeProviders}
@@ -127,91 +127,116 @@ export function LLMProviderSettings({ open }: LLMProviderSettingsProps) {
       </div>
 
       {loadError ? (
-        <div role="alert" className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm">
+        <div
+          role="alert"
+          className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm"
+        >
           <p className="text-destructive">{loadError}</p>
-          <Button type="button" variant="outline" onClick={retryLoad}>{t('common:retry')}</Button>
+          <Button type="button" variant="outline" onClick={retryLoad}>
+            {t('common:retry')}
+          </Button>
         </div>
       ) : !isDataLoaded ? (
-        <div role="status" aria-live="polite" className="flex min-w-0 flex-1 items-center justify-center gap-2 p-6 text-muted-foreground">
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex min-w-0 flex-1 items-center justify-center gap-2 p-6 text-muted-foreground"
+        >
           <Loader2 aria-hidden="true" className="size-4 animate-spin" />
           {t('common:loading')}
         </div>
       ) : (
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6">
-          <div className="mx-auto w-full max-w-3xl min-w-0 space-y-6">
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">
-                {existingProvider ? t('common:edit') : t('common:add')} {displayName}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {existingProvider
-                  ? t('manageProviderDescription', { name: displayName })
-                  : isCustom
-                    ? t('configureCustomEndpoint')
-                    : t('configureApiSettings', { name: displayName })}
-              </p>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-[#080F1A] p-4 sm:p-6">
+            <div className="mx-auto w-full max-w-5xl min-w-0 space-y-5">
+              <header className="rounded-2xl border border-[#30415D] bg-gradient-to-r from-[#12283B] to-[#211B39] px-5 py-6 sm:px-6">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#8CDDE8]">
+                  {t('providerWorkspace')}
+                </p>
+                <h3 className="break-words text-2xl font-semibold text-white">{displayName}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[#B4C5DA]">
+                  {existingProvider
+                    ? t('manageProviderDescription', { name: displayName })
+                    : isCustom
+                      ? t('configureCustomEndpoint')
+                      : t('configureApiSettings', { name: displayName })}
+                </p>
+              </header>
+              <section
+                aria-label={t('connectionSettings')}
+                className="min-w-0 space-y-5 rounded-2xl border border-[#30415D] bg-[#111C2D] p-4 sm:p-6"
+              >
+                <div>
+                  <h4 className="text-base font-semibold text-white">{t('connectionSettings')}</h4>
+                  <p className="mt-1 text-xs text-[#B2C3D8]">{t('connectionSectionDescription')}</p>
+                </div>
+                <ProviderForm
+                  apiKey={apiKey}
+                  onApiKeyChange={setApiKey}
+                  showApiKey={showApiKey}
+                  onShowApiKeyChange={setShowApiKey}
+                  apiBaseUrl={apiBaseUrl}
+                  onApiBaseUrlChange={setApiBaseUrl}
+                  selectedProvider={selectedProvider}
+                  providerName={providerName}
+                  onProviderNameChange={setProviderName}
+                  apiStyle={apiStyle}
+                  onApiStyleChange={setApiStyle}
+                  compatibilityType={compatibilityType}
+                  onCompatibilityTypeChange={setCompatibilityType}
+                  models={models}
+                />
+              </section>
+              <section
+                aria-label={t('models')}
+                className="min-w-0 rounded-2xl border border-[#30415D] bg-[#111C2D] p-4 sm:p-6"
+              >
+                <ModelsTable
+                  models={models}
+                  selectedProvider={selectedProvider}
+                  apiKey={apiKey}
+                  apiBaseUrl={apiBaseUrl}
+                  onOpenFetchModal={handleOpenFetchModal}
+                  onOpenAddModelDialog={() => setAddModelDialogOpen(true)}
+                  onUpdateModelName={handleUpdateModelName}
+                  onDeleteModel={handleDeleteModel}
+                  onModelSettings={handleModelSettings}
+                />
+              </section>
             </div>
+          </div>
 
-            <Separator />
-
-            <ProviderForm
-              apiKey={apiKey}
-              onApiKeyChange={setApiKey}
-              showApiKey={showApiKey}
-              onShowApiKeyChange={setShowApiKey}
-              apiBaseUrl={apiBaseUrl}
-              onApiBaseUrlChange={setApiBaseUrl}
-              selectedProvider={selectedProvider}
-              providerName={providerName}
-              onProviderNameChange={setProviderName}
-              apiStyle={apiStyle}
-              onApiStyleChange={setApiStyle}
-              compatibilityType={compatibilityType}
-              onCompatibilityTypeChange={setCompatibilityType}
-              models={models}
-            />
-
-            <ModelsTable
-              models={models}
-              selectedProvider={selectedProvider}
-              apiKey={apiKey}
-              apiBaseUrl={apiBaseUrl}
-              onOpenFetchModal={handleOpenFetchModal}
-              onOpenAddModelDialog={() => setAddModelDialogOpen(true)}
-              onUpdateModelName={handleUpdateModelName}
-              onDeleteModel={handleDeleteModel}
-              onModelSettings={handleModelSettings}
-            />
+          {/* Footer with Save Button */}
+          <div className="shrink-0 flex flex-wrap items-center justify-end gap-2 border-t border-[#30415D] bg-[#0C1524] p-3 sm:p-4">
+            {savedWithoutModels && (
+              <p className="mr-auto text-sm text-warning">{t('addModelsBeforeChatting')}</p>
+            )}
+            <Button
+              className="bg-[#00E5FF] font-semibold text-[#061524] hover:bg-[#5DEDFB]"
+              onClick={handleSave}
+              disabled={
+                isSaving ||
+                !hasChanges ||
+                (requiresApiKeyForFetch(selectedProvider.id) &&
+                  !apiKey.trim() &&
+                  !existingProvider) ||
+                (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) ||
+                (apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl))
+              }
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="size-4 mr-2 animate-spin" />
+                  {t('common:saving')}
+                </>
+              ) : existingProvider ? (
+                t('common:save')
+              ) : (
+                t('saveConfiguration')
+              )}
+            </Button>
           </div>
         </div>
-
-        {/* Footer with Save Button */}
-        <div className="shrink-0 border-t p-3 sm:p-4 flex flex-wrap items-center justify-end gap-2">
-          {savedWithoutModels && (
-            <p className="mr-auto text-sm text-warning">{t('addModelsBeforeChatting')}</p>
-          )}
-          <Button
-            onClick={handleSave}
-            disabled={
-              isSaving || !hasChanges || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim() && !existingProvider) ||
-              (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) ||
-              (apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl))
-            }
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="size-4 mr-2 animate-spin" />
-                {t('common:saving')}
-              </>
-            ) : existingProvider ? (
-              t('common:save')
-            ) : (
-              t('saveConfiguration')
-            )}
-          </Button>
-        </div>
-      </div>
       )}
 
       {/* Fetch Models Dialog */}

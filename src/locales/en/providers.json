@@ -100,5 +100,19 @@
   "unsecuredEndpointWarning": "This remote server uses HTTP. API keys and prompts could travel unencrypted. Prefer HTTPS.",
   "copyModelId": "Copy Model ID",
   "modelIdCopied": "Model ID copied",
-  "modelIdCopyFailed": "Unable to copy model ID. Check clipboard permissions."
+  "modelIdCopyFailed": "Unable to copy model ID. Check clipboard permissions.",
+  "searchProviders": "Search providers...",
+  "cloudProviders": "Cloud providers",
+  "localRuntimes": "Local runtimes",
+  "localRuntime": "Local runtime",
+  "cloudOrCustom": "Cloud / custom",
+  "providerWorkspace": "Provider workspace",
+  "connectionSettings": "Connection settings",
+  "connectionSectionDescription": "Credentials, network address and connectivity",
+  "modelSectionDescription": "Add or discover models to enable conversations.",
+  "searchConfiguredModels": "Search configured models...",
+  "noMatchingModels": "No models match your search.",
+  "noMatchingProviders": "No providers match your search.",
+  "localNoApiKey": "No API key required",
+  "localNoApiKeyDescription": "This local runtime connects directly to your configured endpoint. Add a model below before testing the connection."
 }

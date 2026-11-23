@@ -263,10 +263,12 @@ const CATCH_ALL_ROUTES: &[(&str, &str)] = &[
     ("nvidia", "https://integrate.api.nvidia.com/v1"),
     ("huggingface", "https://api-inference.huggingface.co/v1"),
     ("cerebras", "https://api.cerebras.ai/v1"),
+    ("zenmux", "https://zenmux.ai/api/v1"),
     ("lmstudio", "http://localhost:1234/v1"),
     ("gpustack", "http://localhost:80/v1"),
     ("ovms", "http://localhost:8000/v1"),
     // Chinese AI
+    ("zai", "https://api.z.ai/api/paas/v4"),
     ("zhipu", "https://open.bigmodel.cn/api/paas/v4"),
     ("yi", "https://api.lingyiwanwu.com/v1"),
     ("baichuan", "https://api.baichuan-ai.com/v1"),
@@ -276,6 +278,7 @@ const CATCH_ALL_ROUTES: &[(&str, &str)] = &[
     ),
     ("stepfun", "https://api.stepfun.com/v1"),
     ("doubao", "https://ark.cn-beijing.volces.com/api/v3"),
+    ("tokenhub", "https://tokenhub.tencentmaas.com/v1"),
     ("hunyuan", "https://api.hunyuan.cloud.tencent.com/v1"),
     ("tencent_cloud_ti", "https://api.lkeap.cloud.tencent.com/v1"),
     ("baidu_cloud", "https://qianfan.baidubce.com/v2"),
@@ -346,6 +349,20 @@ mod tests {
             default_base_url("lmstudio"),
             Some("http://localhost:1234/v1")
         );
+    }
+
+    #[test]
+    fn newly_exposed_cloud_gateways_route_to_chat_completions() {
+        for (id, expected_url) in [
+            ("zenmux", "https://zenmux.ai/api/v1"),
+            ("zai", "https://api.z.ai/api/paas/v4"),
+            ("tokenhub", "https://tokenhub.tencentmaas.com/v1"),
+        ] {
+            let resolved = resolve(id).expect("every exposed provider must have a route");
+            assert_eq!(resolved.wire, Wire::OpenAiCompat, "{id}");
+            assert_eq!(resolved.default_base_url, Some(expected_url), "{id}");
+            assert!(resolved.key_required, "{id}");
+        }
     }
 
     #[test]

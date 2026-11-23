@@ -57,10 +57,14 @@ export function AddModelDialog({ open, onOpenChange, onAddModel }: AddModelDialo
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogTitle>{t('addModelManually')}</DialogTitle>
-        <DialogDescription>{t('enterModelIdentifier')}</DialogDescription>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <DialogContent className="w-[calc(100vw-32px)] max-w-[490px] space-y-4 rounded-2xl border-[#30415D] bg-[#111C2D] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.45)] sm:max-w-[490px] sm:p-6">
+        <DialogTitle className="pr-8 text-xl font-semibold text-white">
+          {t('addModelManually')}
+        </DialogTitle>
+        <DialogDescription className="text-sm leading-relaxed text-[#B2C3D8]">
+          {t('enterModelIdentifier')}
+        </DialogDescription>
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="model-id">{t('modelId')}</Label>
             <Input
@@ -71,6 +75,7 @@ export function AddModelDialog({ open, onOpenChange, onAddModel }: AddModelDialo
                 setModelId(e.target.value)
                 setError(null)
               }}
+              className="h-10 rounded-xl border-[#405474] bg-[#0D1726]"
               autoFocus
             />
           </div>
@@ -81,14 +86,29 @@ export function AddModelDialog({ open, onOpenChange, onAddModel }: AddModelDialo
               placeholder={t('displayNamePlaceholder')}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
+              className="h-10 rounded-xl border-[#405474] bg-[#0D1726]"
             />
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <DialogFooter className="gap-2 border-t border-[#30415D] pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              className="border-[#405474]"
+            >
               {t('common:cancel')}
             </Button>
-            <Button type="submit">{t('common:add')}</Button>
+            <Button
+              type="submit"
+              className="bg-[#00E5FF] font-semibold text-[#061524] hover:bg-[#5DEDFB]"
+            >
+              {t('common:add')}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

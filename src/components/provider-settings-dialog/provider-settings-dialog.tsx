@@ -3,15 +3,7 @@
 
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2 } from 'lucide-react'
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
+import { Cloud, HardDrive, Layers3, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -21,7 +13,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { SidebarProvider } from '@/components/ui/sidebar'
-import { Separator } from '@/components/ui/separator'
 import type { ProviderSettingsDialogProps } from './types'
 import { isCustomProvider, isCustomProviderType } from './types'
 import { useProviderSettings } from './useProviderSettings'
@@ -120,7 +111,8 @@ export function ProviderSettingsDialog({
         existingProvider.name !== (isCustom ? providerName : selectedProvider.name) ||
         existingProvider.provider_type !== effectiveProviderType ||
         existingProvider.api_style !== effectiveApiStyle)) ||
-    (!existingProvider && (isCustom || !requiresApiKeyForFetch(selectedProvider.id) || apiKey.trim().length > 0))
+    (!existingProvider &&
+      (isCustom || !requiresApiKeyForFetch(selectedProvider.id) || apiKey.trim().length > 0))
 
   const appliedFocusRef = React.useRef<string | null>(null)
   const autoOpenedModelsRef = React.useRef<string | null>(null)
@@ -204,7 +196,10 @@ export function ProviderSettingsDialog({
     setSelectedProvider(provider)
   }
 
-  const handleCustomProviderSelect = (provider: typeof selectedProvider, storedProviderId?: string) => {
+  const handleCustomProviderSelect = (
+    provider: typeof selectedProvider,
+    storedProviderId?: string
+  ) => {
     const storeProvider = storedProviderId
       ? storeProviders.find((p) => p.id === storedProviderId)
       : storeProviders.find((p) => p.provider_type === provider.id && p.name === provider.name)
@@ -212,19 +207,24 @@ export function ProviderSettingsDialog({
     setSelectedProvider(provider)
   }
 
+  const isLocalProvider = ['ollama', 'lmstudio', 'gpustack', 'ovms'].includes(selectedProvider.id)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(92dvh,760px)] w-[min(96vw,960px)] max-w-[96vw] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:flex-row">
+      <DialogContent
+        data-testid="ghost-provider-workspace"
+        className="flex h-[min(92dvh,820px)] min-h-[340px] w-[calc(100vw-32px)] max-w-[1120px] min-w-0 flex-col gap-0 overflow-hidden rounded-[22px] border-[#30415D] bg-[#080F1A] p-0 shadow-[0_30px_100px_rgba(0,0,0,0.55)] sm:max-w-[1120px] md:flex-row"
+      >
         <DialogTitle className="sr-only">{t('dialogTitle')}</DialogTitle>
         <DialogDescription className="sr-only">{t('dialogDescription')}</DialogDescription>
-        <SidebarProvider className="min-h-0 min-w-0 flex-1">
+        <SidebarProvider className="min-h-0 min-w-0 flex-1 overflow-hidden">
           <ProviderSidebar
             selectedProvider={selectedProvider}
-            onSelectProvider={(p, storedId) => {
-              if (p.isCustom) {
-                handleCustomProviderSelect(p, storedId)
+            onSelectProvider={(provider, storedId) => {
+              if (provider.isCustom) {
+                handleCustomProviderSelect(provider, storedId)
               } else {
-                handleSidebarSelect(p)
+                handleSidebarSelect(provider)
               }
             }}
             storeProviders={storeProviders}
@@ -232,113 +232,155 @@ export function ProviderSettingsDialog({
           />
           <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <ProviderSelect
-              className="shrink-0 border-b border-border p-3 md:hidden"
+              className="shrink-0 border-b border-[#30415D] bg-[#101A2B] px-5 py-3 md:hidden"
               selectedProvider={selectedProvider}
               editingCustomProviderId={editingCustomProviderId}
               storeProviders={storeProviders}
-              onSelectProvider={(provider, storedId) => provider.isCustom ? handleCustomProviderSelect(provider, storedId) : handleSidebarSelect(provider)}
+              onSelectProvider={(provider, storedId) =>
+                provider.isCustom
+                  ? handleCustomProviderSelect(provider, storedId)
+                  : handleSidebarSelect(provider)
+              }
             />
             {loadError ? (
-              <div role="alert" className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm">
+              <div
+                role="alert"
+                className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm"
+              >
                 <p className="text-destructive">{loadError}</p>
-                <Button type="button" variant="outline" onClick={retryLoad}>{t('common:retry')}</Button>
+                <Button type="button" variant="outline" onClick={retryLoad}>
+                  {t('common:retry')}
+                </Button>
               </div>
             ) : !isDataLoaded ? (
-              <div role="status" aria-live="polite" className="flex flex-1 items-center justify-center gap-3 text-sm text-muted-foreground">
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex flex-1 items-center justify-center gap-3 text-sm text-muted-foreground"
+              >
                 <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-                {t("common:loading")}
+                {t('common:loading')}
               </div>
             ) : (
               <>
-            <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-              <div className="flex items-center gap-2 px-4">
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    <BreadcrumbItem className="hidden md:block">
-                      <BreadcrumbLink href="#">{t('providers')}</BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator className="hidden md:block" />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage>{displayName}</BreadcrumbPage>
-                    </BreadcrumbItem>
-                  </BreadcrumbList>
-                </Breadcrumb>
-              </div>
-            </header>
-            <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pt-0 sm:p-6 sm:pt-0">
-              <div className="min-w-0 space-y-6">
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold">
-                    {existingProvider ? t('common:edit') : t('common:add')} {displayName}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {existingProvider
-                      ? t('manageProviderDescription', { name: displayName })
-                      : isCustom
-                        ? t('configureCustomEndpoint')
-                        : t('configureApiSettings', { name: displayName })}
-                  </p>
+                <header className="shrink-0 border-b border-[#30415D]/65 bg-gradient-to-r from-[#12283B] via-[#111D30] to-[#211B39] px-5 pb-5 pt-6 sm:px-7">
+                  <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8CDDE8]">
+                    <Layers3 aria-hidden="true" className="size-4" />
+                    {t('providerWorkspace')}
+                  </div>
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 pr-5">
+                    <div className="min-w-0">
+                      <h2 className="break-words text-2xl font-semibold tracking-tight text-white sm:text-[28px]">
+                        {displayName}
+                      </h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#B4C5DA]">
+                        {existingProvider
+                          ? t('manageProviderDescription', { name: displayName })
+                          : isCustom
+                            ? t('configureCustomEndpoint')
+                            : t('configureApiSettings', { name: displayName })}
+                      </p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#5C6A87]/50 bg-[#080F1A]/55 px-3 py-1.5 text-xs text-[#CFDBEE]">
+                      {isLocalProvider ? (
+                        <HardDrive aria-hidden="true" className="size-3.5 text-[#00E5FF]" />
+                      ) : (
+                        <Cloud aria-hidden="true" className="size-3.5 text-[#A58BFF]" />
+                      )}
+                      {isLocalProvider ? t('localRuntime') : t('cloudOrCustom')}
+                    </span>
+                  </div>
+                </header>
+                <div className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-5 sm:px-7 sm:py-6">
+                  <section
+                    aria-labelledby="provider-connection-heading"
+                    className="min-w-0 rounded-2xl border border-[#30415D]/75 bg-[#111C2D] p-4 shadow-[0_10px_28px_rgba(0,0,0,0.12)] sm:p-5"
+                  >
+                    <div className="mb-5 flex items-center gap-3">
+                      <div aria-hidden="true" className="h-8 w-1 rounded-full bg-[#00E5FF]" />
+                      <div className="min-w-0">
+                        <h3
+                          id="provider-connection-heading"
+                          className="text-base font-semibold text-white"
+                        >
+                          {t('connectionSettings')}
+                        </h3>
+                        <p className="mt-0.5 text-xs text-[#B2C3D8]">
+                          {t('connectionSectionDescription')}
+                        </p>
+                      </div>
+                    </div>
+                    <ProviderForm
+                      apiKey={apiKey}
+                      onApiKeyChange={setApiKey}
+                      showApiKey={showApiKey}
+                      onShowApiKeyChange={setShowApiKey}
+                      apiBaseUrl={apiBaseUrl}
+                      onApiBaseUrlChange={setApiBaseUrl}
+                      selectedProvider={selectedProvider}
+                      providerName={providerName}
+                      onProviderNameChange={setProviderName}
+                      apiStyle={apiStyle}
+                      onApiStyleChange={setApiStyle}
+                      compatibilityType={compatibilityType}
+                      onCompatibilityTypeChange={setCompatibilityType}
+                      models={models}
+                    />
+                  </section>
+                  <section
+                    aria-label={t('models')}
+                    className="min-w-0 rounded-2xl border border-[#30415D]/75 bg-[#111C2D] p-4 shadow-[0_10px_28px_rgba(0,0,0,0.12)] sm:p-5"
+                  >
+                    <ModelsTable
+                      models={models}
+                      selectedProvider={selectedProvider}
+                      apiKey={apiKey}
+                      apiBaseUrl={apiBaseUrl}
+                      onOpenFetchModal={handleOpenFetchModal}
+                      onOpenAddModelDialog={() => setAddModelDialogOpen(true)}
+                      onUpdateModelName={handleUpdateModelName}
+                      onDeleteModel={handleDeleteModel}
+                      onModelSettings={handleModelSettings}
+                    />
+                  </section>
                 </div>
-
-                <Separator />
-
-                <ProviderForm
-                  apiKey={apiKey}
-                  onApiKeyChange={setApiKey}
-                  showApiKey={showApiKey}
-                  onShowApiKeyChange={setShowApiKey}
-                  apiBaseUrl={apiBaseUrl}
-                  onApiBaseUrlChange={setApiBaseUrl}
-                  selectedProvider={selectedProvider}
-                  providerName={providerName}
-                  onProviderNameChange={setProviderName}
-                  apiStyle={apiStyle}
-                  onApiStyleChange={setApiStyle}
-                  compatibilityType={compatibilityType}
-                  onCompatibilityTypeChange={setCompatibilityType}
-                  models={models}
-                />
-
-                <ModelsTable
-                  models={models}
-                  selectedProvider={selectedProvider}
-                  apiKey={apiKey}
-                  apiBaseUrl={apiBaseUrl}
-                  onOpenFetchModal={handleOpenFetchModal}
-                  onOpenAddModelDialog={() => setAddModelDialogOpen(true)}
-                  onUpdateModelName={handleUpdateModelName}
-                  onDeleteModel={handleDeleteModel}
-                  onModelSettings={handleModelSettings}
-                />
-              </div>
-            </div>
-            <DialogFooter className="shrink-0 flex flex-wrap items-center gap-2 border-t p-3 sm:justify-end sm:p-4">
-              {savedWithoutModels && (
-                <p className="mr-auto text-sm text-warning">{t('addModelsBeforeChatting')}</p>
-              )}
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-                {t('common:cancel')}
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={
-                  isSaving || !hasChanges || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim() && !existingProvider) ||
-                  (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) ||
-              (apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl))
-                }
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="size-4 mr-2 animate-spin" />
-                    {t('common:saving')}
-                  </>
-                ) : existingProvider ? (
-                  t('common:save')
-                ) : (
-                  t('saveConfiguration')
-                )}
-              </Button>
-            </DialogFooter>
+                <DialogFooter className="shrink-0 flex flex-row flex-wrap items-center justify-end gap-2 border-t border-[#30415D] bg-[#0C1524] px-4 py-3 sm:px-7 sm:py-4">
+                  {savedWithoutModels && (
+                    <p className="mr-auto text-xs text-warning">{t('addModelsBeforeChatting')}</p>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                    disabled={isSaving}
+                    className="border-[#405474] text-[#E5E7EB]"
+                  >
+                    {t('common:cancel')}
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    className="bg-[#00E5FF] font-semibold text-[#061524] hover:bg-[#5DEDFB]"
+                    disabled={
+                      isSaving ||
+                      !hasChanges ||
+                      (requiresApiKeyForFetch(selectedProvider.id) &&
+                        !apiKey.trim() &&
+                        !existingProvider) ||
+                      (isCustom && (!providerName.trim() || !apiBaseUrl.trim())) ||
+                      (apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl))
+                    }
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                        {t('common:saving')}
+                      </>
+                    ) : existingProvider ? (
+                      t('common:save')
+                    ) : (
+                      t('saveConfiguration')
+                    )}
+                  </Button>
+                </DialogFooter>
               </>
             )}
           </main>
