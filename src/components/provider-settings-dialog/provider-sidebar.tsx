@@ -62,7 +62,7 @@ export function ProviderSidebar({
             : 'text-[#B9C8DA] hover:bg-white/5 hover:text-white',
         )}
       >
-        <ProviderLogo providerType={provider.id} />
+        <span aria-hidden="true" className="shrink-0"><ProviderLogo providerType={provider.id} /></span>
         <span className="min-w-0 flex-1 truncate">{provider.name}</span>
         {saved && <ProviderStatus count={modelCounts[saved.id] ?? 0} />}
       </button>
@@ -133,7 +133,7 @@ export function ProviderSidebar({
                       active ? 'border-[#00E5FF]/25 bg-[#00E5FF]/10 text-[#91F4FF]' : 'text-[#B9C8DA] hover:bg-white/5 hover:text-white',
                     )}
                   >
-                    <ProviderLogo providerType={cp.provider_type} name={cp.name} />
+                    <span aria-hidden="true" className="shrink-0"><ProviderLogo providerType={cp.provider_type} name={cp.name} /></span>
                     <span className="min-w-0 flex-1 truncate">{cp.name}</span>
                     <ProviderStatus count={modelCounts[cp.id] ?? 0} />
                   </button>
