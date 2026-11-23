@@ -131,9 +131,6 @@ jobs:
     name: Build and open Ghost AI on Windows
     runs-on: windows-2022
     timeout-minutes: 65
-    env:
-      # Avoid generating multi-gigabyte PDBs in CI; keep test debug assertions enabled.
-      CARGO_PROFILE_TEST_DEBUG: '0'
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -152,10 +149,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build production Windows binary
         run: pnpm tauri build --no-bundle
-      # This full suite includes providers::tests; do not compile/run that subset twice.
+      # Reuse the production Rust dependencies from the immediately preceding
+      # Tauri release build instead of recompiling the tree in debug mode.
+      # Run the COMPLETE library suite; release CI additionally runs debug
+      # library suites on Linux/macOS. Do not skip failing tests.
       - name: Run all Rust library regression tests on Windows
         timeout-minutes: 40
-        run: 'cargo test --manifest-path src-tauri/Cargo.toml --lib -- --nocapture --test-threads=1'
+        run: 'cargo test --release --manifest-path src-tauri/Cargo.toml --lib -- --nocapture --test-threads=1'
       - name: Stage packaged resources as in Portable.zip
         shell: pwsh
         run: |
