@@ -43,7 +43,7 @@ futures = "0.3"
 
 # Error handling
 anyhow = "1"
-thiserror = "1"
+thiserror = "2"
 
 # Cryptography
 aes-gcm = "0.10"
@@ -61,7 +61,7 @@ regex = "1"
 # Ripgrep core (in-process search)
 lazy_static = "1.4"
 async-trait = "0.1"
-dirs = "5"
+dirs = "7"
 shell-words = "1"
 nanoid = "0.4"
 
