@@ -14,9 +14,9 @@ if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
 }
 
 Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System;
+using System.Text;
 using System.Runtime.InteropServices;
 public static class GhostAiWindowCapture {
   [StructLayout(LayoutKind.Sequential)]
@@ -27,8 +27,60 @@ public static class GhostAiWindowCapture {
   public static extern bool MoveWindow(IntPtr handle, int x, int y, int width, int height, bool repaint);
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool SetForegroundWindow(IntPtr handle);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool ShowWindow(IntPtr handle, int code);
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool SetProcessDPIAware();
+  public delegate bool EnumWindowsProc(IntPtr window, IntPtr param);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr param);
+  [DllImport("user32.dll")]
+  public static extern bool IsWindowVisible(IntPtr window);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+  public static extern int GetWindowText(IntPtr window, StringBuilder output, int maxLength);
+  [DllImport("user32.dll")]
+  public static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
+  [StructLayout(LayoutKind.Sequential)]
+  public struct POINT { public int X, Y; }
+  [DllImport("user32.dll")]
+  public static extern bool GetClientRect(IntPtr window, out RECT rect);
+  [DllImport("user32.dll")]
+  public static extern bool ClientToScreen(IntPtr window, ref POINT point);
+  [DllImport("user32.dll")]
+  public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")]
+  public static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
+  public static IntPtr FindAppWindow(int processId) {
+    IntPtr found = IntPtr.Zero;
+    EnumWindows((window, _) => {
+      uint owner;
+      GetWindowThreadProcessId(window, out owner);
+      if (owner != (uint)processId || !IsWindowVisible(window)) return true;
+      var title = new StringBuilder(256);
+      GetWindowText(window, title, title.Capacity);
+      if (!string.Equals(title.ToString().Trim(), "Ghost AI", StringComparison.OrdinalIgnoreCase))
+        return true;
+      found = window;
+      return false;
+    }, IntPtr.Zero);
+    return found;
+  }
+  public static void ClickHeaderSettings(IntPtr window) {
+    RECT client;
+    if (!GetClientRect(window, out client)) throw new InvalidOperationException("Cannot read app client bounds");
+    // Actual header button is right-aligned in the 64px-tall webview header.
+    var target = new POINT { X = client.Right - 34, Y = 34 };
+    if (!ClientToScreen(window, ref target)) throw new InvalidOperationException("Cannot locate Settings button");
+    if (!SetCursorPos(target.X, target.Y)) throw new InvalidOperationException("Cannot point at Settings button");
+    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+  }
 }
 '@
+[void][GhostAiWindowCapture]::SetProcessDPIAware()
+Add-Type -AssemblyName System.Windows.Forms
 
 $process = $null
 $bitmap = $null
@@ -42,10 +94,13 @@ try {
     Start-Sleep -Milliseconds 700
     $process.Refresh()
     if ($process.HasExited) { throw "Ghost AI closed before its window appeared" }
-    $window = $process.MainWindowHandle
+    $window = [GhostAiWindowCapture]::FindAppWindow($process.Id)
   } while ($window -eq [IntPtr]::Zero -and (Get-Date) -lt $deadline)
 
-  if ($window -eq [IntPtr]::Zero) { throw "Ghost AI window is not available" }
+  if ($window -eq [IntPtr]::Zero) {
+    throw "NOT VERIFIED: No visible window titled Ghost AI belongs to PID $($process.Id); refusing to capture an unrelated Windows desktop"
+  }
+  Write-Host "Verified Ghost AI window PID=$($process.Id) HWND=$window"
   $display = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
   if ($ViewportWidth -gt 0 -and $ViewportHeight -gt 0) {
     if ($ViewportWidth -gt $display.Width -or $ViewportHeight -gt $display.Height) {
@@ -55,21 +110,25 @@ try {
       throw "Could not resize main window to ${ViewportWidth}x${ViewportHeight}"
     }
   }
+  [void][GhostAiWindowCapture]::ShowWindow($window, 9)
   [void][GhostAiWindowCapture]::SetForegroundWindow($window)
   Start-Sleep -Seconds 6
-  # An unconfigured first run intentionally opens the "Connect an AI model"
-  # onboarding modal. Global Settings shortcuts correctly do nothing behind
-  # a blocking dialog. Dismiss onboarding exactly as a user would; do not
-  # suppress the onboarding flow in the production app or fake a screenshot.
+  # A real connection panel is now nonmodal; Settings must stay reachable.
+  # Escape can still dismiss an older first-run modal when applicable.
   [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
-  Start-Sleep -Milliseconds 1200
+  Start-Sleep -Milliseconds 750
   [void][GhostAiWindowCapture]::SetForegroundWindow($window)
+  Start-Sleep -Milliseconds 350
+  if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $window) {
+    throw "NOT VERIFIED: Ghost AI is not foreground; refusing a desktop/console screenshot"
+  }
   $rect = New-Object GhostAiWindowCapture+RECT
   if (-not [GhostAiWindowCapture]::GetWindowRect($window, [ref]$rect)) {
     throw "Cannot read Ghost AI window dimensions"
   }
   $width = $rect.Right - $rect.Left
   $height = $rect.Bottom - $rect.Top
+  Write-Host ("Verified Ghost AI window bounds: (" + $rect.Left + "," + $rect.Top + ") " + $width + "x" + $height)
   if ($width -lt 680 -or $height -lt 400) { throw "Invalid Ghost AI window dimensions" }
 
   if ($OpenSettings) {
