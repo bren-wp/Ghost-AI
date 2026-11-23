@@ -1,0 +1,48 @@
+# Temporary PR-only formatter. Remove after the formatting commit.
+name: Ghost AI provider UI branch formatter
+on:
+  push:
+    branches:
+      - feat/ghost-ai-provider-workspace-20261123
+permissions:
+  contents: write
+jobs:
+  format-provider-ui:
+    if: github.repository == 'bren-wp/Ghost-AI'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/ghost-ai-provider-workspace-20261123
+          persist-credentials: true
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '10'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply repository Prettier style to UI files only
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --write \
+            src/components/provider-settings-dialog/provider-sidebar.tsx \
+            src/components/provider-settings-dialog/provider-settings-dialog.tsx \
+            src/components/provider-settings-dialog/provider-form.tsx \
+            src/components/provider-settings-dialog/models-table.tsx \
+            src/components/provider-settings-dialog/fetch-models-dialog.tsx \
+            src/components/provider-settings-dialog/add-model-dialog.tsx \
+            src/components/provider-settings-dialog/edit-model-dialog.tsx \
+            src/components/provider-settings-dialog/__tests__/ghost-provider-workspace.test.tsx \
+            src/components/settings-dialog/llm-provider-settings.tsx \
+            src/locales/en/providers.json src/locales/zh-CN/providers.json
+          git add src/components/provider-settings-dialog src/components/settings-dialog/llm-provider-settings.tsx src/locales/en/providers.json src/locales/zh-CN/providers.json
+          if ! git diff --cached --quiet; then
+            git config user.name "ghost-ai-ui-formatter"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "style: apply project Prettier formatting to provider workspace"
+            git push origin HEAD:refs/heads/feat/ghost-ai-provider-workspace-20261123
+          fi
