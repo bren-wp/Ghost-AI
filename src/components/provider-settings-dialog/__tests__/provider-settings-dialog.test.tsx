@@ -184,10 +184,14 @@ describe('ProviderSettingsDialog deep link', () => {
     const save = await screen.findByRole('button', { name: 'Save Configuration' })
     expect(save).toBeDisabled()
 
-    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-test' } })
+    const key = screen.getByLabelText('API Key')
+    fireEvent.change(key, { target: { value: 'sk-test' } })
+    expect(key).toHaveValue('sk-test')
 
+    // Re-query after React's async provider-hydration render; a captured DOM
+    // node may have been replaced if the dialog finished loading.
     await waitFor(() => {
-      expect(save).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Save Configuration' })).toBeEnabled()
     })
   })
 })
