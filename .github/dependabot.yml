@@ -1,8 +1,6 @@
 # Ghost AI by Brendigo
-# Stabilization: prevent new automatic *version-update* PRs from competing
-# with the single active release PR #40. GitHub security alerts/updates and
-# mandatory pnpm/RustSec security gates remain enabled. After v0.1.3 merges,
-# deliberately re-enable version upgrades with fresh lockfiles and QA.
+# Keep dependency upgrades visible and reviewable. Never auto-merge.
+# Major API migrations must pass full desktop/agent tests and release gates.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -12,9 +10,9 @@ updates:
       day: monday
       time: "03:00"
       timezone: Europe/Zagreb
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 5
     groups:
-      ghost-ai-npm-nonbreaking:
+      ghost-ai-npm-compatible:
         applies-to: version-updates
         patterns: ["*"]
         update-types: ["minor", "patch"]
@@ -29,13 +27,30 @@ updates:
       day: monday
       time: "03:30"
       timezone: Europe/Zagreb
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 5
     groups:
-      ghost-ai-cargo-nonbreaking:
+      ghost-ai-desktop-compatible:
         applies-to: version-updates
         patterns: ["*"]
         update-types: ["minor", "patch"]
-      ghost-ai-cargo-security:
+      ghost-ai-desktop-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /vendor/agent
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:45"
+      timezone: Europe/Zagreb
+    open-pull-requests-limit: 5
+    groups:
+      ghost-ai-agent-compatible:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      ghost-ai-agent-security:
         applies-to: security-updates
         patterns: ["*"]
 
@@ -46,7 +61,7 @@ updates:
       day: monday
       time: "04:00"
       timezone: Europe/Zagreb
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 5
     groups:
       ghost-ai-actions:
         patterns: ["*"]
