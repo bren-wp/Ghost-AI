@@ -1,5 +1,5 @@
 // Ghost AI by Brendigo — responsive provider workspace regression tests
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { useModelStore } from '@/stores/modelStore'
@@ -19,6 +19,23 @@ const models: ModelItem[] = Array.from({ length: 5 }, (_, index) => ({
   displayName: `Llama ${index}`,
   isExisting: true,
 }))
+
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn().mockImplementation((media: string) => ({
+      matches: false,
+      media,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+})
 
 beforeEach(() => {
   onSelectProvider.mockReset()
