@@ -96,5 +96,19 @@
   "addModelsBeforeChatting": "至少添加一个模型后即可开始对话。",
   "customProviderPlaceholder": "例如：我的本地 LLM",
   "removeModel": "移除模型",
-  "confirmRemoveModel": "确定要移除 {{name}} 吗？之后可以在服务商设置中重新添加。"
+  "confirmRemoveModel": "确定要移除 {{name}} 吗？之后可以在服务商设置中重新添加。",
+  "searchProviders": "搜索服务提供商...",
+  "cloudProviders": "云端服务",
+  "localRuntimes": "本地运行环境",
+  "localRuntime": "本地运行环境",
+  "cloudOrCustom": "云端 / 自定义",
+  "providerWorkspace": "提供商工作区",
+  "connectionSettings": "连接设置",
+  "connectionSectionDescription": "凭据、服务地址与连接状态",
+  "modelSectionDescription": "添加或发现模型后即可开始对话。",
+  "searchConfiguredModels": "搜索已配置模型...",
+  "noMatchingModels": "没有符合搜索条件的模型。",
+  "noMatchingProviders": "没有符合搜索条件的提供商。",
+  "localNoApiKey": "无需 API 密钥",
+  "localNoApiKeyDescription": "此本地运行环境直接连接所配置的服务地址。请先添加模型，再测试连接。"
 }
