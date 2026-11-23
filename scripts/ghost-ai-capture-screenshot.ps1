@@ -201,6 +201,12 @@ try {
     }
     if ($samples.Count -ge 8) { break }
     if ($attempt -eq 5) {
+      # Retain the rejected frame as diagnostic evidence, never as a passing
+      # screenshot. The workflow uploads the entire smoke/screenshots folder.
+      $diagnostic = [System.IO.Path]::ChangeExtension([System.IO.Path]::GetFullPath($Output), '.invalid.png')
+      [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($diagnostic)) | Out-Null
+      $bitmap.Save($diagnostic, [System.Drawing.Imaging.ImageFormat]::Png)
+      Write-Warning "Rejected WebView frame retained for inspection: $diagnostic"
       throw "Screenshot appears blank or visually invalid after 5 real frame captures (distinct samples: $($samples.Count))"
     }
     Write-Host "WebView content not painted yet (attempt $attempt/5, colors $($samples.Count)); retrying real window capture"
