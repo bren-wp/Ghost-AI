@@ -160,7 +160,30 @@ try {
       }
     }
     if ($checked -eq 0 -or $changed / $checked -lt 0.15) {
-      throw "NOT VERIFIED: Settings shortcut did not visibly open the dialog"
+      # Keyboard synthesis may not reach WebView2 on a hosted runner.
+      # Use the actual visible Settings button moved to the app header.
+      # Both attempts require a real, independently captured UI change.
+      Write-Host "Settings shortcut was not visually confirmed; clicking real header Settings button"
+      [void][GhostAiWindowCapture]::SetForegroundWindow($window)
+      [GhostAiWindowCapture]::ClickHeaderSettings($window)
+      Start-Sleep -Seconds 3
+      if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $window) {
+        throw "NOT VERIFIED: Ghost AI lost focus during Settings verification"
+      }
+      $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, [System.Drawing.Size]::new($width, $height))
+      $changed = 0
+      $checked = 0
+      for ($y = 12; $y -lt $height - 12; $y += [Math]::Max(1, [int]($height / 16))) {
+        for ($x = 12; $x -lt $width - 12; $x += [Math]::Max(1, [int]($width / 16))) {
+          $checked++
+          if ($beforeBitmap.GetPixel($x, $y).ToArgb() -ne $bitmap.GetPixel($x, $y).ToArgb()) {
+            $changed++
+          }
+        }
+      }
+      if ($checked -eq 0 -or $changed / $checked -lt 0.15) {
+        throw "NOT VERIFIED: neither Ctrl+, nor the actual Settings header button visibly opened Settings"
+      }
     }
   }
 
