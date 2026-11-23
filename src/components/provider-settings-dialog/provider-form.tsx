@@ -62,6 +62,7 @@ export function ProviderForm({
 }: ProviderFormProps) {
   const { t } = useTranslation('providers')
   const isCustom = isCustomProvider(selectedProvider)
+  const isKeylessLocal = ['ollama', 'lmstudio', 'gpustack', 'ovms'].includes(selectedProvider.id)
   const invalidEndpoint = apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl)
   const plaintextRemoteEndpoint = isPlaintextRemoteEndpoint(apiBaseUrl)
 
@@ -201,17 +202,26 @@ export function ProviderForm({
         </>
       )}
 
+      {isKeylessLocal ? (
+        <div className="flex items-start gap-3 rounded-xl border border-[#00E5FF]/25 bg-[#00E5FF]/5 p-3 text-sm">
+          <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[#00E5FF]" />
+          <div>
+            <p className="font-medium text-[#E5F9FB]">{t('localNoApiKey')}</p>
+            <p className="mt-1 text-xs leading-relaxed text-[#B2C3D8]">{t('localNoApiKeyDescription')}</p>
+          </div>
+        </div>
+      ) : (
       <div className="space-y-2">
         <Label htmlFor="api-key">{t('apiKey')}</Label>
-        <div className="flex min-w-0 flex-wrap gap-2">
-          <div className="relative min-w-[min(100%,220px)] flex-1">
+        <div className="flex min-w-0 flex-wrap items-start gap-2">
+          <div className="relative min-w-[min(100%,240px)] flex-1">
             <Input
               id="api-key"
               type={showApiKey ? 'text' : 'password'}
               placeholder={t('apiKeyPlaceholder')}
               value={apiKey}
               onChange={(e) => onApiKeyChange(e.target.value)}
-              className="pr-10"
+              className="h-10 rounded-xl border-[#405474] bg-[#0D1726] pr-10"
               disabled={selectedProvider.id === 'ollama'}
             />
             <Button
@@ -241,9 +251,9 @@ export function ProviderForm({
                   : 'outline'
             }
             size="sm"
-            className="h-9 max-w-full shrink-0"
+            className="h-10 max-w-full shrink-0"
             onClick={handleCheckApi}
-            disabled={checkStatus === 'checking' || invalidEndpoint || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())}
+            disabled={checkStatus === 'checking' || invalidEndpoint || models.length === 0 || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())}
           >
             {checkStatus === 'checking' ? (
               <Loader2 className="size-4 animate-spin" />
@@ -279,6 +289,8 @@ export function ProviderForm({
           <p className="text-xs text-muted-foreground">{t('yourApiKeyWillBeStored')}</p>
         )}
       </div>
+
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="api-base-url">
@@ -328,6 +340,27 @@ export function ProviderForm({
           )}
         </p>
       </div>
+      {isKeylessLocal && (
+        <div className="space-y-2 border-t border-[#30415D]/75 pt-4">
+          <Button
+            type="button"
+            variant={checkStatus === 'failed' ? 'destructive' : 'outline'}
+            onClick={handleCheckApi}
+            disabled={checkStatus === 'checking' || invalidEndpoint || models.length === 0}
+            className="border-[#00E5FF]/40 bg-[#00E5FF]/10 text-[#B5F5FC] hover:bg-[#00E5FF]/20"
+          >
+            {checkStatus === 'checking' ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> :
+              checkStatus === 'success' ? <Check aria-hidden="true" className="size-4" /> :
+              checkStatus === 'failed' ? <AlertTriangle aria-hidden="true" className="size-4" /> : null}
+            {checkStatus === 'checking' ? t('common:loading') : t('testConnection')}
+            {checkStatus === 'success' && checkLatency != null ? `${checkLatency}ms` : null}
+          </Button>
+          {models.length === 0 && <p className="text-xs text-[#B2C3D8]">{t('noModelForTesting')}</p>}
+          {checkStatus === 'success' && <p role="status" className="text-xs text-success">{t('connectionSuccessful')}</p>}
+          {checkStatus === 'failed' && <p role="alert" className="text-xs text-destructive">{checkError || t('connectionFailed')}</p>}
+        </div>
+      )}
+
     </div>
   )
 }
