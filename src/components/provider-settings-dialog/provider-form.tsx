@@ -145,7 +145,12 @@ export function ProviderForm({
       {isCustom && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="provider-name">{t('providerName')} <span aria-hidden="true" className="text-destructive">*</span></Label>
+            <Label htmlFor="provider-name">
+              {t('providerName')}{' '}
+              <span aria-hidden="true" className="text-destructive">
+                *
+              </span>
+            </Label>
             <Input
               id="provider-name"
               type="text"
@@ -182,7 +187,11 @@ export function ProviderForm({
           {compatibilityType === 'openai' && (
             <div className="space-y-2">
               <Label>{t('apiStyle')}</Label>
-              <RadioGroup value={apiStyle} onValueChange={onApiStyleChange} className="flex flex-wrap gap-x-4 gap-y-2">
+              <RadioGroup
+                value={apiStyle}
+                onValueChange={onApiStyleChange}
+                className="flex flex-wrap gap-x-4 gap-y-2"
+              >
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="chat_completions" id="api-style-cc" />
                   <Label htmlFor="api-style-cc" className="font-normal cursor-pointer">
@@ -207,87 +216,94 @@ export function ProviderForm({
           <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[#00E5FF]" />
           <div>
             <p className="font-medium text-[#E5F9FB]">{t('localNoApiKey')}</p>
-            <p className="mt-1 text-xs leading-relaxed text-[#B2C3D8]">{t('localNoApiKeyDescription')}</p>
+            <p className="mt-1 text-xs leading-relaxed text-[#B2C3D8]">
+              {t('localNoApiKeyDescription')}
+            </p>
           </div>
         </div>
       ) : (
         <div className="space-y-2">
-        <Label htmlFor="api-key">{t('apiKey')}</Label>
-        <div className="flex min-w-0 flex-wrap items-start gap-2">
-          <div className="relative min-w-[min(100%,240px)] flex-1">
-            <Input
-              id="api-key"
-              type={showApiKey ? 'text' : 'password'}
-              placeholder={t('apiKeyPlaceholder')}
-              value={apiKey}
-              onChange={(e) => onApiKeyChange(e.target.value)}
-              className="h-10 rounded-xl border-[#405474] bg-[#0D1726] pr-10"
-              disabled={selectedProvider.id === 'ollama'}
-            />
+          <Label htmlFor="api-key">{t('apiKey')}</Label>
+          <div className="flex min-w-0 flex-wrap items-start gap-2">
+            <div className="relative min-w-[min(100%,240px)] flex-1">
+              <Input
+                id="api-key"
+                type={showApiKey ? 'text' : 'password'}
+                placeholder={t('apiKeyPlaceholder')}
+                value={apiKey}
+                onChange={(e) => onApiKeyChange(e.target.value)}
+                className="h-10 rounded-xl border-[#405474] bg-[#0D1726] pr-10"
+                disabled={selectedProvider.id === 'ollama'}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                aria-pressed={showApiKey}
+                disabled={selectedProvider.id === 'ollama'}
+                onClick={() => onShowApiKeyChange(!showApiKey)}
+              >
+                {showApiKey ? (
+                  <EyeOff className="size-4 text-muted-foreground" />
+                ) : (
+                  <Eye className="size-4 text-muted-foreground" />
+                )}
+              </Button>
+            </div>
             <Button
               type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-              aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
-              aria-pressed={showApiKey}
-              disabled={selectedProvider.id === 'ollama'}
-              onClick={() => onShowApiKeyChange(!showApiKey)}
+              variant={
+                checkStatus === 'success'
+                  ? 'default'
+                  : checkStatus === 'failed'
+                    ? 'destructive'
+                    : 'outline'
+              }
+              size="sm"
+              className="h-10 max-w-full shrink-0"
+              onClick={handleCheckApi}
+              disabled={
+                checkStatus === 'checking' ||
+                invalidEndpoint ||
+                models.length === 0 ||
+                (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())
+              }
             >
-              {showApiKey ? (
-                <EyeOff className="size-4 text-muted-foreground" />
+              {checkStatus === 'checking' ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : checkStatus === 'success' ? (
+                <>
+                  <Check className="size-4" />
+                  {checkLatency != null && <span className="ml-1 text-xs">{checkLatency}ms</span>}
+                </>
+              ) : checkStatus === 'failed' ? (
+                <>
+                  <AlertTriangle className="size-4" />
+                  <span className="ml-1">{t('failed')}</span>
+                </>
               ) : (
-                <Eye className="size-4 text-muted-foreground" />
+                t('testConnection')
               )}
             </Button>
           </div>
-          <Button
-            type="button"
-            variant={
-              checkStatus === 'success'
-                ? 'default'
-                : checkStatus === 'failed'
-                  ? 'destructive'
-                  : 'outline'
-            }
-            size="sm"
-            className="h-10 max-w-full shrink-0"
-            onClick={handleCheckApi}
-            disabled={checkStatus === 'checking' || invalidEndpoint || models.length === 0 || (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())}
-          >
-            {checkStatus === 'checking' ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : checkStatus === 'success' ? (
-              <>
-                <Check className="size-4" />
-                {checkLatency != null && <span className="ml-1 text-xs">{checkLatency}ms</span>}
-              </>
-            ) : checkStatus === 'failed' ? (
-              <>
-                <AlertTriangle className="size-4" />
-                <span className="ml-1">{t('failed')}</span>
-              </>
-            ) : (
-              t('testConnection')
-            )}
-          </Button>
-        </div>
-        {checkStatus === 'failed' && checkError && (
-          <div role="alert" className="text-xs text-destructive space-y-1">
-            <p className="font-medium">{t('connectionFailed')}</p>
-            <div className="px-2 py-1.5 bg-destructive/5 rounded max-h-24 overflow-y-auto">
-              <p className="font-mono text-destructive/80 whitespace-pre-wrap break-all">
-                {checkError}
-              </p>
+          {checkStatus === 'failed' && checkError && (
+            <div role="alert" className="text-xs text-destructive space-y-1">
+              <p className="font-medium">{t('connectionFailed')}</p>
+              <div className="px-2 py-1.5 bg-destructive/5 rounded max-h-24 overflow-y-auto">
+                <p className="font-mono text-destructive/80 whitespace-pre-wrap break-all">
+                  {checkError}
+                </p>
+              </div>
             </div>
-          </div>
-        )}
-        {checkStatus === 'success' && (
-          <p className="text-xs text-success">{t('connectionSuccessful')}</p>
-        )}
-        {checkStatus !== 'failed' && checkStatus !== 'success' && (
-          <p className="text-xs text-muted-foreground">{t('yourApiKeyWillBeStored')}</p>
-        )}
+          )}
+          {checkStatus === 'success' && (
+            <p className="text-xs text-success">{t('connectionSuccessful')}</p>
+          )}
+          {checkStatus !== 'failed' && checkStatus !== 'success' && (
+            <p className="text-xs text-muted-foreground">{t('yourApiKeyWillBeStored')}</p>
+          )}
         </div>
       )}
 
@@ -349,18 +365,31 @@ export function ProviderForm({
             disabled={checkStatus === 'checking' || invalidEndpoint || models.length === 0}
             className="border-[#00E5FF]/40 bg-[#00E5FF]/10 text-[#B5F5FC] hover:bg-[#00E5FF]/20"
           >
-            {checkStatus === 'checking' ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> :
-              checkStatus === 'success' ? <Check aria-hidden="true" className="size-4" /> :
-              checkStatus === 'failed' ? <AlertTriangle aria-hidden="true" className="size-4" /> : null}
+            {checkStatus === 'checking' ? (
+              <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+            ) : checkStatus === 'success' ? (
+              <Check aria-hidden="true" className="size-4" />
+            ) : checkStatus === 'failed' ? (
+              <AlertTriangle aria-hidden="true" className="size-4" />
+            ) : null}
             {checkStatus === 'checking' ? t('common:loading') : t('testConnection')}
             {checkStatus === 'success' && checkLatency != null ? `${checkLatency}ms` : null}
           </Button>
-          {models.length === 0 && <p className="text-xs text-[#B2C3D8]">{t('noModelForTesting')}</p>}
-          {checkStatus === 'success' && <p role="status" className="text-xs text-success">{t('connectionSuccessful')}</p>}
-          {checkStatus === 'failed' && <p role="alert" className="text-xs text-destructive">{checkError || t('connectionFailed')}</p>}
+          {models.length === 0 && (
+            <p className="text-xs text-[#B2C3D8]">{t('noModelForTesting')}</p>
+          )}
+          {checkStatus === 'success' && (
+            <p role="status" className="text-xs text-success">
+              {t('connectionSuccessful')}
+            </p>
+          )}
+          {checkStatus === 'failed' && (
+            <p role="alert" className="text-xs text-destructive">
+              {checkError || t('connectionFailed')}
+            </p>
+          )}
         </div>
       )}
-
     </div>
   )
 }

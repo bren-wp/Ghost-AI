@@ -34,10 +34,12 @@ describe('Ghost AI provider workspace', () => {
           onSelectProvider={onSelectProvider}
           storeProviders={[]}
         />
-      </SidebarProvider>,
+      </SidebarProvider>
     )
     expect(screen.getByRole('navigation', { name: 'Providers' })).toBeInTheDocument()
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search providers...' }), { target: { value: 'ollama' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search providers...' }), {
+      target: { value: 'ollama' },
+    })
     expect(screen.getByRole('button', { name: 'Ollama' })).toHaveAttribute('aria-current', 'page')
     expect(screen.queryByRole('button', { name: 'OpenAI' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Ollama' }))
@@ -61,13 +63,15 @@ describe('Ghost AI provider workspace', () => {
         compatibilityType="openai"
         onCompatibilityTypeChange={noop}
         models={[]}
-      />,
+      />
     )
     expect(screen.queryByLabelText('API Key')).not.toBeInTheDocument()
     expect(screen.getByText('No API key required')).toBeInTheDocument()
     expect(screen.getByLabelText('API Base URL')).toHaveValue(ollama.baseUrl)
     expect(screen.getByRole('button', { name: 'Test Connection' })).toBeDisabled()
-    expect(screen.getByText('No model available for testing. Add a model first.')).toBeInTheDocument()
+    expect(
+      screen.getByText('No model available for testing. Add a model first.')
+    ).toBeInTheDocument()
   })
 
   it('renders full model identifiers without a clipped table and filters the configured list', () => {
@@ -82,12 +86,14 @@ describe('Ghost AI provider workspace', () => {
         onUpdateModelName={noop}
         onDeleteModel={noop}
         onModelSettings={noop}
-      />,
+      />
     )
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(5)
     expect(screen.getByText('llama-model-0')).toBeInTheDocument()
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search configured models...' }), { target: { value: 'llama-model-4' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search configured models...' }), {
+      target: { value: 'llama-model-4' },
+    })
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
     expect(screen.getByText('llama-model-4')).toBeInTheDocument()
   })
