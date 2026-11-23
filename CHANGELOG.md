@@ -1,6 +1,18 @@
 # Ghost AI by Brendigo — release history
 
-## v0.1.3 — CI hardening and dependency consolidation (release candidate; not yet published)
+## v0.1.4 — Provider workspace and connection reliability
+
+- Redesigned provider settings with searchable cloud/local/custom navigation, responsive model cards and consistent Ghost AI dialogs.
+- Aligned 43 built-in provider routes and discovery capabilities, including ZenMux, Z.ai and Tencent TokenHub.
+- Expanded OpenAI discovery to reasoning and fine-tuned conversation models.
+- Normalized Ollama native and OpenAI-compatible URLs across discovery and conversation.
+- Added optional credentials for protected LM Studio, GPUStack and OVMS servers and model-specific connection testing.
+- Normalized API keys on save as well as discovery and connection checks; reject duplicate or empty active model IDs before mutation.
+- Fixed hidden model filters when a configured list shrinks and reset filters when changing providers.
+- Preserved safe provider errors, regression coverage, compatible dependency updates and independent security scans. Routine Dependabot version PRs are disabled.
+- Release packages are published only after matching source, platform builds and mandatory quality gates pass. Cloud account-specific live model availability is not guaranteed.
+
+## v0.1.3 — CI hardening and dependency consolidation
 
 - Consolidates pending dependency upgrades, reverting incompatible rand/rig API bumps until full migration is available.
 - Hardens MCP OAuth server discovery against issuer mismatches and remote HTTP, and bounds untrusted WebView HTML delivery size/queue.
@@ -10,7 +22,7 @@
 - Restores frozen pnpm/Cargo lockfile consistency and retains audited package overrides.
 - Runs quality checks on merged `main`, executes all Windows Rust library tests and requires complete viewport screenshot evidence.
 - Strengthens release blocking tests for JavaScript and Rust dependency security findings.
-- Requires actual build, startup, installer, update and packaging evidence before release. This section describes candidate changes, not a published or verified release.
+- Requires actual build, startup, installer, update and packaging evidence before release. The published v0.1.3 remains a preview; see its release assets and verification results.
 
 ## v0.1.2 — Windows launch and recovery
 
