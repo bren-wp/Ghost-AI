@@ -65,7 +65,7 @@ export function ProviderForm({
   const [selectedTestModel, setSelectedTestModel] = React.useState('')
   // Fall back to the previous last-model behavior until the user explicitly
   // selects a model. A removed model must never be sent to the API.
-  const testModel = models.find((model) => model.id === selectedTestModel) ?? models.at(-1)
+  const testModel = models.find((model) => model.id === selectedTestModel) ?? models[models.length - 1]
   const testModelId = testModel?.modelId.trim() || null
   const [checkStatus, setCheckStatus] = React.useState<CheckStatus>('idle')
   const [checkError, setCheckError] = React.useState<string | null>(null)
