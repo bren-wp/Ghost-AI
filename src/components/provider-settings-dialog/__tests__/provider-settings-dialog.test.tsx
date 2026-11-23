@@ -125,8 +125,14 @@ describe('ProviderSettingsDialog deep link', () => {
     mockBackend({ models: [model], providers: [provider] })
     renderDialog(provider.id)
 
-    const key = await screen.findByLabelText('API Key')
-    await waitFor(() => expect(key).toHaveValue('sk-test'))
+    // The dialog initially renders the default provider before applying its
+    // deep link. Re-query the actual focused provider field on every retry:
+    // an element captured too early can belong to the previous form.
+    await waitFor(() => {
+      expect(screen.getByLabelText('API Key')).toHaveValue('sk-test')
+      expect(screen.getByDisplayValue(model.name)).toBeInTheDocument()
+    })
+    const key = screen.getByLabelText('API Key')
     const nameInput = screen.getByDisplayValue(model.name)
 
     fireEvent.change(key, { target: { value: 'sk-unsaved-edit' } })
