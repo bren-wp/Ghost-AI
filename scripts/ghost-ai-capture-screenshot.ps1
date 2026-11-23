@@ -187,13 +187,30 @@ try {
     }
   }
 
+  # WebView2 can paint its initial blank surface after the native window
+  # appears, particularly on hosted Windows runners. Require *real* rendered
+  # content, but allow bounded repaints rather than failing a single frame.
+  # Never upload or count an invalid capture as a successful screenshot.
   $samples = [System.Collections.Generic.HashSet[int]]::new()
-  for ($y = 12; $y -lt $height - 12; $y += [Math]::Max(1, [int]($height / 16))) {
-    for ($x = 12; $x -lt $width - 12; $x += [Math]::Max(1, [int]($width / 16))) {
-      [void]$samples.Add($bitmap.GetPixel($x, $y).ToArgb())
+  for ($attempt = 1; $attempt -le 5; $attempt++) {
+    $samples.Clear()
+    for ($y = 12; $y -lt $height - 12; $y += [Math]::Max(1, [int]($height / 16))) {
+      for ($x = 12; $x -lt $width - 12; $x += [Math]::Max(1, [int]($width / 16))) {
+        [void]$samples.Add($bitmap.GetPixel($x, $y).ToArgb())
+      }
     }
+    if ($samples.Count -ge 8) { break }
+    if ($attempt -eq 5) {
+      throw "Screenshot appears blank or visually invalid after 5 real frame captures (distinct samples: $($samples.Count))"
+    }
+    Write-Host "WebView content not painted yet (attempt $attempt/5, colors $($samples.Count)); retrying real window capture"
+    Start-Sleep -Seconds 3
+    [void][GhostAiWindowCapture]::SetForegroundWindow($window)
+    if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $window) {
+      throw "NOT VERIFIED: Ghost AI lost foreground during screenshot retry"
+    }
+    $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, [System.Drawing.Size]::new($width, $height))
   }
-  if ($samples.Count -lt 8) { throw "Screenshot appears blank or visually invalid" }
 
   $destination = [System.IO.Path]::GetFullPath($Output)
   [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($destination)) | Out-Null
