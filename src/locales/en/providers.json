@@ -114,5 +114,8 @@
   "noMatchingModels": "No models match your search.",
   "noMatchingProviders": "No providers match your search.",
   "localNoApiKey": "No API key required",
-  "localNoApiKeyDescription": "This local runtime connects directly to your configured endpoint. Add a model below before testing the connection."
+  "localNoApiKeyDescription": "This local runtime connects directly to your configured endpoint. Add a model below before testing the connection.",
+  "testModel": "Model to test",
+  "optionalApiKey": "API key (optional)",
+  "optionalLocalApiKeyDescription": "Leave empty for a keyless local server, or enter the key required by your server."
 }
