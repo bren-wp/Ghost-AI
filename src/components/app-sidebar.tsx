@@ -16,7 +16,6 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { ProviderSettingsDialog } from '@/components/provider-settings-dialog'
-import { SettingsDialog } from '@/components/settings-dialog'
 import { AssistantDialog } from '@/components/assistant-dialog'
 import { PromptDialog } from '@/components/prompt-dialog'
 import { ConversationList } from '@/components/sidebar/conversation-list'
@@ -71,22 +70,6 @@ export function AppSidebar({
   const { t } = useTranslation()
   const navItems = React.useMemo(() => getNavItems(t), [t])
   const activeItem = navItems.find((item) => item.id === activeSection) || navItems[0]
-  const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false)
-
-  // Native-feeling shortcut on Windows/Linux (Ctrl+,) and macOS (Cmd+,).
-  // Ignore it while another blocking modal owns keyboard focus.
-  React.useEffect(() => {
-    const onSettingsShortcut = (event: KeyboardEvent) => {
-      if (event.code !== 'Comma' || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) {
-        return
-      }
-      if (hasBlockingDialog()) return
-      event.preventDefault()
-      setSettingsDialogOpen(true)
-    }
-    window.addEventListener('keydown', onSettingsShortcut)
-    return () => window.removeEventListener('keydown', onSettingsShortcut)
-  }, [])
   const [assistantDialogOpen, setAssistantDialogOpen] = React.useState(false)
   const [promptDialogOpen, setPromptDialogOpen] = React.useState(false)
   const [editingAssistant, setEditingAssistant] = React.useState<AssistantDB | null>(null)
@@ -317,12 +300,6 @@ export function AppSidebar({
         )
       case 'artifacts':
         return <ArtifactsContent />
-      case 'settings':
-        return (
-          <div className="p-4">
-            <p className="text-sm text-muted-foreground">{t('settingsComingSoon')}</p>
-          </div>
-        )
       default:
         return null
     }
@@ -416,8 +393,6 @@ export function AppSidebar({
             </Button>
           </div>
         )
-      case 'settings':
-        return null
       default:
         return null
     }
@@ -461,7 +436,6 @@ export function AppSidebar({
           setOpen(item.id !== 'translation')
           setOpenMobile(false)
         }}
-        onSettingsClick={() => setSettingsDialogOpen(true)}
         user={SIDEBAR_DATA.user}
       />
 
@@ -543,8 +517,6 @@ export function AppSidebar({
           else closeProviderSettings()
         }}
       />
-
-      <SettingsDialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen} />
 
       <AssistantDialog
         open={assistantDialogOpen}

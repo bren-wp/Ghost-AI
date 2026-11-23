@@ -1,10 +1,12 @@
 // Ghost AI by Brendigo
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, SquarePen, X } from 'lucide-react'
+import { AlertTriangle, Settings as SettingsIcon, SquarePen, X } from 'lucide-react'
 import { MorphSpinner } from '@/components/ui/morph-spinner'
 import appIcon from '@/assets/app-icon.png'
 import { AppSidebar } from '@/components/app-sidebar'
+import { SettingsDialog } from '@/components/settings-dialog'
+import { hasBlockingDialog } from '@/lib/blocking-dialog'
 import { ChatView } from '@/components/chat-view'
 import { ContactProfile } from '@/components/contact-profile'
 import { useSelectedContact } from '@/hooks/useContactProfile'
@@ -58,6 +60,7 @@ function CollapsedNewConversationButton({ onClick }: { onClick: () => void }) {
 export function ChatPage() {
   const { t } = useTranslation()
   const [activeSection, setActiveSection] = useState('conversations')
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
   const isTranslation = activeSection === 'translation'
   // Initialize app (load agents, conversations, settings)
   const { isInitialized, error: initError, keychainAvailable } = useAppInit()
@@ -122,6 +125,19 @@ export function ChatPage() {
       document.removeEventListener('dragover', preventDefaultDrag)
       document.removeEventListener('drop', preventDefaultDrag)
     }
+  }, [])
+
+  // Settings belongs to the app header, independent of sidebar visibility.
+  // Respect other active dialogs and their keyboard focus.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.code !== 'Comma' || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
+      if (hasBlockingDialog()) return
+      event.preventDefault()
+      setSettingsDialogOpen(true)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
   }, [])
 
   // Global shortcut: Cmd+K / Ctrl+K to open search
@@ -250,7 +266,18 @@ export function ChatPage() {
                           ? currentConversation.title || t('chat:newConversation')
                           : t('chat:selectConversation')}
             </h1>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-auto shrink-0"
+              aria-label={t('common:settings')}
+              title={t('common:settings')}
+              onClick={() => setSettingsDialogOpen(true)}
+            >
+              <SettingsIcon className="size-4" />
+            </Button>
           </header>
+          <OnboardingDialog />
           <SyncLockedBanner />
           {!keychainAvailable && showKeychainWarning && (
             <div className="flex items-center justify-between gap-2 bg-warning/10 border-b border-warning/20 px-4 py-2 text-sm text-warning">
@@ -300,7 +327,7 @@ export function ChatPage() {
         </SidebarInset>
       </SidebarProvider>
       <Toaster position="top-center" />
-      <OnboardingDialog />
+      <SettingsDialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen} />
       <SyncOnboardingDialog />
       <SearchDialog />
     </>
