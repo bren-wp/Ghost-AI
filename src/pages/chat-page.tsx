@@ -9,6 +9,7 @@ import { SettingsDialog } from '@/components/settings-dialog'
 import { hasBlockingDialog } from '@/lib/blocking-dialog'
 import { ChatView } from '@/components/chat-view'
 import { WorkspaceHome } from '@/components/workspace-home'
+import { sectionAfterConversationChange } from '@/lib/workspace-navigation'
 import { useProviderSettingsStore } from '@/stores/providerSettingsStore'
 import { ContactProfile } from '@/components/contact-profile'
 import { useSelectedContact } from '@/hooks/useContactProfile'
@@ -205,10 +206,11 @@ export function ChatPage() {
   useEffect(() => {
     return useConversationStore.subscribe((state, previous) => {
       if (state.currentConversation?.id !== previous.currentConversation?.id) {
+        const nextId = state.currentConversation?.id
+        const previousId = previous.currentConversation?.id
+        const draftId = state.draftConversation?.id
         setActiveSection((section) =>
-          section === 'home' || section === 'translation' || section === 'contacts' || section === 'library'
-            ? 'conversations'
-            : section
+          sectionAfterConversationChange(section, previousId, nextId, draftId)
         )
       }
     })

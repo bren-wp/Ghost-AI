@@ -5,9 +5,9 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 /// Environment variable that opts every public function in this module into
-/// the in-process mock keychain backend. Set it (any non-empty value) in any
-/// build or test environment where touching the real OS keychain would be
-/// wrong — unit tests, integration tests, doc tests, sandboxed CI runners.
+/// the in-process mock keychain backend in debug builds or unit tests.
+/// Use it only in isolated development and test environments where touching
+/// the real OS keychain would be wrong.
 ///
 /// Unit tests install it automatically via `cfg!(test)`; the env var remains
 /// as an escape hatch for debug-profile external runners that link this crate.
