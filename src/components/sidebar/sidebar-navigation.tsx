@@ -42,10 +42,8 @@ export function SidebarNavigation({
   const renderItem = (item: NavItem) => (
     <SidebarMenuItem key={item.id}>
       <SidebarMenuButton
-        tooltip={{
-          children: item.title,
-          hidden: false,
-        }}
+        type="button"
+        tooltip={showLabels ? undefined : { children: item.title, hidden: false }}
         onClick={() => onItemClick(item)}
         isActive={activeItem?.id === item.id}
         aria-current={activeItem?.id === item.id ? 'page' : undefined}

@@ -96,7 +96,7 @@ Add-Type -AssemblyName System.Windows.Forms
 # Reference-route navigation is verified through the real WebView accessibility
 # tree. No coordinate guesses or synthetic HTML previews are accepted.
 function Get-VisibleUiElement {
-  param([IntPtr]$Window, [string]$Property, [string[]]$Values)
+  param([IntPtr]$Window, [string]$Property, [string[]]$Values, [switch]$NavigationButton)
   $root = [System.Windows.Automation.AutomationElement]::FromHandle($Window)
   $uiaProperty = if ($Property -eq 'id') {
     [System.Windows.Automation.AutomationElement]::AutomationIdProperty
@@ -105,9 +105,28 @@ function Get-VisibleUiElement {
   }
   foreach ($value in $Values) {
     $condition = [System.Windows.Automation.PropertyCondition]::new($uiaProperty, $value)
+    if ($NavigationButton) {
+      # Chromium exposes both a button and its label/tooltip text in the
+      # accessibility tree. A text node must never win the name lookup.
+      $buttonCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [System.Windows.Automation.ControlType]::Button
+      )
+      $condition = [System.Windows.Automation.AndCondition]::new($condition, $buttonCondition)
+    }
     $matches = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
+    $visible = @()
     foreach ($element in $matches) {
-      if (-not $element.Current.IsOffscreen) { return $element }
+      if (-not $element.Current.IsOffscreen -and (-not $NavigationButton -or $element.Current.IsEnabled)) {
+        if (-not $NavigationButton) { return $element }
+        $visible += $element
+      }
+    }
+    # Avoid selecting an unrelated similarly named button; stable ID wins,
+    # otherwise the visible button name must identify exactly one control.
+    if ($NavigationButton -and $visible.Count -eq 1) { return $visible[0] }
+    if ($NavigationButton -and $visible.Count -gt 1) {
+      Write-Host "Ambiguous accessible button match: $Property=$value ($($visible.Count) controls)"
     }
   }
   return $null
@@ -132,21 +151,39 @@ function Open-ReferenceSurface {
   $deadline = (Get-Date).AddSeconds(15)
   $button = $null
   do {
-    $button = Get-VisibleUiElement -Window $Window -Property id -Values @("ghost-ai-nav-$Surface")
+    $button = Get-VisibleUiElement -Window $Window -Property id -Values @("ghost-ai-nav-$Surface") -NavigationButton
     # The Settings header shares the accessible name. Only the navigation
     # element's stable identifier may select Settings.
     if (-not $button -and $Surface -ne 'settings') {
-      $button = Get-VisibleUiElement -Window $Window -Property name -Values @($labels[$Surface])
+      $button = Get-VisibleUiElement -Window $Window -Property name -Values @($labels[$Surface]) -NavigationButton
     }
     if (-not $button) { Start-Sleep -Milliseconds 500 }
   } while (-not $button -and (Get-Date) -lt $deadline)
   if (-not $button) { throw "NOT VERIFIED: accessible navigation element for $Surface was not found" }
   if (-not $button.Current.IsEnabled) { throw "NOT VERIFIED: $Surface navigation is disabled" }
+  Write-Host "Selected navigation button: $Surface; automation ID=$($button.Current.AutomationId)"
   $pattern = $null
-  if (-not $button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
-    throw "NOT VERIFIED: $Surface navigation does not expose an invokable control"
+  if ($button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+    ([System.Windows.Automation.InvokePattern]$pattern).Invoke()
+  } else {
+    # Some WebView2 accessibility providers expose real buttons but not
+    # InvokePattern. Use the same keyboard activation available to a user,
+    # only after proving focus belongs to the chosen button.
+    if (-not $button.Current.IsKeyboardFocusable) {
+      throw "NOT VERIFIED: $Surface navigation is neither invokable nor keyboard focusable"
+    }
+    $button.SetFocus()
+    Start-Sleep -Milliseconds 250
+    $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+    if (-not $focused -or -not [System.Windows.Automation.Automation]::Compare($button, $focused)) {
+      throw "NOT VERIFIED: keyboard focus did not reach $Surface navigation"
+    }
+    if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $Window) {
+      throw "NOT VERIFIED: Ghost AI lost foreground before navigation activation"
+    }
+    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    Write-Host "Activated $Surface using verified keyboard focus"
   }
-  $pattern.Invoke()
   $deadline = (Get-Date).AddSeconds(15)
   $heading = $null
   do {
