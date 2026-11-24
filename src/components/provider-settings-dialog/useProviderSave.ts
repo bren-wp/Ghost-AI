@@ -96,15 +96,14 @@ export function useProviderSave({
       seenIds.add(id)
     }
     saveInFlightRef.current = true
-    const newModels = models.filter((m) => !m.isExisting)
-    const modifiedModels = models.filter(
+    const newModels = activeModels.filter((m) => !m.isExisting)
+    const modifiedModels = activeModels.filter(
       (m) =>
         m.isExisting &&
         (originalModelNames[m.id] !== m.displayName || originalModelIds[m.id] !== m.modelId)
     )
 
-    const remainingModels =
-      models.filter((m) => m.isExisting && !modelsToDelete.includes(m.id)).length + newModels.length
+    const remainingModels = activeModels.length
 
     setIsSaving(true)
     try {
@@ -164,16 +163,17 @@ export function useProviderSave({
         if (isCustom) onProviderCreated?.(providerId)
       }
 
-      for (const modelId of modelsToDelete) {
+      for (const modelId of new Set(modelsToDelete)) {
+        if (models.some((model) => model.id === modelId && !model.isExisting)) continue
         await invoke('delete_model', { id: modelId })
         logger.info('Tombstoned model:', modelId)
       }
 
       for (const model of modifiedModels) {
         const modelReq: CreateModelRequest = {
-          name: model.displayName,
+          name: model.displayName.trim() || model.modelId.trim(),
           provider_id: providerId,
-          model_id: model.modelId,
+          model_id: model.modelId.trim(),
           is_starred: false,
         }
         await invoke('update_model', { id: model.id, req: modelReq })
@@ -182,13 +182,13 @@ export function useProviderSave({
 
       for (const model of newModels) {
         const modelReq: CreateModelRequest = {
-          name: model.displayName,
+          name: model.displayName.trim() || model.modelId.trim(),
           provider_id: providerId,
-          model_id: model.modelId,
+          model_id: model.modelId.trim(),
           is_starred: false,
         }
         await invoke('create_model', { req: modelReq })
-        logger.info('Created model', { name: model.displayName, id: model.modelId })
+        logger.info('Created model', { name: model.displayName.trim() || model.modelId.trim(), id: model.modelId })
       }
 
       loadExistingData()

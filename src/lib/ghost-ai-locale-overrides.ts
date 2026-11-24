@@ -407,9 +407,13 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "edit": "Editar",
       "delete": "Eliminar",
       "settings": "Configuración",
-      "loading": "Cargando",
+      "loading": "Cargando…",
       "saving": "Guardando",
-      "close": "Cerrar"
+      "close": "Cerrar",
+      "copy": "Copiar",
+      "error": "Error",
+      "retry": "Reintentar",
+      "search": "Buscar"
     },
     "settings": {
       "llmProvider": "Proveedores de IA",
@@ -434,6 +438,19 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "saveConfiguration": "Guardar configuración",
       "testConnection": "Probar conexión",
       "yourApiKeyWillBeStored": "Tu clave API se almacenará de forma segura"
+    },
+    "sidebar": {
+      "home": "Inicio",
+      "conversations": "Conversaciones",
+      "agents": "Agentes",
+      "documents": "Documentos",
+      "providers": "Proveedores",
+      "settings": "Configuración",
+      "contacts": "Contactos",
+      "translation": "Traducción",
+      "library": "Biblioteca",
+      "artifacts": "Artefactos",
+      "newConversation": "Nueva conversación"
     }
   },
   "fr": {
@@ -444,9 +461,13 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "edit": "Modifier",
       "delete": "Supprimer",
       "settings": "Paramètres",
-      "loading": "Chargement",
+      "loading": "Chargement…",
       "saving": "Enregistrement",
-      "close": "Fermer"
+      "close": "Fermer",
+      "copy": "Copier",
+      "error": "Erreur",
+      "retry": "Réessayer",
+      "search": "Rechercher"
     },
     "settings": {
       "llmProvider": "Fournisseurs d’IA",
@@ -471,19 +492,36 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "saveConfiguration": "Enregistrer la configuration",
       "testConnection": "Tester la connexion",
       "yourApiKeyWillBeStored": "Votre clé API sera stockée de manière sécurisée"
+    },
+    "sidebar": {
+      "home": "Accueil",
+      "conversations": "Conversations",
+      "agents": "Agents",
+      "documents": "Documents",
+      "providers": "Fournisseurs",
+      "settings": "Paramètres",
+      "contacts": "Contacts",
+      "translation": "Traduction",
+      "library": "Bibliothèque",
+      "artifacts": "Artefacts",
+      "newConversation": "Nouvelle conversation"
     }
   },
   "pt": {
     "common": {
-      "save": "Guardar",
+      "save": "Salvar",
       "cancel": "Cancelar",
       "add": "Adicionar",
       "edit": "Editar",
-      "delete": "Eliminar",
-      "settings": "Definições",
-      "loading": "A carregar",
+      "delete": "Excluir",
+      "settings": "Configurações",
+      "loading": "Carregando…",
       "saving": "A guardar",
-      "close": "Fechar"
+      "close": "Fechar",
+      "copy": "Copiar",
+      "error": "Erro",
+      "retry": "Tentar novamente",
+      "search": "Pesquisar"
     },
     "settings": {
       "llmProvider": "Fornecedores de IA",
@@ -508,6 +546,19 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "saveConfiguration": "Guardar configuração",
       "testConnection": "Testar ligação",
       "yourApiKeyWillBeStored": "A sua chave de API será guardada em segurança"
+    },
+    "sidebar": {
+      "home": "Início",
+      "conversations": "Conversas",
+      "agents": "Agentes",
+      "documents": "Documentos",
+      "providers": "Provedores",
+      "settings": "Configurações",
+      "contacts": "Contatos",
+      "translation": "Tradução",
+      "library": "Biblioteca",
+      "artifacts": "Artefatos",
+      "newConversation": "Nova conversa"
     }
   },
   "it": {
@@ -518,9 +569,13 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "edit": "Modifica",
       "delete": "Elimina",
       "settings": "Impostazioni",
-      "loading": "Caricamento",
+      "loading": "Caricamento…",
       "saving": "Salvataggio",
-      "close": "Chiudi"
+      "close": "Chiudi",
+      "copy": "Copia",
+      "error": "Errore",
+      "retry": "Riprova",
+      "search": "Cerca"
     },
     "settings": {
       "llmProvider": "Provider AI",
@@ -545,6 +600,831 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "saveConfiguration": "Salva configurazione",
       "testConnection": "Verifica connessione",
       "yourApiKeyWillBeStored": "La chiave API sarà archiviata in modo sicuro"
+    },
+    "sidebar": {
+      "home": "Home",
+      "conversations": "Conversazioni",
+      "agents": "Agenti",
+      "documents": "Documenti",
+      "providers": "Provider",
+      "settings": "Impostazioni",
+      "contacts": "Contatti",
+      "translation": "Traduzione",
+      "library": "Libreria",
+      "artifacts": "Artefatti",
+      "newConversation": "Nuova conversazione"
+    }
+  },
+  "nl": {
+    "sidebar": {
+      "home": "Start",
+      "conversations": "Gesprekken",
+      "agents": "Agenten",
+      "documents": "Documenten",
+      "providers": "Aanbieders",
+      "settings": "Instellingen",
+      "contacts": "Contacten",
+      "translation": "Vertaling",
+      "library": "Bibliotheek",
+      "artifacts": "Artefacten",
+      "newConversation": "Nieuw gesprek"
+    },
+    "common": {
+      "save": "Opslaan",
+      "cancel": "Annuleren",
+      "close": "Sluiten",
+      "delete": "Verwijderen",
+      "edit": "Bewerken",
+      "add": "Toevoegen",
+      "copy": "Kopiëren",
+      "loading": "Laden…",
+      "error": "Fout",
+      "retry": "Opnieuw proberen",
+      "search": "Zoeken",
+      "settings": "Instellingen"
+    }
+  },
+  "pl": {
+    "sidebar": {
+      "home": "Strona główna",
+      "conversations": "Rozmowy",
+      "agents": "Agenci",
+      "documents": "Dokumenty",
+      "providers": "Dostawcy",
+      "settings": "Ustawienia",
+      "contacts": "Kontakty",
+      "translation": "Tłumaczenie",
+      "library": "Biblioteka",
+      "artifacts": "Artefakty",
+      "newConversation": "Nowa rozmowa"
+    },
+    "common": {
+      "save": "Zapisz",
+      "cancel": "Anuluj",
+      "close": "Zamknij",
+      "delete": "Usuń",
+      "edit": "Edytuj",
+      "add": "Dodaj",
+      "copy": "Kopiuj",
+      "loading": "Ładowanie…",
+      "error": "Błąd",
+      "retry": "Spróbuj ponownie",
+      "search": "Szukaj",
+      "settings": "Ustawienia"
+    }
+  },
+  "cs": {
+    "sidebar": {
+      "home": "Domů",
+      "conversations": "Konverzace",
+      "agents": "Agenti",
+      "documents": "Dokumenty",
+      "providers": "Poskytovatelé",
+      "settings": "Nastavení",
+      "contacts": "Kontakty",
+      "translation": "Překlad",
+      "library": "Knihovna",
+      "artifacts": "Artefakty",
+      "newConversation": "Nová konverzace"
+    },
+    "common": {
+      "save": "Uložit",
+      "cancel": "Zrušit",
+      "close": "Zavřít",
+      "delete": "Smazat",
+      "edit": "Upravit",
+      "add": "Přidat",
+      "copy": "Kopírovat",
+      "loading": "Načítání…",
+      "error": "Chyba",
+      "retry": "Zkusit znovu",
+      "search": "Hledat",
+      "settings": "Nastavení"
+    }
+  },
+  "sk": {
+    "sidebar": {
+      "home": "Domov",
+      "conversations": "Konverzácie",
+      "agents": "Agenti",
+      "documents": "Dokumenty",
+      "providers": "Poskytovatelia",
+      "settings": "Nastavenia",
+      "contacts": "Kontakty",
+      "translation": "Preklad",
+      "library": "Knižnica",
+      "artifacts": "Artefakty",
+      "newConversation": "Nová konverzácia"
+    },
+    "common": {
+      "save": "Uložiť",
+      "cancel": "Zrušiť",
+      "close": "Zavrieť",
+      "delete": "Odstrániť",
+      "edit": "Upraviť",
+      "add": "Pridať",
+      "copy": "Kopírovať",
+      "loading": "Načítava sa…",
+      "error": "Chyba",
+      "retry": "Skúsiť znova",
+      "search": "Hľadať",
+      "settings": "Nastavenia"
+    }
+  },
+  "sl": {
+    "sidebar": {
+      "home": "Domov",
+      "conversations": "Pogovori",
+      "agents": "Agenti",
+      "documents": "Dokumenti",
+      "providers": "Ponudniki",
+      "settings": "Nastavitve",
+      "contacts": "Stiki",
+      "translation": "Prevajanje",
+      "library": "Knjižnica",
+      "artifacts": "Artefakti",
+      "newConversation": "Nov pogovor"
+    },
+    "common": {
+      "save": "Shrani",
+      "cancel": "Prekliči",
+      "close": "Zapri",
+      "delete": "Izbriši",
+      "edit": "Uredi",
+      "add": "Dodaj",
+      "copy": "Kopiraj",
+      "loading": "Nalaganje…",
+      "error": "Napaka",
+      "retry": "Poskusi znova",
+      "search": "Išči",
+      "settings": "Nastavitve"
+    }
+  },
+  "hu": {
+    "sidebar": {
+      "home": "Kezdőlap",
+      "conversations": "Beszélgetések",
+      "agents": "Ügynökök",
+      "documents": "Dokumentumok",
+      "providers": "Szolgáltatók",
+      "settings": "Beállítások",
+      "contacts": "Névjegyek",
+      "translation": "Fordítás",
+      "library": "Könyvtár",
+      "artifacts": "Műtermékek",
+      "newConversation": "Új beszélgetés"
+    },
+    "common": {
+      "save": "Mentés",
+      "cancel": "Mégse",
+      "close": "Bezárás",
+      "delete": "Törlés",
+      "edit": "Szerkesztés",
+      "add": "Hozzáadás",
+      "copy": "Másolás",
+      "loading": "Betöltés…",
+      "error": "Hiba",
+      "retry": "Újrapróbálkozás",
+      "search": "Keresés",
+      "settings": "Beállítások"
+    }
+  },
+  "ro": {
+    "sidebar": {
+      "home": "Acasă",
+      "conversations": "Conversații",
+      "agents": "Agenți",
+      "documents": "Documente",
+      "providers": "Furnizori",
+      "settings": "Setări",
+      "contacts": "Contacte",
+      "translation": "Traducere",
+      "library": "Bibliotecă",
+      "artifacts": "Artefacte",
+      "newConversation": "Conversație nouă"
+    },
+    "common": {
+      "save": "Salvează",
+      "cancel": "Anulează",
+      "close": "Închide",
+      "delete": "Șterge",
+      "edit": "Editează",
+      "add": "Adaugă",
+      "copy": "Copiază",
+      "loading": "Se încarcă…",
+      "error": "Eroare",
+      "retry": "Încearcă din nou",
+      "search": "Caută",
+      "settings": "Setări"
+    }
+  },
+  "bg": {
+    "sidebar": {
+      "home": "Начало",
+      "conversations": "Разговори",
+      "agents": "Агенти",
+      "documents": "Документи",
+      "providers": "Доставчици",
+      "settings": "Настройки",
+      "contacts": "Контакти",
+      "translation": "Превод",
+      "library": "Библиотека",
+      "artifacts": "Артефакти",
+      "newConversation": "Нов разговор"
+    },
+    "common": {
+      "save": "Запази",
+      "cancel": "Отказ",
+      "close": "Затвори",
+      "delete": "Изтрий",
+      "edit": "Редактирай",
+      "add": "Добави",
+      "copy": "Копирай",
+      "loading": "Зареждане…",
+      "error": "Грешка",
+      "retry": "Опитай отново",
+      "search": "Търси",
+      "settings": "Настройки"
+    }
+  },
+  "el": {
+    "sidebar": {
+      "home": "Αρχική",
+      "conversations": "Συνομιλίες",
+      "agents": "Πράκτορες",
+      "documents": "Έγγραφα",
+      "providers": "Πάροχοι",
+      "settings": "Ρυθμίσεις",
+      "contacts": "Επαφές",
+      "translation": "Μετάφραση",
+      "library": "Βιβλιοθήκη",
+      "artifacts": "Τεχνουργήματα",
+      "newConversation": "Νέα συνομιλία"
+    },
+    "common": {
+      "save": "Αποθήκευση",
+      "cancel": "Ακύρωση",
+      "close": "Κλείσιμο",
+      "delete": "Διαγραφή",
+      "edit": "Επεξεργασία",
+      "add": "Προσθήκη",
+      "copy": "Αντιγραφή",
+      "loading": "Φόρτωση…",
+      "error": "Σφάλμα",
+      "retry": "Επανάληψη",
+      "search": "Αναζήτηση",
+      "settings": "Ρυθμίσεις"
+    }
+  },
+  "tr": {
+    "sidebar": {
+      "home": "Ana sayfa",
+      "conversations": "Sohbetler",
+      "agents": "Ajanlar",
+      "documents": "Belgeler",
+      "providers": "Sağlayıcılar",
+      "settings": "Ayarlar",
+      "contacts": "Kişiler",
+      "translation": "Çeviri",
+      "library": "Kitaplık",
+      "artifacts": "Üretilen öğeler",
+      "newConversation": "Yeni sohbet"
+    },
+    "common": {
+      "save": "Kaydet",
+      "cancel": "İptal",
+      "close": "Kapat",
+      "delete": "Sil",
+      "edit": "Düzenle",
+      "add": "Ekle",
+      "copy": "Kopyala",
+      "loading": "Yükleniyor…",
+      "error": "Hata",
+      "retry": "Yeniden dene",
+      "search": "Ara",
+      "settings": "Ayarlar"
+    }
+  },
+  "uk": {
+    "sidebar": {
+      "home": "Головна",
+      "conversations": "Розмови",
+      "agents": "Агенти",
+      "documents": "Документи",
+      "providers": "Постачальники",
+      "settings": "Налаштування",
+      "contacts": "Контакти",
+      "translation": "Переклад",
+      "library": "Бібліотека",
+      "artifacts": "Артефакти",
+      "newConversation": "Нова розмова"
+    },
+    "common": {
+      "save": "Зберегти",
+      "cancel": "Скасувати",
+      "close": "Закрити",
+      "delete": "Видалити",
+      "edit": "Редагувати",
+      "add": "Додати",
+      "copy": "Копіювати",
+      "loading": "Завантаження…",
+      "error": "Помилка",
+      "retry": "Повторити",
+      "search": "Пошук",
+      "settings": "Налаштування"
+    }
+  },
+  "ru": {
+    "sidebar": {
+      "home": "Главная",
+      "conversations": "Диалоги",
+      "agents": "Агенты",
+      "documents": "Документы",
+      "providers": "Провайдеры",
+      "settings": "Настройки",
+      "contacts": "Контакты",
+      "translation": "Перевод",
+      "library": "Библиотека",
+      "artifacts": "Артефакты",
+      "newConversation": "Новый диалог"
+    },
+    "common": {
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "close": "Закрыть",
+      "delete": "Удалить",
+      "edit": "Изменить",
+      "add": "Добавить",
+      "copy": "Копировать",
+      "loading": "Загрузка…",
+      "error": "Ошибка",
+      "retry": "Повторить",
+      "search": "Поиск",
+      "settings": "Настройки"
+    }
+  },
+  "sr": {
+    "sidebar": {
+      "home": "Почетна",
+      "conversations": "Разговори",
+      "agents": "Агенти",
+      "documents": "Документи",
+      "providers": "Пружаоци услуга",
+      "settings": "Подешавања",
+      "contacts": "Контакти",
+      "translation": "Превођење",
+      "library": "Библиотека",
+      "artifacts": "Артефакти",
+      "newConversation": "Нови разговор"
+    },
+    "common": {
+      "save": "Сачувај",
+      "cancel": "Откажи",
+      "close": "Затвори",
+      "delete": "Избриши",
+      "edit": "Уреди",
+      "add": "Додај",
+      "copy": "Копирај",
+      "loading": "Учитавање…",
+      "error": "Грешка",
+      "retry": "Покушај поново",
+      "search": "Претражи",
+      "settings": "Подешавања"
+    }
+  },
+  "bs": {
+    "sidebar": {
+      "home": "Početna",
+      "conversations": "Razgovori",
+      "agents": "Agenti",
+      "documents": "Dokumenti",
+      "providers": "Pružaoci usluga",
+      "settings": "Postavke",
+      "contacts": "Kontakti",
+      "translation": "Prevođenje",
+      "library": "Biblioteka",
+      "artifacts": "Artefakti",
+      "newConversation": "Novi razgovor"
+    },
+    "common": {
+      "save": "Sačuvaj",
+      "cancel": "Otkaži",
+      "close": "Zatvori",
+      "delete": "Izbriši",
+      "edit": "Uredi",
+      "add": "Dodaj",
+      "copy": "Kopiraj",
+      "loading": "Učitavanje…",
+      "error": "Greška",
+      "retry": "Pokušaj ponovo",
+      "search": "Pretraži",
+      "settings": "Postavke"
+    }
+  },
+  "da": {
+    "sidebar": {
+      "home": "Hjem",
+      "conversations": "Samtaler",
+      "agents": "Agenter",
+      "documents": "Dokumenter",
+      "providers": "Udbydere",
+      "settings": "Indstillinger",
+      "contacts": "Kontakter",
+      "translation": "Oversættelse",
+      "library": "Bibliotek",
+      "artifacts": "Artefakter",
+      "newConversation": "Ny samtale"
+    },
+    "common": {
+      "save": "Gem",
+      "cancel": "Annuller",
+      "close": "Luk",
+      "delete": "Slet",
+      "edit": "Rediger",
+      "add": "Tilføj",
+      "copy": "Kopiér",
+      "loading": "Indlæser…",
+      "error": "Fejl",
+      "retry": "Prøv igen",
+      "search": "Søg",
+      "settings": "Indstillinger"
+    }
+  },
+  "sv": {
+    "sidebar": {
+      "home": "Hem",
+      "conversations": "Konversationer",
+      "agents": "Agenter",
+      "documents": "Dokument",
+      "providers": "Leverantörer",
+      "settings": "Inställningar",
+      "contacts": "Kontakter",
+      "translation": "Översättning",
+      "library": "Bibliotek",
+      "artifacts": "Artefakter",
+      "newConversation": "Ny konversation"
+    },
+    "common": {
+      "save": "Spara",
+      "cancel": "Avbryt",
+      "close": "Stäng",
+      "delete": "Ta bort",
+      "edit": "Redigera",
+      "add": "Lägg till",
+      "copy": "Kopiera",
+      "loading": "Läser in…",
+      "error": "Fel",
+      "retry": "Försök igen",
+      "search": "Sök",
+      "settings": "Inställningar"
+    }
+  },
+  "no": {
+    "sidebar": {
+      "home": "Hjem",
+      "conversations": "Samtaler",
+      "agents": "Agenter",
+      "documents": "Dokumenter",
+      "providers": "Leverandører",
+      "settings": "Innstillinger",
+      "contacts": "Kontakter",
+      "translation": "Oversettelse",
+      "library": "Bibliotek",
+      "artifacts": "Artefakter",
+      "newConversation": "Ny samtale"
+    },
+    "common": {
+      "save": "Lagre",
+      "cancel": "Avbryt",
+      "close": "Lukk",
+      "delete": "Slett",
+      "edit": "Rediger",
+      "add": "Legg til",
+      "copy": "Kopier",
+      "loading": "Laster inn…",
+      "error": "Feil",
+      "retry": "Prøv igjen",
+      "search": "Søk",
+      "settings": "Innstillinger"
+    }
+  },
+  "fi": {
+    "sidebar": {
+      "home": "Etusivu",
+      "conversations": "Keskustelut",
+      "agents": "Agentit",
+      "documents": "Asiakirjat",
+      "providers": "Palveluntarjoajat",
+      "settings": "Asetukset",
+      "contacts": "Yhteystiedot",
+      "translation": "Käännös",
+      "library": "Kirjasto",
+      "artifacts": "Tuotokset",
+      "newConversation": "Uusi keskustelu"
+    },
+    "common": {
+      "save": "Tallenna",
+      "cancel": "Peruuta",
+      "close": "Sulje",
+      "delete": "Poista",
+      "edit": "Muokkaa",
+      "add": "Lisää",
+      "copy": "Kopioi",
+      "loading": "Ladataan…",
+      "error": "Virhe",
+      "retry": "Yritä uudelleen",
+      "search": "Hae",
+      "settings": "Asetukset"
+    }
+  },
+  "et": {
+    "sidebar": {
+      "home": "Avaleht",
+      "conversations": "Vestlused",
+      "agents": "Agendid",
+      "documents": "Dokumendid",
+      "providers": "Teenusepakkujad",
+      "settings": "Seaded",
+      "contacts": "Kontaktid",
+      "translation": "Tõlge",
+      "library": "Teek",
+      "artifacts": "Artefaktid",
+      "newConversation": "Uus vestlus"
+    },
+    "common": {
+      "save": "Salvesta",
+      "cancel": "Tühista",
+      "close": "Sulge",
+      "delete": "Kustuta",
+      "edit": "Muuda",
+      "add": "Lisa",
+      "copy": "Kopeeri",
+      "loading": "Laadimine…",
+      "error": "Viga",
+      "retry": "Proovi uuesti",
+      "search": "Otsi",
+      "settings": "Seaded"
+    }
+  },
+  "lv": {
+    "sidebar": {
+      "home": "Sākums",
+      "conversations": "Sarunas",
+      "agents": "Aģenti",
+      "documents": "Dokumenti",
+      "providers": "Pakalpojumu sniedzēji",
+      "settings": "Iestatījumi",
+      "contacts": "Kontakti",
+      "translation": "Tulkošana",
+      "library": "Bibliotēka",
+      "artifacts": "Artefakti",
+      "newConversation": "Jauna saruna"
+    },
+    "common": {
+      "save": "Saglabāt",
+      "cancel": "Atcelt",
+      "close": "Aizvērt",
+      "delete": "Dzēst",
+      "edit": "Rediģēt",
+      "add": "Pievienot",
+      "copy": "Kopēt",
+      "loading": "Ielāde…",
+      "error": "Kļūda",
+      "retry": "Mēģināt vēlreiz",
+      "search": "Meklēt",
+      "settings": "Iestatījumi"
+    }
+  },
+  "lt": {
+    "sidebar": {
+      "home": "Pradžia",
+      "conversations": "Pokalbiai",
+      "agents": "Agentai",
+      "documents": "Dokumentai",
+      "providers": "Teikėjai",
+      "settings": "Nustatymai",
+      "contacts": "Kontaktai",
+      "translation": "Vertimas",
+      "library": "Biblioteka",
+      "artifacts": "Artefaktai",
+      "newConversation": "Naujas pokalbis"
+    },
+    "common": {
+      "save": "Išsaugoti",
+      "cancel": "Atšaukti",
+      "close": "Uždaryti",
+      "delete": "Ištrinti",
+      "edit": "Redaguoti",
+      "add": "Pridėti",
+      "copy": "Kopijuoti",
+      "loading": "Įkeliama…",
+      "error": "Klaida",
+      "retry": "Bandyti dar kartą",
+      "search": "Ieškoti",
+      "settings": "Nustatymai"
+    }
+  },
+  "ja": {
+    "sidebar": {
+      "home": "ホーム",
+      "conversations": "会話",
+      "agents": "エージェント",
+      "documents": "ドキュメント",
+      "providers": "プロバイダー",
+      "settings": "設定",
+      "contacts": "連絡先",
+      "translation": "翻訳",
+      "library": "ライブラリ",
+      "artifacts": "成果物",
+      "newConversation": "新しい会話"
+    },
+    "common": {
+      "save": "保存",
+      "cancel": "キャンセル",
+      "close": "閉じる",
+      "delete": "削除",
+      "edit": "編集",
+      "add": "追加",
+      "copy": "コピー",
+      "loading": "読み込み中…",
+      "error": "エラー",
+      "retry": "再試行",
+      "search": "検索",
+      "settings": "設定"
+    }
+  },
+  "ko": {
+    "sidebar": {
+      "home": "홈",
+      "conversations": "대화",
+      "agents": "에이전트",
+      "documents": "문서",
+      "providers": "제공업체",
+      "settings": "설정",
+      "contacts": "연락처",
+      "translation": "번역",
+      "library": "라이브러리",
+      "artifacts": "결과물",
+      "newConversation": "새 대화"
+    },
+    "common": {
+      "save": "저장",
+      "cancel": "취소",
+      "close": "닫기",
+      "delete": "삭제",
+      "edit": "편집",
+      "add": "추가",
+      "copy": "복사",
+      "loading": "불러오는 중…",
+      "error": "오류",
+      "retry": "다시 시도",
+      "search": "검색",
+      "settings": "설정"
+    }
+  },
+  "ar": {
+    "sidebar": {
+      "home": "الرئيسية",
+      "conversations": "المحادثات",
+      "agents": "الوكلاء",
+      "documents": "المستندات",
+      "providers": "المزوّدون",
+      "settings": "الإعدادات",
+      "contacts": "جهات الاتصال",
+      "translation": "الترجمة",
+      "library": "المكتبة",
+      "artifacts": "المخرجات",
+      "newConversation": "محادثة جديدة"
+    },
+    "common": {
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "close": "إغلاق",
+      "delete": "حذف",
+      "edit": "تعديل",
+      "add": "إضافة",
+      "copy": "نسخ",
+      "loading": "جارٍ التحميل…",
+      "error": "خطأ",
+      "retry": "إعادة المحاولة",
+      "search": "بحث",
+      "settings": "الإعدادات"
+    }
+  },
+  "hi": {
+    "sidebar": {
+      "home": "होम",
+      "conversations": "बातचीत",
+      "agents": "एजेंट",
+      "documents": "दस्तावेज़",
+      "providers": "प्रदाता",
+      "settings": "सेटिंग्स",
+      "contacts": "संपर्क",
+      "translation": "अनुवाद",
+      "library": "लाइब्रेरी",
+      "artifacts": "निर्मित सामग्री",
+      "newConversation": "नई बातचीत"
+    },
+    "common": {
+      "save": "सहेजें",
+      "cancel": "रद्द करें",
+      "close": "बंद करें",
+      "delete": "हटाएँ",
+      "edit": "संपादित करें",
+      "add": "जोड़ें",
+      "copy": "कॉपी करें",
+      "loading": "लोड हो रहा है…",
+      "error": "त्रुटि",
+      "retry": "फिर प्रयास करें",
+      "search": "खोजें",
+      "settings": "सेटिंग्स"
+    }
+  },
+  "id": {
+    "sidebar": {
+      "home": "Beranda",
+      "conversations": "Percakapan",
+      "agents": "Agen",
+      "documents": "Dokumen",
+      "providers": "Penyedia",
+      "settings": "Pengaturan",
+      "contacts": "Kontak",
+      "translation": "Terjemahan",
+      "library": "Pustaka",
+      "artifacts": "Artefak",
+      "newConversation": "Percakapan baru"
+    },
+    "common": {
+      "save": "Simpan",
+      "cancel": "Batal",
+      "close": "Tutup",
+      "delete": "Hapus",
+      "edit": "Edit",
+      "add": "Tambah",
+      "copy": "Salin",
+      "loading": "Memuat…",
+      "error": "Kesalahan",
+      "retry": "Coba lagi",
+      "search": "Cari",
+      "settings": "Pengaturan"
+    }
+  },
+  "vi": {
+    "sidebar": {
+      "home": "Trang chủ",
+      "conversations": "Cuộc trò chuyện",
+      "agents": "Tác nhân",
+      "documents": "Tài liệu",
+      "providers": "Nhà cung cấp",
+      "settings": "Cài đặt",
+      "contacts": "Liên hệ",
+      "translation": "Dịch thuật",
+      "library": "Thư viện",
+      "artifacts": "Sản phẩm tạo ra",
+      "newConversation": "Cuộc trò chuyện mới"
+    },
+    "common": {
+      "save": "Lưu",
+      "cancel": "Hủy",
+      "close": "Đóng",
+      "delete": "Xóa",
+      "edit": "Chỉnh sửa",
+      "add": "Thêm",
+      "copy": "Sao chép",
+      "loading": "Đang tải…",
+      "error": "Lỗi",
+      "retry": "Thử lại",
+      "search": "Tìm kiếm",
+      "settings": "Cài đặt"
+    }
+  },
+  "th": {
+    "sidebar": {
+      "home": "หน้าหลัก",
+      "conversations": "การสนทนา",
+      "agents": "เอเจนต์",
+      "documents": "เอกสาร",
+      "providers": "ผู้ให้บริการ",
+      "settings": "การตั้งค่า",
+      "contacts": "รายชื่อผู้ติดต่อ",
+      "translation": "การแปล",
+      "library": "คลังข้อมูล",
+      "artifacts": "ชิ้นงาน",
+      "newConversation": "การสนทนาใหม่"
+    },
+    "common": {
+      "save": "บันทึก",
+      "cancel": "ยกเลิก",
+      "close": "ปิด",
+      "delete": "ลบ",
+      "edit": "แก้ไข",
+      "add": "เพิ่ม",
+      "copy": "คัดลอก",
+      "loading": "กำลังโหลด…",
+      "error": "ข้อผิดพลาด",
+      "retry": "ลองอีกครั้ง",
+      "search": "ค้นหา",
+      "settings": "การตั้งค่า"
     }
   }
 }

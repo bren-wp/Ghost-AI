@@ -59,7 +59,9 @@ export function ProviderForm({
   const isCustom = isCustomProvider(selectedProvider)
   const isKeylessLocal = selectedProvider.id === 'ollama'
   const supportsOptionalKey = !isKeylessLocal && !requiresApiKeyForFetch(selectedProvider.id)
+  const endpointRequired = isCustom || !selectedProvider.baseUrl
   const invalidEndpoint = apiBaseUrl.trim().length > 0 && !isValidProviderEndpoint(apiBaseUrl)
+  const missingEndpoint = endpointRequired && !apiBaseUrl.trim()
   const plaintextRemoteEndpoint = isPlaintextRemoteEndpoint(apiBaseUrl)
 
   const [selectedTestModel, setSelectedTestModel] = React.useState('')
@@ -95,6 +97,12 @@ export function ProviderForm({
         ? 'custom_anthropic'
         : 'custom_openai'
       : selectedProvider.id
+
+    if (invalidEndpoint || missingEndpoint) {
+      setCheckStatus('failed')
+      setCheckError(t(invalidEndpoint ? 'invalidBaseUrl' : 'baseUrlRequired'))
+      return
+    }
 
     if (!testModelId) {
       setCheckStatus('failed')
@@ -138,7 +146,7 @@ export function ProviderForm({
       setCheckStatus('failed')
       setCheckError(t('connectionFailed'))
     }
-  }, [selectedProvider, isCustom, compatibilityType, apiKey, apiBaseUrl, apiStyle, testModelId, t])
+  }, [selectedProvider, isCustom, compatibilityType, apiKey, apiBaseUrl, apiStyle, testModelId, invalidEndpoint, missingEndpoint, t])
 
   return (
     <div className="min-w-0 space-y-4">
@@ -284,7 +292,7 @@ export function ProviderForm({
               onClick={handleCheckApi}
               disabled={
                 checkStatus === 'checking' ||
-                invalidEndpoint ||
+                invalidEndpoint || missingEndpoint ||
                 !testModelId ||
                 (requiresApiKeyForFetch(selectedProvider.id) && !apiKey.trim())
               }
@@ -385,7 +393,7 @@ export function ProviderForm({
             type="button"
             variant={checkStatus === 'failed' ? 'destructive' : 'outline'}
             onClick={handleCheckApi}
-            disabled={checkStatus === 'checking' || invalidEndpoint || !testModelId}
+            disabled={checkStatus === 'checking' || invalidEndpoint || missingEndpoint || !testModelId}
             className="border-[#00E5FF]/40 bg-[#00E5FF]/10 text-[#B5F5FC] hover:bg-[#00E5FF]/20"
           >
             {checkStatus === 'checking' ? (

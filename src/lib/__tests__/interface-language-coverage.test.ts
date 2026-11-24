@@ -14,8 +14,14 @@ describe('bundled interface translation status', () => {
     }
   )
 
-  it.each(['nl', 'ja', 'ar', 'unknown'])('reports fallback-only locale %s', (code) => {
-    expect(getInterfaceTranslationStatus(code)).toBe('fallback')
+  it('reports unknown locales as fallback-only', () => {
+    expect(getInterfaceTranslationStatus('unknown')).toBe('fallback')
+  })
+
+  it('bundles actual core UI translations for every supported language', () => {
+    for (const { code } of supportedLanguages) {
+      expect(getInterfaceTranslationStatus(code)).not.toBe('fallback')
+    }
   })
 
   it('returns a supported status for every declared locale', () => {
