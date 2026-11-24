@@ -139,6 +139,17 @@ describe('useImageSelect', () => {
     expect(logger.error).toHaveBeenCalledTimes(1)
   })
 
+  it('does not log selected absolute paths or raw read errors', async () => {
+    vi.mocked(open).mockResolvedValue('/private/secret.png')
+    vi.mocked(invoke).mockRejectedValue(new Error('read failed at /private/secret.png'))
+    const { handleImageSelect } = renderSelect()
+    await act(async () => handleImageSelect())
+    expect(attachments).toEqual([])
+    expect(JSON.stringify(vi.mocked(logger.info).mock.calls)).not.toContain('/private/')
+    expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain('/private/')
+    expect(logger.error).toHaveBeenCalledTimes(1)
+  })
+
   it('a dialog failure logs and attaches nothing', async () => {
     vi.mocked(open).mockRejectedValue(new Error('dialog crashed'))
     const { handleImageSelect } = renderSelect()

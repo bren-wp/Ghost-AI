@@ -217,6 +217,17 @@ describe('useFileSelect', () => {
     expect(attachments).toEqual([])
   })
 
+  it('keeps selected paths and backend errors out of diagnostic logs', async () => {
+    vi.mocked(open).mockResolvedValue('/private/secret.md')
+    vi.mocked(invoke).mockRejectedValue(new Error('read failed at /private/secret.md'))
+    const { handleFileSelect } = renderSelect()
+    await act(async () => handleFileSelect())
+    expect(attachments).toEqual([])
+    expect(JSON.stringify(vi.mocked(logger.info).mock.calls)).not.toContain('/private/')
+    expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain('/private/')
+    expect(toast.error).toHaveBeenCalledWith('Failed to read: secret.md', expect.anything())
+  })
+
   it('a dialog failure logs without a toast and attaches nothing', async () => {
     vi.mocked(open).mockRejectedValue(new Error('dialog crashed'))
     const { handleFileSelect } = renderSelect()

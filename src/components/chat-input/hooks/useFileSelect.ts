@@ -1,16 +1,6 @@
 // Ghost AI by Brendigo
-import { useCallback } from 'react'
-import { open } from '@tauri-apps/plugin-dialog'
-import { toast } from 'sonner'
-import { useTranslation } from 'react-i18next'
-import { type Attachment, SUPPORTED_DOCUMENT_EXTENSIONS } from '../types'
-import {
-  isRejected,
-  readDocumentFromPath,
-  reportRejected,
-  type RejectedFile,
-} from '../attachment-ingest'
-import { logger } from '@/lib/logger'
+import type { Attachment } from '../types'
+import { useNativeAttachmentPicker } from './useNativeAttachmentPicker'
 
 export interface UseFileSelectReturn {
   handleFileSelect: () => Promise<void>
@@ -19,52 +9,6 @@ export interface UseFileSelectReturn {
 export function useFileSelect(
   setAttachments: React.Dispatch<React.SetStateAction<Attachment[]>>
 ): UseFileSelectReturn {
-  const { t } = useTranslation('messages')
-  const handleFileSelect = useCallback(async () => {
-    try {
-      logger.info('[handleFileSelect] Opening file dialog...')
-      const selected = await open({
-        multiple: true,
-        filters: [
-          {
-            name: 'Documents',
-            extensions: SUPPORTED_DOCUMENT_EXTENSIONS,
-          },
-        ],
-      })
-
-
-      if (!selected) {
-        logger.info('[handleFileSelect] No file selected')
-        return
-      }
-
-      const files = Array.isArray(selected) ? selected : [selected]
-      logger.info('[handleFileSelect] File count:', files.length)
-
-      const rejected: RejectedFile[] = []
-      for (const filePath of files) {
-        const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'file'
-        try {
-          const result = await readDocumentFromPath(t, filePath, fileName)
-          if (isRejected(result)) {
-            rejected.push(result)
-            continue
-          }
-          setAttachments((prev) => [...prev, result])
-        } catch (error) {
-          logger.error('[handleFileSelect] Failed to read selected file')
-          toast.error(t('failedToReadFile', { file: fileName }), {
-            description: error instanceof Error ? error.message : String(error),
-          })
-        }
-      }
-      reportRejected(t, rejected)
-      logger.info('[handleFileSelect] Done processing files')
-    } catch {
-      logger.error('[handleFileSelect] Failed to select file')
-    }
-  }, [setAttachments, t])
-
+  const handleFileSelect = useNativeAttachmentPicker('document', setAttachments)
   return { handleFileSelect }
 }
