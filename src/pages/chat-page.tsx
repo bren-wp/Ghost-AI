@@ -9,7 +9,12 @@ import { SettingsDialog } from '@/components/settings-dialog'
 import { hasBlockingDialog } from '@/lib/blocking-dialog'
 import { ChatView } from '@/components/chat-view'
 import { WorkspaceHome } from '@/components/workspace-home'
-import { sectionAfterConversationChange } from '@/lib/workspace-navigation'
+import { AgentsWorkspace, DocumentsWorkspace, ProvidersWorkspace, SettingsWorkspace } from '@/components/reference-workspaces'
+import { AssistantDialog } from '@/components/assistant-dialog'
+import { PermissionApprovalDialog } from '@/components/chat-view/PermissionApprovalDialog'
+import { McpElicitationDialog } from '@/components/chat-view/McpElicitationDialog'
+import { AskUserDialog } from '@/components/chat-view/AskUserDialog'
+import { isReferenceWorkspace, sectionAfterConversationChange } from '@/lib/workspace-navigation'
 import { useProviderSettingsStore } from '@/stores/providerSettingsStore'
 import { ContactProfile } from '@/components/contact-profile'
 import { useSelectedContact } from '@/hooks/useContactProfile'
@@ -65,6 +70,12 @@ export function ChatPage() {
   const [activeSection, setActiveSection] = useState('home')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
+  const [settingsInitialSection, setSettingsInitialSection] = useState<string | undefined>()
+  const [createAssistantOpen, setCreateAssistantOpen] = useState(false)
+  const openSettingsSection = (section?: string) => {
+    setSettingsInitialSection(section)
+    setSettingsDialogOpen(true)
+  }
   const isTranslation = activeSection === 'translation'
   // Initialize app (load agents, conversations, settings)
   const { isInitialized, error: initError, keychainAvailable } = useAppInit()
@@ -138,6 +149,7 @@ export function ChatPage() {
       if (event.code !== 'Comma' || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
       if (hasBlockingDialog()) return
       event.preventDefault()
+      setSettingsInitialSection(undefined)
       setSettingsDialogOpen(true)
     }
     window.addEventListener('keydown', handler)
@@ -182,10 +194,13 @@ export function ChatPage() {
     void openNewConversation()
   }, [openNewConversation])
 
-  const openAgents = () => {
-    useContactSelectionStore.getState().setActiveTab('assistants')
-    setActiveSection('contacts')
+  const openWorkspace = (section: string) => {
+    setActiveSection(section)
     setSidebarOpen(true)
+  }
+  const openAgentProfile = (id: string) => {
+    useContactSelectionStore.getState().selectContact({ kind: 'assistant', id })
+    openWorkspace('contacts')
   }
   const openDocumentConversation = async () => {
     const previousDraft = useConversationStore.getState().draftConversation?.id
@@ -255,7 +270,7 @@ export function ChatPage() {
         onOpenChange={setSidebarOpen}
         style={
           {
-            '--sidebar-width': activeSection === 'home' ? '255px' : '350px',
+            '--sidebar-width': isReferenceWorkspace(activeSection) ? '255px' : '350px',
           } as React.CSSProperties
         }
       >
@@ -263,7 +278,6 @@ export function ChatPage() {
           activeSection={activeSection}
           onSectionChange={setActiveSection}
           onNewConversation={startNewConversation}
-          onOpenSettings={() => setSettingsDialogOpen(true)}
         />
         <SidebarInset className="flex min-w-0 flex-col h-screen overflow-hidden">
           <header
@@ -274,11 +288,11 @@ export function ChatPage() {
             }
           >
             <SidebarTrigger className={isTranslation ? '-ml-1 md:hidden' : '-ml-1'} />
-            {!isTranslation && activeSection !== 'home' && <CollapsedNewConversationButton onClick={startNewConversation} />}
+            {!isTranslation && !isReferenceWorkspace(activeSection) && <CollapsedNewConversationButton onClick={startNewConversation} />}
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
             <h1 className="min-w-0 truncate text-sm font-medium">
-              {activeSection === 'home'
-                ? t('sidebar:home')
+              {isReferenceWorkspace(activeSection)
+                ? t(`sidebar:${activeSection}`)
                 : isTranslation
                 ? t('sidebar:translation')
                 : showContactProfile
@@ -299,7 +313,7 @@ export function ChatPage() {
               className="ml-auto shrink-0"
               aria-label={t('common:settings')}
               title={t('common:settings')}
-              onClick={() => setSettingsDialogOpen(true)}
+              onClick={() => openSettingsSection()}
             >
               <SettingsIcon className="size-4" />
             </Button>
@@ -324,10 +338,18 @@ export function ChatPage() {
           {activeSection === 'home' ? (
             <WorkspaceHome
               onConversation={startNewConversation}
-              onDocument={() => void openDocumentConversation()}
-              onAgents={openAgents}
-              onProviders={() => openProviders()}
+              onDocument={() => openWorkspace('documents')}
+              onAgents={() => openWorkspace('agents')}
+              onProviders={() => openWorkspace('providers')}
             />
+          ) : activeSection === 'agents' ? (
+            <AgentsWorkspace onSelect={openAgentProfile} onCreate={() => setCreateAssistantOpen(true)} />
+          ) : activeSection === 'documents' ? (
+            <DocumentsWorkspace onStart={() => void openDocumentConversation()} />
+          ) : activeSection === 'providers' ? (
+            <ProvidersWorkspace onConfigure={openProviders} />
+          ) : activeSection === 'settings' ? (
+            <SettingsWorkspace onOpen={openSettingsSection} />
           ) : isTranslation ? (
             <TranslationContent />
           ) : showContactProfile && selectedContact ? (
@@ -356,12 +378,16 @@ export function ChatPage() {
           ) : showSkillDetail && selectedSkill ? (
             <SkillDetail key={selectedSkill.id} skill={selectedSkill} />
           ) : (
-            <ChatView />
+            <ChatView showInteractionDialogs={false} />
           )}
         </SidebarInset>
       </SidebarProvider>
       <Toaster position="top-center" />
-      <SettingsDialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen} />
+      <SettingsDialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen} initialSection={settingsInitialSection} />
+      <AssistantDialog open={createAssistantOpen} onOpenChange={setCreateAssistantOpen} />
+      <PermissionApprovalDialog />
+      <McpElicitationDialog />
+      <AskUserDialog />
       <SyncOnboardingDialog />
       <SearchDialog />
     </>

@@ -23,7 +23,7 @@ import {
   useMessageHandlers,
 } from './hooks'
 
-export function ChatView() {
+export function ChatView({ showInteractionDialogs = true }: { showInteractionDialogs?: boolean } = {}) {
   const { t } = useTranslation('chat')
 
   // Get conversation state from stores
@@ -316,9 +316,13 @@ export function ChatView() {
         </div>
       </div>
 
-      <PermissionApprovalDialog />
-      <McpElicitationDialog />
-      <AskUserDialog />
+      {showInteractionDialogs && (
+        <>
+          <PermissionApprovalDialog />
+          <McpElicitationDialog />
+          <AskUserDialog />
+        </>
+      )}
     </div>
   )
 }

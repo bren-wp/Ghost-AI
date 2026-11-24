@@ -47,6 +47,7 @@ import { hasBlockingDialog } from '@/lib/blocking-dialog'
 import { usePromptStore } from '@/stores/promptStore'
 import { useProviderSettingsStore } from '@/stores/providerSettingsStore'
 import { getNavItems } from '@/lib/sidebar-data'
+import { isReferenceWorkspace } from '@/lib/workspace-navigation'
 import type { Prompt as PromptListItem } from '@/components/prompt-list'
 import type { Model as ModelListItem } from '@/components/model-list'
 import type { Assistant as AssistantListItem } from '@/components/assistant-list'
@@ -59,14 +60,12 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onSectionChange: (section: string) => void
   /** Switches to the conversations section and opens a draft */
   onNewConversation: () => void
-  onOpenSettings?: () => void
 }
 
 export function AppSidebar({
   activeSection,
   onSectionChange,
   onNewConversation,
-  onOpenSettings,
   ...props
 }: AppSidebarProps) {
   const { t } = useTranslation()
@@ -438,12 +437,10 @@ export function AppSidebar({
           setOpen(item.id !== 'translation')
           setOpenMobile(false)
         }}
-        showLabels={activeSection === 'home' && (sidebarState === 'expanded' || isMobile)}
-        onOpenProviders={() => openProviderSettings()}
-        onOpenSettings={onOpenSettings}
+        showLabels={isReferenceWorkspace(activeSection) && (sidebarState === 'expanded' || isMobile)}
       />
 
-      {activeSection !== 'translation' && activeSection !== 'home' && (
+      {activeSection !== 'translation' && !isReferenceWorkspace(activeSection) && (
         <Sidebar collapsible="none" className="hidden flex-1 md:flex">
           <SidebarHeader className="gap-3.5 border-b p-4">
             <div className="flex w-full items-center justify-between h-7">

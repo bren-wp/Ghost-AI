@@ -128,7 +128,14 @@ export function ProviderSettingsDialog({
     if (!initialProviderId || !isDataLoaded) return
     if (appliedFocusRef.current === initialProviderId) return
     const provider = storeProviders.find((p) => p.id === initialProviderId)
-    if (!provider) return
+    if (!provider) {
+      const template = BUILTIN_PROVIDERS.find((p) => p.id === initialProviderId)
+      if (!template) return
+      appliedFocusRef.current = initialProviderId
+      setEditingCustomProviderId(null)
+      setSelectedProvider(template)
+      return
+    }
     appliedFocusRef.current = initialProviderId
     if (isCustomProviderType(provider.provider_type)) {
       setEditingCustomProviderId(provider.id)

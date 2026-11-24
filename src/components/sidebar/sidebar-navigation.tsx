@@ -1,6 +1,4 @@
 // Ghost AI by Brendigo
-import { Plug, Settings } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
 import appIcon from '@/assets/app-icon.png'
 import {
   Sidebar,
@@ -30,8 +28,6 @@ interface SidebarNavigationProps {
   activeItem: NavItem
   onItemClick: (item: NavItem) => void
   showLabels?: boolean
-  onOpenProviders?: () => void
-  onOpenSettings?: () => void
 }
 
 export function SidebarNavigation({
@@ -39,10 +35,7 @@ export function SidebarNavigation({
   activeItem,
   onItemClick,
   showLabels = false,
-  onOpenProviders,
-  onOpenSettings,
 }: SidebarNavigationProps) {
-  const { t } = useTranslation()
   const itemClass = showLabels
     ? 'h-11 rounded-xl px-3 data-[active=true]:text-primary'
     : 'px-2.5 md:px-2'
@@ -86,22 +79,6 @@ export function SidebarNavigation({
           <SidebarGroupContent className={showLabels ? undefined : 'px-1.5 md:px-0'}>
             <SidebarMenu>
               {navItems.map(renderItem)}
-              {onOpenProviders && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton className={itemClass} tooltip={{ children: t('providers:providers'), hidden: false }} aria-label={t('providers:providers')} onClick={onOpenProviders}>
-                    <Plug />
-                    <span className={showLabels ? undefined : 'sr-only'}>{t('providers:providers')}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              {onOpenSettings && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton className={itemClass} tooltip={{ children: t('common:settings'), hidden: false }} aria-label={t('common:settings')} onClick={onOpenSettings}>
-                    <Settings />
-                    <span className={showLabels ? undefined : 'sr-only'}>{t('common:settings')}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

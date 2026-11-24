@@ -136,6 +136,7 @@ const data = {
 interface SettingsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialSection?: string
 }
 
 interface LogStorageInfo {
@@ -195,10 +196,15 @@ function AuxVisionModelList({
   ))
 }
 
-export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
+export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsDialogProps) {
   const { t } = useTranslation('settings')
   const { t: tc } = useTranslation('common')
   const [activeSection, setActiveSection] = React.useState('llmProvider')
+  React.useEffect(() => {
+    if (open && initialSection && data.nav.some((item) => item.name === initialSection)) {
+      setActiveSection(initialSection)
+    }
+  }, [open, initialSection])
   const [auxTinyModelId, setAuxTinyModelId] = React.useState('')
   const [auxVisionModelId, setAuxVisionModelId] = React.useState('')
   const [autoReviewModelId, setAutoReviewModelId] = React.useState('')
