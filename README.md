@@ -54,7 +54,7 @@ Ghost AI brings your favorite compatible AI services and local models into a pow
 
 Ghost AI uses a responsive interface designed for laptop screens, external monitors and different display scales. Its window opens at a comfortable size without filling the whole screen.
 
-Every display should feel consistent. Real application screenshots are included only after capture and verification on a supported operating system.
+Every display should feel consistent. [View the captured Windows application screenshots from the v0.1.4 baseline](https://github.com/bren-wp/Ghost-AI/actions/runs/45286815596/artifacts/14871654495). These are real captures of the previous build, not screenshots of the redesigned workspaces. GitHub artifact access may require sign-in.
 
 ## Available platforms
 

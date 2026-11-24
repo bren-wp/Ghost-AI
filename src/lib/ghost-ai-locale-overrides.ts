@@ -2,7 +2,7 @@
 // Curated core UI translations. Missing keys fall back to the English source.
 export const localeOverrides: Record<string, Record<string, Record<string, string>>> = {
   "hr": {
-    "sidebar": { "home": "Početna", "agents": "Agenti", "documents": "Dokumenti", "providers": "Pružatelji", "settings": "Postavke" },
+    "sidebar": { "home": "Početna", "agents": "Agenti", "documents": "Dokumenti", "providers": "Pružatelji", "settings": "Postavke", "conversations": "Razgovori", "contacts": "Kontakti", "translation": "Prevođenje", "library": "Biblioteka", "artifacts": "Artefakti", "newConversation": "Novi razgovor" },
     "chat": {
       "reference_agentsTitle": "Agenti i tijekovi rada",
       "reference_agentsSubtitle": "Odaberi asistenta i pregledaj njegove alate prije početka.",
@@ -65,6 +65,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
     },
     "settings": {
       "llmProvider": "AI pružatelji",
+      "auxModels": "Pomoćni modeli",
+      "builtInTools": "Ugrađeni alati",
+      "mcpServers": "MCP poslužitelji",
+      "permissions": "Dozvole",
+      "skills": "Vještine",
+      "webFetch": "Dohvat weba",
+      "webSearch": "Pretraživanje weba",
+      "visuals": "Vizualni prikazi",
+      "sync": "Sinkronizacija",
+      "advanced": "Napredno",
+      "theme": "Tema",
+      "themeDescription": "Ghost AI koristi dosljedan tamni izgled.",
       "language": "Jezik",
       "appearance": "Izgled",
       "themeDark": "Tamna tema",
@@ -91,7 +103,7 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
     }
   },
   "de": {
-    "sidebar": { "home": "Startseite", "agents": "Agenten", "documents": "Dokumente", "providers": "Anbieter", "settings": "Einstellungen" },
+    "sidebar": { "home": "Startseite", "agents": "Agenten", "documents": "Dokumente", "providers": "Anbieter", "settings": "Einstellungen", "conversations": "Unterhaltungen", "contacts": "Kontakte", "translation": "Übersetzung", "library": "Bibliothek", "artifacts": "Artefakte", "newConversation": "Neue Unterhaltung" },
     "chat": {
       "reference_agentsTitle": "Agenten und Arbeitsabläufe",
       "reference_agentsSubtitle": "Wähle einen Assistenten und prüfe vor dem Start seine Werkzeuge.",
@@ -154,6 +166,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
     },
     "settings": {
       "llmProvider": "KI-Anbieter",
+      "auxModels": "Hilfsmodelle",
+      "builtInTools": "Integrierte Werkzeuge",
+      "mcpServers": "MCP-Server",
+      "permissions": "Berechtigungen",
+      "skills": "Fähigkeiten",
+      "webFetch": "Webabruf",
+      "webSearch": "Websuche",
+      "visuals": "Visualisierungen",
+      "sync": "Synchronisierung",
+      "advanced": "Erweitert",
+      "theme": "Design",
+      "themeDescription": "Ghost AI verwendet ein einheitliches dunkles Design.",
       "language": "Sprache",
       "appearance": "Darstellung",
       "themeDark": "Dunkles Design",

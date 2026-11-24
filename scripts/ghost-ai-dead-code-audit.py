@@ -9,9 +9,11 @@ No files are removed by this tool.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import posixpath
 import re
-from collections import deque
+import tomllib
+from collections import defaultdict, deque
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +55,8 @@ def ts_candidates() -> tuple[int, list[str], int]:
         for p in (ROOT / "src").rglob("*")
         if p.is_file() and p.suffix in TS_EXTENSIONS and not p.name.endswith(".d.ts")
     }
+    known = set(sources)
+    assets = {p.relative_to(ROOT).as_posix() for p in (ROOT / "src").rglob("*") if p.is_file()}
     graph: dict[str, set[str]] = {}
     unresolved = 0
     for name, path in sorted(sources.items()):
@@ -60,11 +64,15 @@ def ts_candidates() -> tuple[int, list[str], int]:
         imports = IMPORT_RE.findall(contents)
         targets = set()
         for specifier in imports:
-            target = ts_target(name, specifier, set(sources))
+            target = ts_target(name, specifier, known)
             if target is not None:
                 targets.add(target)
             elif specifier.startswith((".", "@/")):
-                unresolved += 1
+                # Existing non-code assets (JSON, CSS, images, declarations)
+                # are resolved inputs, not missing TS modules.
+                raw = specifier.split("?", 1)[0]
+                if ts_target(name, raw, assets) is None:
+                    unresolved += 1
         graph[name] = targets
     # Importing a module from a test does not make it production-reachable.
     production = {
@@ -72,9 +80,21 @@ def ts_candidates() -> tuple[int, list[str], int]:
         if not re.search(r"(?:/__tests__/|\.(?:test|spec)\.[jt]sx?$)", name)
     }
     entrypoints = {x for x in ("src/main.tsx", "src/main.ts", "src/index.tsx", "src/index.ts") if x in sources}
-    # React roots may use imported global CSS and lazy modules. This report
-    # deliberately does not infer live behavior from filenames alone.
+    # The configured Vitest setup is a test entrypoint, not production code
+    # and not a deletion candidate. Only use paths explicitly in setupFiles.
+    config = ROOT / "vitest.config.ts"
+    setup_roots = set()
+    if config.is_file():
+        match = re.search(r"setupFiles\s*:\s*\[([^\]]*)\]", config.read_text(encoding="utf-8"))
+        if match:
+            for path in re.findall(r"['\"]([^'\"]+)['\"]", match.group(1)):
+                normalized = posixpath.normpath(path)
+                if normalized in known:
+                    setup_roots.add(normalized)
+    production -= setup_roots
     reached = walk_graph(graph, entrypoints)
+    # Test-only dependencies are still not production-reachable. Keep them
+    # in the candidate inventory, but never list the explicit setup root.
     candidates = sorted(production - reached)
     return len(production), candidates, unresolved
 
@@ -98,26 +118,61 @@ def rust_candidates() -> tuple[int, list[str]]:
         for root in roots if root.is_dir()
         for p in root.rglob("*.rs")
     }
+    known = set(files)
     graph: dict[str, set[str]] = {}
     for name, path in sorted(files.items()):
         contents = path.read_text(encoding="utf-8")
         graph[name] = {
             child for module in RUST_MOD_RE.findall(contents)
-            if (child := rust_child(name, module, set(files))) is not None
+            if (child := rust_child(name, module, known)) is not None
         }
     entrypoints = {
         name for name in files
         if name in ("src-tauri/src/lib.rs", "src-tauri/src/main.rs")
         or re.fullmatch(r"vendor/agent/crates/[^/]+/src/(?:lib|main)\.rs", name)
     }
+    # Cargo explicit and auto-discovered binary targets are entrypoints.
+    for root in roots:
+        manifest = root.parent / "Cargo.toml"
+        if not manifest.is_file():
+            continue
+        config = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        for target in config.get("bin", []):
+            path = target.get("path")
+            if path:
+                candidate = (root.parent / path).relative_to(ROOT).as_posix()
+                if candidate in known:
+                    entrypoints.add(candidate)
+        if config.get("package", {}).get("autobins", True):
+            prefix = (root / "bin").relative_to(ROOT).as_posix()
+            entrypoints.update(name for name in known if re.fullmatch(
+                re.escape(prefix) + r"/(?:[^/]+\.rs|[^/]+/main\.rs)", name
+            ))
     reached = walk_graph(graph, entrypoints)
     # Non-module Rust files (examples and build scripts) are outside src roots.
     return len(files), sorted(set(files) - reached)
 
 
+def exact_duplicates() -> list[list[str]]:
+    """Byte-identical source candidates; not semantic clone detection."""
+    groups: dict[str, list[str]] = defaultdict(list)
+    for root in (ROOT / "src", ROOT / "src-tauri" / "src"):
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or path.suffix not in (*TS_EXTENSIONS, ".rs"):
+                continue
+            name = path.relative_to(ROOT).as_posix()
+            if "/types/generated/" in name or path.name.endswith(".d.ts"):
+                continue
+            data = path.read_bytes()
+            if len(data) >= 100:
+                groups[hashlib.sha256(data).hexdigest()].append(name)
+    return sorted(sorted(group) for group in groups.values() if len(group) > 1)
+
+
 def report(output: Path) -> dict[str, int]:
     ts_total, unused_ts, unresolved = ts_candidates()
     rust_total, unused_rust = rust_candidates()
+    duplicates = exact_duplicates()
     lines = [
         "# Ghost AI by Brendigo — full first-party static dead-code review",
         "",
@@ -131,6 +186,7 @@ def report(output: Path) -> dict[str, int]:
         f"- TS modules without a static path from a production entrypoint: **{len(unused_ts)}**",
         f"- Rust modules without a recognized `mod` path: **{len(unused_rust)}**",
         f"- Unresolved relative/alias import specifiers (review required): **{unresolved}**",
+        f"- Byte-identical first-party source groups (review required): **{len(duplicates)}**",
         "",
         "## TypeScript review candidates",
         "",
@@ -142,6 +198,12 @@ def report(output: Path) -> dict[str, int]:
     lines.extend(f"- `{file}`" for file in unused_rust)
     if not unused_rust:
         lines.append("None identified by the Rust module graph.")
+    lines.extend(["", "## Exact duplicate source candidates", "",
+                  "Generated declarations are excluded. Similar functions and semantic clones need manual review."])
+    for group in duplicates:
+        lines.append("- " + ", ".join(f"`{name}`" for name in group))
+    if not duplicates:
+        lines.append("No byte-identical source groups identified within the checked scope.")
     lines.extend([
         "",
         "## Reviewer procedure",
@@ -154,7 +216,8 @@ def report(output: Path) -> dict[str, int]:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines), encoding="utf-8")
     return {"typescript": ts_total, "rust": rust_total, "ts_candidates": len(unused_ts),
-            "rust_candidates": len(unused_rust), "unresolved_imports": unresolved}
+            "rust_candidates": len(unused_rust), "unresolved_imports": unresolved,
+            "exact_duplicate_groups": len(duplicates)}
 
 
 def main() -> None:
