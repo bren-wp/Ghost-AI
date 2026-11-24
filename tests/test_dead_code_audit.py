@@ -51,3 +51,46 @@ class DeadCodeAuditTests(unittest.TestCase):
         self.put("src/x.ts", "tiny")
         self.put("src/y.ts", "tiny")
         self.assertEqual(audit.exact_duplicates(), [["src/a.ts", "src/b.ts"]])
+
+
+    def test_structural_clones_detect_renamed_identifiers_and_literals(self):
+        first = """function processInvoice(items) {
+            const result = [];
+            for (const item of items) {
+                if (item.enabled === true) {
+                    const total = item.price * item.quantity + 10;
+                    result.push({ name: item.name, total: total });
+                } else {
+                    result.push({ name: item.name, total: 0 });
+                }
+            }
+            return result;
+        }"""
+        second = (first.replace("processInvoice", "prepareOrders")
+                  .replace("items", "orders").replace("item", "order")
+                  .replace("result", "output").replace("price", "cost")
+                  .replace("quantity", "units").replace("10", "20"))
+        self.put("src/first.ts", first)
+        self.put("src/second.ts", second)
+        self.put("src/types/generated/third.ts", first)
+        self.put("src/__tests__/copy.test.ts", first)
+        count, groups, skipped = audit.structural_clone_candidates()
+        self.assertEqual(count, 2)
+        self.assertEqual(skipped, 0)
+        self.assertTrue(any({entry[0] for entry in group} == {"src/first.ts", "src/second.ts"} for group in groups))
+
+    def test_clone_tokenization_retains_control_flow_and_operator_differences(self):
+        first = audit.clone_tokens("if (user.allowed) { return 1; }")
+        second = audit.clone_tokens("if (admin.enabled) { return 2; }")
+        third = audit.clone_tokens("if (!admin.enabled) { return 2; }")
+        self.assertEqual(first, second)
+        self.assertNotEqual(second, third)
+
+    def test_clone_fingerprints_are_bounded_for_repeated_boilerplate(self):
+        source = "\n".join(["if (allowed) { return value; }"] * 30)
+        for index in range(audit.CLONE_MAX_OCCURRENCES + 1):
+            self.put(f"src/file{index}.ts", source)
+        count, groups, skipped = audit.structural_clone_candidates()
+        self.assertEqual(count, audit.CLONE_MAX_OCCURRENCES + 1)
+        self.assertGreater(skipped, 0)
+        self.assertEqual(groups, [])
