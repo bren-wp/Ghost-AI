@@ -82,6 +82,10 @@ pub fn set_secret(key: &str, secret: &str) -> Result<()> {
     let entry = Entry::new(SERVICE_NAME, key)
         .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
 
+    // An OS backend can report a write error after attempting a mutation.
+    // Invalidate the old cache entry before I/O so an error cannot leave
+    // an apparently authoritative stale credential in memory.
+    c.remove(key);
     entry
         .set_password(secret)
         .map_err(|e| anyhow!("Failed to store secret: {}", e))?;
