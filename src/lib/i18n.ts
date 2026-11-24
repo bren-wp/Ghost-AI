@@ -119,6 +119,31 @@ for (const { code } of supportedLanguages) {
 export const hasBundledTranslation = (code: string) =>
   code === 'en' || code === 'zh-CN' || Boolean(localeOverrides[code])
 
+export type InterfaceTranslationStatus = 'complete' | 'partial' | 'fallback'
+
+// Compare bundled leaves, not resolved i18next values: English fallback is
+// not a translation. Complete means key coverage only, not linguistic QA.
+function countBundledKeys(base: unknown, candidate: unknown): [number, number] {
+  if (typeof base === 'string') return [1, typeof candidate === 'string' && candidate.trim() ? 1 : 0]
+  if (!base || typeof base !== 'object') return [0, 0]
+  const target =
+    candidate && typeof candidate === 'object' ? (candidate as Record<string, unknown>) : {}
+  let total = 0
+  let translated = 0
+  for (const [key, value] of Object.entries(base)) {
+    const [baseCount, translatedCount] = countBundledKeys(value, target[key])
+    total += baseCount
+    translated += translatedCount
+  }
+  return [total, translated]
+}
+
+export function getInterfaceTranslationStatus(code: string): InterfaceTranslationStatus {
+  const [total, translated] = countBundledKeys(resources.en, resources[code])
+  if (translated === 0) return 'fallback'
+  return translated === total ? 'complete' : 'partial'
+}
+
 const languageDetector = {
   type: 'languageDetector' as const,
   async: true,

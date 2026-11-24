@@ -19,7 +19,9 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "appearance": "Izgled",
       "themeDark": "Tamna tema",
       "about": "O aplikaciji",
-      "languageDescription": "Odaberite jezik sučelja. Neprevedeni dijelovi prikazuju se na engleskom."
+      "languageDescription": "Odaberite jezik sučelja. Neprevedeni dijelovi prikazuju se na engleskom.",
+      "languagePartial": "djelomičan prijevod",
+      "languageFallback": "prikaz na engleskom"
     },
     "providers": {
       "providers": "Pružatelji",
@@ -56,7 +58,9 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "appearance": "Darstellung",
       "themeDark": "Dunkles Design",
       "about": "Über",
-      "languageDescription": "Sprache der Oberfläche auswählen. Nicht übersetzte Texte erscheinen auf Englisch."
+      "languageDescription": "Sprache der Oberfläche auswählen. Nicht übersetzte Texte erscheinen auf Englisch.",
+      "languagePartial": "teilweise übersetzt",
+      "languageFallback": "englische Ersatzsprache"
     },
     "providers": {
       "providers": "Anbieter",

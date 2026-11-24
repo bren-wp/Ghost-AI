@@ -94,7 +94,7 @@ import { fetchModelCapabilities, invalidateCapabilitiesCache } from '@/hooks/use
 import { invalidateVisionFallbackStatus } from '@/hooks/useVisionFallbackStatus'
 import { AUTO_REVIEW_MODEL_KEY, invalidateAutoReviewStatus } from '@/lib/permission-mode'
 import { logger } from '@/lib/logger'
-import { changeLanguage, supportedLanguages, getCurrentLanguage } from '@/lib/i18n'
+import { changeLanguage, supportedLanguages, getCurrentLanguage, getInterfaceTranslationStatus } from '@/lib/i18n'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { BuiltinToolIcon } from '@/components/builtin-tool-icon'
@@ -1307,9 +1307,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             }}
             className="min-h-11 w-full min-w-0 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           >
-            {supportedLanguages.map((lang) => (
-              <option value={lang.code} key={lang.code}>{lang.name}</option>
-            ))}
+            {supportedLanguages.map((lang) => {
+              const status = getInterfaceTranslationStatus(lang.code)
+              const suffix =
+                status === 'partial'
+                  ? t('languagePartial')
+                  : status === 'fallback'
+                    ? t('languageFallback')
+                    : ''
+              return (
+                <option value={lang.code} key={lang.code}>
+                  {lang.name}{suffix ? ` — ${suffix}` : ''}
+                </option>
+              )
+            })}
           </select>
           <p className="text-xs leading-5 text-muted-foreground">
             {t('languageDescription')}
@@ -1516,9 +1527,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       <DialogContent className="max-h-[min(92vh,800px)] w-[min(96vw,940px)] max-w-[96vw] overflow-hidden p-0 md:max-w-[94vw] lg:max-w-[940px]">
         <DialogTitle className="sr-only">{tc('settings')}</DialogTitle>
         <DialogDescription className="sr-only">{tc('settings')}</DialogDescription>
-        <SidebarProvider className="min-h-0 min-w-0 items-start">
-          <Sidebar collapsible="none" className="hidden md:flex">
-            <SidebarContent>
+        <SidebarProvider className="h-[min(84dvh,680px)] min-h-0 min-w-0 items-stretch overflow-hidden">
+          <Sidebar collapsible="none" className="hidden h-full min-h-0 shrink-0 md:flex" role="navigation" aria-label={tc('settings')}>
+            <SidebarContent className="overflow-y-auto overscroll-contain">
               <SidebarGroup>
                 <SidebarGroupContent>
                   <SidebarMenu>
@@ -1526,6 +1537,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       <SidebarMenuItem key={item.name}>
                         <SidebarMenuButton
                           isActive={item.name === activeSection}
+                          aria-current={item.name === activeSection ? 'true' : undefined}
                           onClick={() => setActiveSection(item.name)}
                         >
                           <item.icon />
@@ -1538,7 +1550,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </SidebarGroup>
             </SidebarContent>
           </Sidebar>
-          <main className="flex h-[min(84dvh,680px)] min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <main className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
               <div className="flex min-w-0 items-center gap-2 px-4">
                 <label className="sr-only" htmlFor="ghost-settings-navigation">Settings section</label>
