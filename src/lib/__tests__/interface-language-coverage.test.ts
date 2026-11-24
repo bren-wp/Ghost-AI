@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import i18n, { changeLanguage, getInterfaceTranslationStatus, supportedLanguages } from '@/lib/i18n'
 import providerEnglish from '@/locales/en/providers.json'
+import onboardingEnglish from '@/locales/en/onboarding.json'
 import { localeOverrides } from '@/lib/ghost-ai-locale-overrides'
 
 describe('bundled interface translation status', () => {
@@ -53,6 +54,16 @@ describe('interface reading direction', () => {
       expect(document.documentElement.dir).toBe('ltr')
     } finally {
       await i18n.changeLanguage(initial || 'en')
+    }
+  })
+})
+
+
+describe('onboarding locale completeness', () => {
+  it.each(supportedLanguages.map(({ code }) => code))('has every onboarding key in %s', (code) => {
+    for (const key of Object.keys(onboardingEnglish)) {
+      expect(i18n.getResource(code, 'onboarding', key)).toEqual(expect.any(String))
+      expect(i18n.getResource(code, 'onboarding', key).trim()).not.toBe('')
     }
   })
 })

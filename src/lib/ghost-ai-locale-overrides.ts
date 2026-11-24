@@ -305,6 +305,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "noResults": "Nema odgovarajućih rezultata",
       "stats": "Pronađeno {{count}} rezultata za {{time}} s",
       "inConversation": "u: {{title}}"
+    },
+    "onboarding": {
+      "welcome": "Dobro došao u Ghost AI",
+      "settingUp": "Postavljanje aplikacije Ghost AI…",
+      "checkingForModels": "Provjera dostupnih modela",
+      "setupProvider": "Poveži model",
+      "configureProvider": "Poveži AI model za početak",
+      "configureProviderDesc": "Ghost AI radi s AI uslugom koju odabereš. Zalijepi API ključ za OpenAI, Anthropic ili OpenRouter ili koristi besplatan model na vlastitom računalu uz Ollamu.",
+      "ollamaReady": "Ollama je spremna",
+      "ollamaFoundModels": "Pronađeno je {{count}} modela koji rade na ovom računalu i dodani su za tebe. Privatni su i rade izvan mreže. Druge usluge možeš povezati bilo kada.",
+      "addMoreProviders": "Poveži drugu uslugu",
+      "continue": "Nastavi"
     }
   },
   "de": {
@@ -611,6 +623,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "noResults": "Keine passenden Ergebnisse",
       "stats": "{{count}} Ergebnisse in {{time}} s gefunden",
       "inConversation": "in: {{title}}"
+    },
+    "onboarding": {
+      "welcome": "Willkommen bei Ghost AI",
+      "settingUp": "Ghost AI wird eingerichtet…",
+      "checkingForModels": "Verfügbare Modelle werden geprüft",
+      "setupProvider": "Modell verbinden",
+      "configureProvider": "Verbinde zum Start ein KI-Modell",
+      "configureProviderDesc": "Ghost AI funktioniert mit dem KI-Dienst deiner Wahl. Füge einen API-Schlüssel von OpenAI, Anthropic oder OpenRouter ein oder nutze mit Ollama ein kostenloses Modell auf deinem Computer.",
+      "ollamaReady": "Ollama ist bereit",
+      "ollamaFoundModels": "{{count}} Modelle auf diesem Computer wurden gefunden und für dich hinzugefügt. Sie sind privat und funktionieren offline. Weitere Dienste kannst du jederzeit verbinden.",
+      "addMoreProviders": "Weiteren Dienst verbinden",
+      "continue": "Weiter"
     }
   },
   "es": {
@@ -665,6 +689,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "library": "Biblioteca",
       "artifacts": "Artefactos",
       "newConversation": "Nueva conversación"
+    },
+    "onboarding": {
+      "welcome": "Te damos la bienvenida a Ghost AI",
+      "settingUp": "Configurando Ghost AI…",
+      "checkingForModels": "Buscando modelos disponibles",
+      "setupProvider": "Conectar un modelo",
+      "configureProvider": "Conecta un modelo de IA para empezar",
+      "configureProviderDesc": "Ghost AI funciona con el servicio de IA que elijas. Pega una clave API de OpenAI, Anthropic u OpenRouter o usa un modelo gratuito en tu ordenador con Ollama.",
+      "ollamaReady": "Ollama está listo",
+      "ollamaFoundModels": "Se encontraron y añadieron {{count}} modelos que se ejecutan en este ordenador. Son privados y funcionan sin conexión. Puedes conectar otros servicios en cualquier momento.",
+      "addMoreProviders": "Conectar otro servicio",
+      "continue": "Continuar"
     }
   },
   "fr": {
@@ -719,6 +755,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "library": "Bibliothèque",
       "artifacts": "Artefacts",
       "newConversation": "Nouvelle conversation"
+    },
+    "onboarding": {
+      "welcome": "Bienvenue dans Ghost AI",
+      "settingUp": "Configuration de Ghost AI…",
+      "checkingForModels": "Recherche des modèles disponibles",
+      "setupProvider": "Connecter un modèle",
+      "configureProvider": "Connectez un modèle d’IA pour commencer",
+      "configureProviderDesc": "Ghost AI fonctionne avec le service d’IA de votre choix. Collez une clé API OpenAI, Anthropic ou OpenRouter, ou utilisez un modèle gratuit sur votre ordinateur avec Ollama.",
+      "ollamaReady": "Ollama est prêt",
+      "ollamaFoundModels": "{{count}} modèles exécutés sur cet ordinateur ont été trouvés et ajoutés pour vous. Ils sont privés et fonctionnent hors ligne. Vous pouvez connecter d’autres services à tout moment.",
+      "addMoreProviders": "Connecter un autre service",
+      "continue": "Continuer"
     }
   },
   "pt": {
@@ -773,6 +821,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "library": "Biblioteca",
       "artifacts": "Artefatos",
       "newConversation": "Nova conversa"
+    },
+    "onboarding": {
+      "welcome": "Boas-vindas ao Ghost AI",
+      "settingUp": "Configurando o Ghost AI…",
+      "checkingForModels": "Verificando modelos disponíveis",
+      "setupProvider": "Conectar um modelo",
+      "configureProvider": "Conecte um modelo de IA para começar",
+      "configureProviderDesc": "O Ghost AI funciona com o serviço de IA que você escolher. Cole uma chave de API da OpenAI, Anthropic ou OpenRouter, ou use um modelo gratuito no seu computador com o Ollama.",
+      "ollamaReady": "Ollama está pronto",
+      "ollamaFoundModels": "Foram encontrados e adicionados {{count}} modelos em execução neste computador. Eles são privados e funcionam offline. Você pode conectar outros serviços a qualquer momento.",
+      "addMoreProviders": "Conectar outro serviço",
+      "continue": "Continuar"
     }
   },
   "it": {
@@ -827,6 +887,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "library": "Libreria",
       "artifacts": "Artefatti",
       "newConversation": "Nuova conversazione"
+    },
+    "onboarding": {
+      "welcome": "Benvenuto in Ghost AI",
+      "settingUp": "Configurazione di Ghost AI…",
+      "checkingForModels": "Ricerca dei modelli disponibili",
+      "setupProvider": "Collega un modello",
+      "configureProvider": "Collega un modello di IA per iniziare",
+      "configureProviderDesc": "Ghost AI funziona con il servizio di IA che scegli. Incolla una chiave API di OpenAI, Anthropic o OpenRouter oppure usa un modello gratuito sul tuo computer con Ollama.",
+      "ollamaReady": "Ollama è pronto",
+      "ollamaFoundModels": "Sono stati trovati e aggiunti {{count}} modelli in esecuzione su questo computer. Sono privati e funzionano offline. Puoi collegare altri servizi in qualsiasi momento.",
+      "addMoreProviders": "Collega un altro servizio",
+      "continue": "Continua"
     }
   },
   "nl": {
@@ -856,6 +928,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Opnieuw proberen",
       "search": "Zoeken",
       "settings": "Instellingen"
+    },
+    "onboarding": {
+      "welcome": "Welkom bij Ghost AI",
+      "settingUp": "Ghost AI wordt ingesteld…",
+      "checkingForModels": "Beschikbare modellen zoeken",
+      "setupProvider": "Een model verbinden",
+      "configureProvider": "Verbind een AI-model om te beginnen",
+      "configureProviderDesc": "Ghost AI werkt met de AI-dienst van je keuze. Plak een API-sleutel van OpenAI, Anthropic of OpenRouter, of gebruik met Ollama een gratis model op je computer.",
+      "ollamaReady": "Ollama is gereed",
+      "ollamaFoundModels": "Er zijn {{count}} modellen gevonden die op deze computer draaien en voor je toegevoegd. Ze zijn privé en werken offline. Je kunt altijd andere diensten verbinden.",
+      "addMoreProviders": "Een andere dienst verbinden",
+      "continue": "Doorgaan"
     }
   },
   "pl": {
@@ -885,6 +969,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Spróbuj ponownie",
       "search": "Szukaj",
       "settings": "Ustawienia"
+    },
+    "onboarding": {
+      "welcome": "Witaj w Ghost AI",
+      "settingUp": "Konfigurowanie Ghost AI…",
+      "checkingForModels": "Sprawdzanie dostępnych modeli",
+      "setupProvider": "Połącz model",
+      "configureProvider": "Połącz model AI, aby rozpocząć",
+      "configureProviderDesc": "Ghost AI współpracuje z wybraną usługą AI. Wklej klucz API OpenAI, Anthropic lub OpenRouter albo użyj bezpłatnego modelu na własnym komputerze za pomocą Ollama.",
+      "ollamaReady": "Ollama jest gotowa",
+      "ollamaFoundModels": "Znaleziono i dodano {{count}} modeli działających na tym komputerze. Są prywatne i działają offline. Inne usługi możesz połączyć w dowolnym momencie.",
+      "addMoreProviders": "Połącz inną usługę",
+      "continue": "Kontynuuj"
     }
   },
   "cs": {
@@ -914,6 +1010,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Zkusit znovu",
       "search": "Hledat",
       "settings": "Nastavení"
+    },
+    "onboarding": {
+      "welcome": "Vítejte v Ghost AI",
+      "settingUp": "Nastavování Ghost AI…",
+      "checkingForModels": "Kontrola dostupných modelů",
+      "setupProvider": "Připojit model",
+      "configureProvider": "Začněte připojením modelu AI",
+      "configureProviderDesc": "Ghost AI funguje se službou AI podle vašeho výběru. Vložte klíč API od OpenAI, Anthropic nebo OpenRouter, případně použijte bezplatný model ve svém počítači prostřednictvím Ollama.",
+      "ollamaReady": "Ollama je připravena",
+      "ollamaFoundModels": "Bylo nalezeno a přidáno {{count}} modelů běžících v tomto počítači. Jsou soukromé a fungují offline. Další služby můžete připojit kdykoli.",
+      "addMoreProviders": "Připojit další službu",
+      "continue": "Pokračovat"
     }
   },
   "sk": {
@@ -943,6 +1051,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Skúsiť znova",
       "search": "Hľadať",
       "settings": "Nastavenia"
+    },
+    "onboarding": {
+      "welcome": "Vitajte v Ghost AI",
+      "settingUp": "Nastavovanie Ghost AI…",
+      "checkingForModels": "Kontrola dostupných modelov",
+      "setupProvider": "Pripojiť model",
+      "configureProvider": "Začnite pripojením modelu AI",
+      "configureProviderDesc": "Ghost AI funguje so službou AI podľa vášho výberu. Vložte kľúč API od OpenAI, Anthropic alebo OpenRouter, prípadne použite bezplatný model vo svojom počítači prostredníctvom Ollama.",
+      "ollamaReady": "Ollama je pripravená",
+      "ollamaFoundModels": "Našlo a pridalo sa {{count}} modelov spustených v tomto počítači. Sú súkromné a fungujú offline. Ďalšie služby môžete pripojiť kedykoľvek.",
+      "addMoreProviders": "Pripojiť ďalšiu službu",
+      "continue": "Pokračovať"
     }
   },
   "sl": {
@@ -972,6 +1092,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Poskusi znova",
       "search": "Išči",
       "settings": "Nastavitve"
+    },
+    "onboarding": {
+      "welcome": "Dobrodošli v Ghost AI",
+      "settingUp": "Nastavljanje Ghost AI…",
+      "checkingForModels": "Preverjanje razpoložljivih modelov",
+      "setupProvider": "Poveži model",
+      "configureProvider": "Za začetek poveži model AI",
+      "configureProviderDesc": "Ghost AI deluje z izbrano storitvijo AI. Prilepi ključ API za OpenAI, Anthropic ali OpenRouter ali uporabi brezplačen model na svojem računalniku z Ollamo.",
+      "ollamaReady": "Ollama je pripravljena",
+      "ollamaFoundModels": "Najdenih in dodanih je bilo {{count}} modelov, ki delujejo na tem računalniku. So zasebni in delujejo brez povezave. Druge storitve lahko povežeš kadar koli.",
+      "addMoreProviders": "Poveži drugo storitev",
+      "continue": "Nadaljuj"
     }
   },
   "hu": {
@@ -1001,6 +1133,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Újrapróbálkozás",
       "search": "Keresés",
       "settings": "Beállítások"
+    },
+    "onboarding": {
+      "welcome": "Üdvözöl a Ghost AI",
+      "settingUp": "A Ghost AI beállítása…",
+      "checkingForModels": "Elérhető modellek ellenőrzése",
+      "setupProvider": "Modell csatlakoztatása",
+      "configureProvider": "A kezdéshez csatlakoztass egy AI-modellt",
+      "configureProviderDesc": "A Ghost AI az általad választott AI-szolgáltatással működik. Illeszd be az OpenAI, az Anthropic vagy az OpenRouter API-kulcsát, vagy használj ingyenes modellt a saját számítógépeden az Ollamával.",
+      "ollamaReady": "Az Ollama készen áll",
+      "ollamaFoundModels": "A számítógépen futó {{count}} modellt megtaláltuk és hozzáadtuk. Privátak és offline is működnek. Más szolgáltatásokat bármikor csatlakoztathatsz.",
+      "addMoreProviders": "Másik szolgáltatás csatlakoztatása",
+      "continue": "Folytatás"
     }
   },
   "ro": {
@@ -1030,6 +1174,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Încearcă din nou",
       "search": "Caută",
       "settings": "Setări"
+    },
+    "onboarding": {
+      "welcome": "Bun venit în Ghost AI",
+      "settingUp": "Configurarea Ghost AI…",
+      "checkingForModels": "Se verifică modelele disponibile",
+      "setupProvider": "Conectează un model",
+      "configureProvider": "Conectează un model AI pentru a începe",
+      "configureProviderDesc": "Ghost AI funcționează cu serviciul AI ales de tine. Introdu o cheie API OpenAI, Anthropic sau OpenRouter ori folosește un model gratuit pe calculatorul tău cu Ollama.",
+      "ollamaReady": "Ollama este gata",
+      "ollamaFoundModels": "Au fost găsite și adăugate {{count}} modele care rulează pe acest calculator. Sunt private și funcționează offline. Poți conecta alte servicii oricând.",
+      "addMoreProviders": "Conectează alt serviciu",
+      "continue": "Continuă"
     }
   },
   "bg": {
@@ -1059,6 +1215,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Опитай отново",
       "search": "Търси",
       "settings": "Настройки"
+    },
+    "onboarding": {
+      "welcome": "Добре дошли в Ghost AI",
+      "settingUp": "Настройване на Ghost AI…",
+      "checkingForModels": "Проверка за налични модели",
+      "setupProvider": "Свържи модел",
+      "configureProvider": "Свържи AI модел, за да започнеш",
+      "configureProviderDesc": "Ghost AI работи с избраната от теб AI услуга. Постави API ключ от OpenAI, Anthropic или OpenRouter или използвай безплатен модел на компютъра си с Ollama.",
+      "ollamaReady": "Ollama е готова",
+      "ollamaFoundModels": "Намерени и добавени са {{count}} модела, работещи на този компютър. Те са частни и работят офлайн. Можеш да свържеш други услуги по всяко време.",
+      "addMoreProviders": "Свържи друга услуга",
+      "continue": "Продължи"
     }
   },
   "el": {
@@ -1088,6 +1256,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Επανάληψη",
       "search": "Αναζήτηση",
       "settings": "Ρυθμίσεις"
+    },
+    "onboarding": {
+      "welcome": "Καλώς ήρθες στο Ghost AI",
+      "settingUp": "Ρύθμιση του Ghost AI…",
+      "checkingForModels": "Έλεγχος διαθέσιμων μοντέλων",
+      "setupProvider": "Σύνδεση μοντέλου",
+      "configureProvider": "Σύνδεσε ένα μοντέλο AI για να ξεκινήσεις",
+      "configureProviderDesc": "Το Ghost AI λειτουργεί με την υπηρεσία AI που επιλέγεις. Επικόλλησε ένα κλειδί API από OpenAI, Anthropic ή OpenRouter ή χρησιμοποίησε ένα δωρεάν μοντέλο στον υπολογιστή σου με το Ollama.",
+      "ollamaReady": "Το Ollama είναι έτοιμο",
+      "ollamaFoundModels": "Βρέθηκαν και προστέθηκαν {{count}} μοντέλα που εκτελούνται σε αυτόν τον υπολογιστή. Είναι ιδιωτικά και λειτουργούν εκτός σύνδεσης. Μπορείς να συνδέσεις άλλες υπηρεσίες οποτεδήποτε.",
+      "addMoreProviders": "Σύνδεση άλλης υπηρεσίας",
+      "continue": "Συνέχεια"
     }
   },
   "tr": {
@@ -1117,6 +1297,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Yeniden dene",
       "search": "Ara",
       "settings": "Ayarlar"
+    },
+    "onboarding": {
+      "welcome": "Ghost AI'ya hoş geldin",
+      "settingUp": "Ghost AI kuruluyor…",
+      "checkingForModels": "Kullanılabilir modeller kontrol ediliyor",
+      "setupProvider": "Model bağla",
+      "configureProvider": "Başlamak için bir yapay zekâ modeli bağla",
+      "configureProviderDesc": "Ghost AI seçtiğin yapay zekâ hizmetiyle çalışır. OpenAI, Anthropic veya OpenRouter API anahtarını yapıştır ya da Ollama ile kendi bilgisayarında çalışan ücretsiz bir model kullan.",
+      "ollamaReady": "Ollama hazır",
+      "ollamaFoundModels": "Bu bilgisayarda çalışan {{count}} model bulundu ve eklendi. Bu modeller gizlidir ve çevrimdışı çalışır. Diğer hizmetleri istediğin zaman bağlayabilirsin.",
+      "addMoreProviders": "Başka bir hizmet bağla",
+      "continue": "Devam et"
     }
   },
   "uk": {
@@ -1146,6 +1338,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Повторити",
       "search": "Пошук",
       "settings": "Налаштування"
+    },
+    "onboarding": {
+      "welcome": "Вітаємо в Ghost AI",
+      "settingUp": "Налаштування Ghost AI…",
+      "checkingForModels": "Перевірка доступних моделей",
+      "setupProvider": "Підключити модель",
+      "configureProvider": "Підключіть модель ШІ, щоб почати",
+      "configureProviderDesc": "Ghost AI працює з вибраною вами службою ШІ. Вставте ключ API від OpenAI, Anthropic або OpenRouter чи скористайтеся безкоштовною моделлю на своєму комп’ютері через Ollama.",
+      "ollamaReady": "Ollama готова",
+      "ollamaFoundModels": "Знайдено та додано {{count}} моделей, що працюють на цьому комп’ютері. Вони приватні й працюють офлайн. Інші служби можна підключити будь-коли.",
+      "addMoreProviders": "Підключити іншу службу",
+      "continue": "Продовжити"
     }
   },
   "ru": {
@@ -1175,6 +1379,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Повторить",
       "search": "Поиск",
       "settings": "Настройки"
+    },
+    "onboarding": {
+      "welcome": "Добро пожаловать в Ghost AI",
+      "settingUp": "Настройка Ghost AI…",
+      "checkingForModels": "Проверка доступных моделей",
+      "setupProvider": "Подключить модель",
+      "configureProvider": "Подключите модель ИИ, чтобы начать",
+      "configureProviderDesc": "Ghost AI работает с выбранным вами сервисом ИИ. Вставьте ключ API от OpenAI, Anthropic или OpenRouter либо используйте бесплатную модель на своём компьютере с Ollama.",
+      "ollamaReady": "Ollama готова",
+      "ollamaFoundModels": "Найдено и добавлено {{count}} моделей, работающих на этом компьютере. Они приватны и работают офлайн. Другие сервисы можно подключить в любое время.",
+      "addMoreProviders": "Подключить другой сервис",
+      "continue": "Продолжить"
     }
   },
   "sr": {
@@ -1204,6 +1420,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Покушај поново",
       "search": "Претражи",
       "settings": "Подешавања"
+    },
+    "onboarding": {
+      "welcome": "Добро дошли у Ghost AI",
+      "settingUp": "Подешавање апликације Ghost AI…",
+      "checkingForModels": "Провера доступних модела",
+      "setupProvider": "Повежи модел",
+      "configureProvider": "Повежи AI модел за почетак",
+      "configureProviderDesc": "Ghost AI ради са AI услугом коју одабереш. Налепи API кључ за OpenAI, Anthropic или OpenRouter или користи бесплатан модел на свом рачунару уз Ollama.",
+      "ollamaReady": "Ollama је спремна",
+      "ollamaFoundModels": "Пронађено је и додато {{count}} модела који раде на овом рачунару. Приватни су и раде ван мреже. Друге услуге можеш повезати у сваком тренутку.",
+      "addMoreProviders": "Повежи другу услугу",
+      "continue": "Настави"
     }
   },
   "bs": {
@@ -1233,6 +1461,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Pokušaj ponovo",
       "search": "Pretraži",
       "settings": "Postavke"
+    },
+    "onboarding": {
+      "welcome": "Dobro došli u Ghost AI",
+      "settingUp": "Podešavanje aplikacije Ghost AI…",
+      "checkingForModels": "Provjera dostupnih modela",
+      "setupProvider": "Poveži model",
+      "configureProvider": "Poveži AI model za početak",
+      "configureProviderDesc": "Ghost AI radi s AI uslugom koju odabereš. Zalijepi API ključ za OpenAI, Anthropic ili OpenRouter ili koristi besplatan model na svom računaru uz Ollamu.",
+      "ollamaReady": "Ollama je spremna",
+      "ollamaFoundModels": "Pronađeno je i dodano {{count}} modela koji rade na ovom računaru. Privatni su i rade bez interneta. Druge usluge možeš povezati bilo kada.",
+      "addMoreProviders": "Poveži drugu uslugu",
+      "continue": "Nastavi"
     }
   },
   "da": {
@@ -1262,6 +1502,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Prøv igen",
       "search": "Søg",
       "settings": "Indstillinger"
+    },
+    "onboarding": {
+      "welcome": "Velkommen til Ghost AI",
+      "settingUp": "Konfigurerer Ghost AI…",
+      "checkingForModels": "Kontrollerer tilgængelige modeller",
+      "setupProvider": "Tilslut en model",
+      "configureProvider": "Tilslut en AI-model for at komme i gang",
+      "configureProviderDesc": "Ghost AI fungerer med den AI-tjeneste, du vælger. Indsæt en API-nøgle fra OpenAI, Anthropic eller OpenRouter, eller brug en gratis model på din egen computer med Ollama.",
+      "ollamaReady": "Ollama er klar",
+      "ollamaFoundModels": "Der blev fundet og tilføjet {{count}} modeller, som kører på denne computer. De er private og fungerer offline. Du kan tilslutte andre tjenester når som helst.",
+      "addMoreProviders": "Tilslut en anden tjeneste",
+      "continue": "Fortsæt"
     }
   },
   "sv": {
@@ -1291,6 +1543,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Försök igen",
       "search": "Sök",
       "settings": "Inställningar"
+    },
+    "onboarding": {
+      "welcome": "Välkommen till Ghost AI",
+      "settingUp": "Konfigurerar Ghost AI…",
+      "checkingForModels": "Söker efter tillgängliga modeller",
+      "setupProvider": "Anslut en modell",
+      "configureProvider": "Anslut en AI-modell för att komma igång",
+      "configureProviderDesc": "Ghost AI fungerar med den AI-tjänst du väljer. Klistra in en API-nyckel från OpenAI, Anthropic eller OpenRouter, eller använd en kostnadsfri modell på din dator med Ollama.",
+      "ollamaReady": "Ollama är redo",
+      "ollamaFoundModels": "{{count}} modeller som körs på den här datorn hittades och lades till. De är privata och fungerar offline. Du kan ansluta andra tjänster när som helst.",
+      "addMoreProviders": "Anslut en annan tjänst",
+      "continue": "Fortsätt"
     }
   },
   "no": {
@@ -1320,6 +1584,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Prøv igjen",
       "search": "Søk",
       "settings": "Innstillinger"
+    },
+    "onboarding": {
+      "welcome": "Velkommen til Ghost AI",
+      "settingUp": "Konfigurerer Ghost AI…",
+      "checkingForModels": "Ser etter tilgjengelige modeller",
+      "setupProvider": "Koble til en modell",
+      "configureProvider": "Koble til en AI-modell for å komme i gang",
+      "configureProviderDesc": "Ghost AI fungerer med AI-tjenesten du velger. Lim inn en API-nøkkel fra OpenAI, Anthropic eller OpenRouter, eller bruk en gratis modell på din egen datamaskin med Ollama.",
+      "ollamaReady": "Ollama er klar",
+      "ollamaFoundModels": "Fant og la til {{count}} modeller som kjører på denne datamaskinen. De er private og fungerer uten nett. Du kan koble til andre tjenester når som helst.",
+      "addMoreProviders": "Koble til en annen tjeneste",
+      "continue": "Fortsett"
     }
   },
   "fi": {
@@ -1349,6 +1625,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Yritä uudelleen",
       "search": "Hae",
       "settings": "Asetukset"
+    },
+    "onboarding": {
+      "welcome": "Tervetuloa Ghost AI:hin",
+      "settingUp": "Ghost AI:n määritys…",
+      "checkingForModels": "Tarkistetaan saatavilla olevia malleja",
+      "setupProvider": "Yhdistä malli",
+      "configureProvider": "Aloita yhdistämällä tekoälymalli",
+      "configureProviderDesc": "Ghost AI toimii valitsemasi tekoälypalvelun kanssa. Liitä OpenAI:n, Anthropicin tai OpenRouterin API-avain tai käytä ilmaista mallia omalla tietokoneellasi Ollaman avulla.",
+      "ollamaReady": "Ollama on valmis",
+      "ollamaFoundModels": "Tältä tietokoneelta löytyi {{count}} käynnissä olevaa mallia, jotka lisättiin puolestasi. Ne ovat yksityisiä ja toimivat offline-tilassa. Voit yhdistää muita palveluita milloin tahansa.",
+      "addMoreProviders": "Yhdistä toinen palvelu",
+      "continue": "Jatka"
     }
   },
   "et": {
@@ -1378,6 +1666,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Proovi uuesti",
       "search": "Otsi",
       "settings": "Seaded"
+    },
+    "onboarding": {
+      "welcome": "Tere tulemast Ghost AI-sse",
+      "settingUp": "Ghost AI seadistamine…",
+      "checkingForModels": "Saadaolevate mudelite kontrollimine",
+      "setupProvider": "Ühenda mudel",
+      "configureProvider": "Alustamiseks ühenda tehisintellektimudel",
+      "configureProviderDesc": "Ghost AI töötab sinu valitud tehisintellektiteenusega. Kleebi OpenAI, Anthropicu või OpenRouteri API-võti või kasuta Ollama abil oma arvutis tasuta mudelit.",
+      "ollamaReady": "Ollama on valmis",
+      "ollamaFoundModels": "Leiti ja lisati {{count}} selles arvutis töötavat mudelit. Need on privaatsed ja töötavad võrguühenduseta. Muid teenuseid saad ühendada igal ajal.",
+      "addMoreProviders": "Ühenda teine teenus",
+      "continue": "Jätka"
     }
   },
   "lv": {
@@ -1407,6 +1707,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Mēģināt vēlreiz",
       "search": "Meklēt",
       "settings": "Iestatījumi"
+    },
+    "onboarding": {
+      "welcome": "Laipni lūdzam Ghost AI",
+      "settingUp": "Ghost AI iestatīšana…",
+      "checkingForModels": "Pieejamo modeļu pārbaude",
+      "setupProvider": "Pievieno modeli",
+      "configureProvider": "Lai sāktu, pievieno MI modeli",
+      "configureProviderDesc": "Ghost AI darbojas ar tevis izvēlēto MI pakalpojumu. Ielīmē OpenAI, Anthropic vai OpenRouter API atslēgu vai izmanto bezmaksas modeli savā datorā ar Ollama.",
+      "ollamaReady": "Ollama ir gatava",
+      "ollamaFoundModels": "Atrasti un pievienoti {{count}} modeļi, kas darbojas šajā datorā. Tie ir privāti un darbojas bezsaistē. Citus pakalpojumus vari pievienot jebkurā laikā.",
+      "addMoreProviders": "Pievieno citu pakalpojumu",
+      "continue": "Turpināt"
     }
   },
   "lt": {
@@ -1436,6 +1748,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Bandyti dar kartą",
       "search": "Ieškoti",
       "settings": "Nustatymai"
+    },
+    "onboarding": {
+      "welcome": "Sveiki atvykę į Ghost AI",
+      "settingUp": "Ghost AI konfigūravimas…",
+      "checkingForModels": "Tikrinami pasiekiami modeliai",
+      "setupProvider": "Prijunk modelį",
+      "configureProvider": "Norėdamas pradėti, prijunk DI modelį",
+      "configureProviderDesc": "Ghost AI veikia su tavo pasirinkta DI paslauga. Įklijuok OpenAI, Anthropic arba OpenRouter API raktą arba naudok nemokamą modelį savo kompiuteryje su Ollama.",
+      "ollamaReady": "Ollama paruošta",
+      "ollamaFoundModels": "Rasta ir pridėta {{count}} šiame kompiuteryje veikiančių modelių. Jie privatūs ir veikia neprisijungus. Kitas paslaugas gali prijungti bet kada.",
+      "addMoreProviders": "Prijunk kitą paslaugą",
+      "continue": "Tęsti"
     }
   },
   "ja": {
@@ -1465,6 +1789,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "再試行",
       "search": "検索",
       "settings": "設定"
+    },
+    "onboarding": {
+      "welcome": "Ghost AI へようこそ",
+      "settingUp": "Ghost AI を設定しています…",
+      "checkingForModels": "利用可能なモデルを確認しています",
+      "setupProvider": "モデルを接続",
+      "configureProvider": "AI モデルを接続して始めましょう",
+      "configureProviderDesc": "Ghost AI はお好みの AI サービスで動作します。OpenAI、Anthropic、OpenRouter の API キーを貼り付けるか、Ollama で自分のコンピューター上の無料モデルを利用できます。",
+      "ollamaReady": "Ollama の準備ができました",
+      "ollamaFoundModels": "このコンピューターで動作するモデルを {{count}} 個検出し、追加しました。プライベートに利用でき、オフラインでも動作します。他のサービスはいつでも接続できます。",
+      "addMoreProviders": "別のサービスを接続",
+      "continue": "続行"
     }
   },
   "ko": {
@@ -1494,6 +1830,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "다시 시도",
       "search": "검색",
       "settings": "설정"
+    },
+    "onboarding": {
+      "welcome": "Ghost AI에 오신 것을 환영합니다",
+      "settingUp": "Ghost AI 설정 중…",
+      "checkingForModels": "사용 가능한 모델 확인 중",
+      "setupProvider": "모델 연결",
+      "configureProvider": "시작하려면 AI 모델을 연결하세요",
+      "configureProviderDesc": "Ghost AI는 원하는 AI 서비스와 함께 작동합니다. OpenAI, Anthropic 또는 OpenRouter의 API 키를 붙여 넣거나 Ollama로 내 컴퓨터에서 무료 모델을 실행하세요.",
+      "ollamaReady": "Ollama가 준비되었습니다",
+      "ollamaFoundModels": "이 컴퓨터에서 실행 중인 모델 {{count}}개를 찾아 추가했습니다. 이 모델은 비공개로 사용할 수 있으며 오프라인에서도 작동합니다. 언제든 다른 서비스를 연결할 수 있습니다.",
+      "addMoreProviders": "다른 서비스 연결",
+      "continue": "계속"
     }
   },
   "ar": {
@@ -1523,6 +1871,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "إعادة المحاولة",
       "search": "بحث",
       "settings": "الإعدادات"
+    },
+    "onboarding": {
+      "welcome": "مرحبًا بك في Ghost AI",
+      "settingUp": "جارٍ إعداد Ghost AI…",
+      "checkingForModels": "جارٍ التحقق من النماذج المتاحة",
+      "setupProvider": "ربط نموذج",
+      "configureProvider": "اربط نموذج ذكاء اصطناعي للبدء",
+      "configureProviderDesc": "يعمل Ghost AI مع خدمة الذكاء الاصطناعي التي تختارها. ألصق مفتاح API من OpenAI أو Anthropic أو OpenRouter، أو استخدم نموذجًا مجانيًا يعمل على حاسوبك عبر Ollama.",
+      "ollamaReady": "أصبح Ollama جاهزًا",
+      "ollamaFoundModels": "عُثر على نماذج تعمل على هذا الحاسوب وأُضيفت إليك، وعددها {{count}}. وهي خاصة وتعمل دون اتصال بالإنترنت. يمكنك ربط خدمات أخرى في أي وقت.",
+      "addMoreProviders": "ربط خدمة أخرى",
+      "continue": "متابعة"
     }
   },
   "hi": {
@@ -1552,6 +1912,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "फिर प्रयास करें",
       "search": "खोजें",
       "settings": "सेटिंग्स"
+    },
+    "onboarding": {
+      "welcome": "Ghost AI में आपका स्वागत है",
+      "settingUp": "Ghost AI सेट किया जा रहा है…",
+      "checkingForModels": "उपलब्ध मॉडलों की जाँच हो रही है",
+      "setupProvider": "मॉडल जोड़ें",
+      "configureProvider": "शुरू करने के लिए AI मॉडल जोड़ें",
+      "configureProviderDesc": "Ghost AI आपकी चुनी हुई AI सेवा के साथ काम करता है। OpenAI, Anthropic या OpenRouter की API कुंजी चिपकाएँ या Ollama की मदद से अपने कंप्यूटर पर मुफ़्त मॉडल चलाएँ।",
+      "ollamaReady": "Ollama तैयार है",
+      "ollamaFoundModels": "इस कंप्यूटर पर चल रहे {{count}} मॉडल मिले और जोड़ दिए गए। ये निजी हैं और ऑफ़लाइन काम करते हैं। आप कभी भी अन्य सेवाएँ जोड़ सकते हैं।",
+      "addMoreProviders": "दूसरी सेवा जोड़ें",
+      "continue": "जारी रखें"
     }
   },
   "id": {
@@ -1581,6 +1953,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Coba lagi",
       "search": "Cari",
       "settings": "Pengaturan"
+    },
+    "onboarding": {
+      "welcome": "Selamat datang di Ghost AI",
+      "settingUp": "Menyiapkan Ghost AI…",
+      "checkingForModels": "Memeriksa model yang tersedia",
+      "setupProvider": "Hubungkan model",
+      "configureProvider": "Hubungkan model AI untuk memulai",
+      "configureProviderDesc": "Ghost AI bekerja dengan layanan AI pilihan Anda. Tempel kunci API dari OpenAI, Anthropic, atau OpenRouter, atau gunakan model gratis di komputer Anda melalui Ollama.",
+      "ollamaReady": "Ollama siap",
+      "ollamaFoundModels": "Ditemukan dan ditambahkan {{count}} model yang berjalan di komputer ini. Model tersebut bersifat pribadi dan berfungsi secara offline. Anda dapat menghubungkan layanan lain kapan saja.",
+      "addMoreProviders": "Hubungkan layanan lain",
+      "continue": "Lanjutkan"
     }
   },
   "vi": {
@@ -1610,6 +1994,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "Thử lại",
       "search": "Tìm kiếm",
       "settings": "Cài đặt"
+    },
+    "onboarding": {
+      "welcome": "Chào mừng đến với Ghost AI",
+      "settingUp": "Đang thiết lập Ghost AI…",
+      "checkingForModels": "Đang kiểm tra các mô hình khả dụng",
+      "setupProvider": "Kết nối mô hình",
+      "configureProvider": "Kết nối một mô hình AI để bắt đầu",
+      "configureProviderDesc": "Ghost AI hoạt động với dịch vụ AI bạn chọn. Dán khóa API từ OpenAI, Anthropic hoặc OpenRouter, hoặc dùng mô hình miễn phí chạy trên máy tính của bạn với Ollama.",
+      "ollamaReady": "Ollama đã sẵn sàng",
+      "ollamaFoundModels": "Đã tìm thấy và thêm {{count}} mô hình đang chạy trên máy tính này. Chúng đảm bảo tính riêng tư và hoạt động ngoại tuyến. Bạn có thể kết nối dịch vụ khác bất cứ lúc nào.",
+      "addMoreProviders": "Kết nối dịch vụ khác",
+      "continue": "Tiếp tục"
     }
   },
   "th": {
@@ -1639,6 +2035,18 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
       "retry": "ลองอีกครั้ง",
       "search": "ค้นหา",
       "settings": "การตั้งค่า"
+    },
+    "onboarding": {
+      "welcome": "ยินดีต้อนรับสู่ Ghost AI",
+      "settingUp": "กำลังตั้งค่า Ghost AI…",
+      "checkingForModels": "กำลังตรวจสอบโมเดลที่พร้อมใช้งาน",
+      "setupProvider": "เชื่อมต่อโมเดล",
+      "configureProvider": "เชื่อมต่อโมเดล AI เพื่อเริ่มต้น",
+      "configureProviderDesc": "Ghost AI ทำงานร่วมกับบริการ AI ที่คุณเลือก วางคีย์ API จาก OpenAI, Anthropic หรือ OpenRouter หรือใช้โมเดลฟรีที่ทำงานบนคอมพิวเตอร์ของคุณผ่าน Ollama",
+      "ollamaReady": "Ollama พร้อมใช้งาน",
+      "ollamaFoundModels": "พบและเพิ่มโมเดลที่ทำงานบนคอมพิวเตอร์นี้จำนวน {{count}} โมเดล โมเดลเหล่านี้เป็นส่วนตัวและทำงานแบบออฟไลน์ได้ คุณสามารถเชื่อมต่อบริการอื่นได้ทุกเมื่อ",
+      "addMoreProviders": "เชื่อมต่อบริการอื่น",
+      "continue": "ดำเนินการต่อ"
     }
   }
 }
