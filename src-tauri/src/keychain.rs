@@ -3,6 +3,7 @@ use anyhow::{Result, anyhow};
 use keyring::Entry;
 use std::collections::HashMap;
 use std::sync::RwLock;
+use zeroize::Zeroizing;
 
 /// Environment variable that opts every public function in this module into
 /// the in-process mock keychain backend in debug builds or unit tests.
@@ -23,10 +24,12 @@ const SERVICE_NAME: &str = "app.ghost_ai.desktop";
 /// especially during development where the binary signature changes on rebuild.
 /// Hold the write guard across keychain I/O and cache updates to prevent a
 /// concurrent cache miss from reintroducing a rotated or deleted credential.
-static SECRET_CACHE: std::sync::OnceLock<RwLock<HashMap<String, String>>> =
-    std::sync::OnceLock::new();
+/// Cached values are zeroized on removal or replacement. The public API still
+/// returns owned Strings; their consumers must manage those lifetimes separately.
+type SecretCache = HashMap<String, Zeroizing<String>>;
+static SECRET_CACHE: std::sync::OnceLock<RwLock<SecretCache>> = std::sync::OnceLock::new();
 
-fn cache() -> &'static RwLock<HashMap<String, String>> {
+fn cache() -> &'static RwLock<SecretCache> {
     SECRET_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
 }
 
@@ -90,7 +93,7 @@ pub fn set_secret(key: &str, secret: &str) -> Result<()> {
         .set_password(secret)
         .map_err(|e| anyhow!("Failed to store secret: {}", e))?;
 
-    c.insert(key.to_string(), secret.to_string());
+    c.insert(key.to_string(), Zeroizing::new(secret.to_owned()));
 
     tracing::info!("[keychain] Stored secret");
     Ok(())
@@ -106,7 +109,7 @@ pub fn get_secret(key: &str) -> Result<Option<String>> {
             .read()
             .map_err(|_| anyhow!("Keychain cache lock poisoned"))?;
         if let Some(v) = c.get(key) {
-            return Ok(Some(v.clone()));
+            return Ok(Some(v.as_str().to_owned()));
         }
     }
 
@@ -116,7 +119,7 @@ pub fn get_secret(key: &str) -> Result<Option<String>> {
         .write()
         .map_err(|_| anyhow!("Keychain cache lock poisoned"))?;
     if let Some(v) = c.get(key) {
-        return Ok(Some(v.clone()));
+        return Ok(Some(v.as_str().to_owned()));
     }
 
     let entry = Entry::new(SERVICE_NAME, key)
@@ -124,8 +127,10 @@ pub fn get_secret(key: &str) -> Result<Option<String>> {
 
     match entry.get_password() {
         Ok(password) => {
-            c.insert(key.to_string(), password.clone());
-            Ok(Some(password))
+            let password = Zeroizing::new(password);
+            let result = password.as_str().to_owned();
+            c.insert(key.to_string(), password);
+            Ok(Some(result))
         }
         Err(keyring::Error::NoEntry) => Ok(None),
         Err(e) => Err(anyhow!("Failed to retrieve secret: {}", e)),
@@ -210,6 +215,26 @@ mod tests {
 
         delete_secret(key).unwrap();
         delete_secret(other).unwrap();
+    }
+
+    #[test]
+    fn test_cache_eviction_and_rotation_with_zeroizing_values() {
+        let key = "test_zeroizing_cache_lifecycle";
+        delete_secret(key).unwrap();
+        set_secret(key, "first").unwrap();
+        {
+            let guard = cache().read().unwrap();
+            let value: &Zeroizing<String> = guard.get(key).unwrap();
+            assert_eq!(value.as_str(), "first");
+        }
+        set_secret(key, "second").unwrap();
+        assert_eq!(get_secret(key).unwrap().as_deref(), Some("second"));
+        // Simulate an ordinary cache miss without changing the OS entry.
+        cache().write().unwrap().remove(key);
+        assert_eq!(get_secret(key).unwrap().as_deref(), Some("second"));
+        delete_secret(key).unwrap();
+        assert!(!cache().read().unwrap().contains_key(key));
+        assert_eq!(get_secret(key).unwrap(), None);
     }
 
     #[test]
