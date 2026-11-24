@@ -237,3 +237,12 @@
 .ghost-legal-markdown li { padding-left: .2rem; margin-bottom: .35rem; }
 .ghost-legal-markdown strong { color: #e5e7eb; font-weight: 650; }
 .ghost-legal-markdown button:focus-visible { outline: 2px solid #00e5ff; outline-offset: 3px; }
+
+/* Code, technical values and math retain their natural reading order in RTL UI. */
+:root[dir='rtl'] pre,
+:root[dir='rtl'] .katex-display {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+}
+:root[dir='rtl'] code { unicode-bidi: isolate; }

@@ -256,6 +256,7 @@ export function ProviderForm({
             <div className="relative min-w-[min(100%,240px)] flex-1">
               <Input
                 id="api-key"
+                dir="ltr"
                 type={showApiKey ? 'text' : 'password'}
                 placeholder={t('apiKeyPlaceholder')}
                 value={apiKey}
@@ -345,6 +346,7 @@ export function ProviderForm({
         </Label>
         <Input
           id="api-base-url"
+          dir="ltr"
           type="url"
           required={isCustom}
           aria-required={endpointRequired}

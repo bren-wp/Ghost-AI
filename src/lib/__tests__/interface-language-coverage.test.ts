@@ -1,6 +1,6 @@
 // Ghost AI by Brendigo
 import { describe, expect, it } from 'vitest'
-import i18n, { getInterfaceTranslationStatus, supportedLanguages } from '@/lib/i18n'
+import i18n, { changeLanguage, getInterfaceTranslationStatus, supportedLanguages } from '@/lib/i18n'
 import providerEnglish from '@/locales/en/providers.json'
 import { localeOverrides } from '@/lib/ghost-ai-locale-overrides'
 
@@ -36,6 +36,23 @@ describe('bundled interface translation status', () => {
       expect(['complete', 'partial', 'fallback']).toContain(
         getInterfaceTranslationStatus(language.code)
       )
+    }
+  })
+})
+
+
+describe('interface reading direction', () => {
+  it('sets the document locale and RTL direction, and restores LTR on switching back', async () => {
+    const initial = i18n.language
+    try {
+      await changeLanguage('ar')
+      expect(document.documentElement.lang).toBe('ar')
+      expect(document.documentElement.dir).toBe('rtl')
+      await changeLanguage('de')
+      expect(document.documentElement.lang).toBe('de')
+      expect(document.documentElement.dir).toBe('ltr')
+    } finally {
+      await i18n.changeLanguage(initial || 'en')
     }
   })
 })

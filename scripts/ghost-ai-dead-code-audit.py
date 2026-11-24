@@ -58,7 +58,8 @@ def ts_dependency_inventory():
         if p.is_file() and p.suffix in TS_EXTENSIONS and not p.name.endswith(".d.ts")
     }
     known = set(sources)
-    assets = {p.relative_to(ROOT).as_posix() for p in (ROOT / "src").rglob("*") if p.is_file()}
+    assets = {p.relative_to(ROOT).as_posix() for folder in (ROOT / "src", ROOT / "legal")
+              for p in folder.rglob("*") if p.is_file()}
     graph: dict[str, set[str]] = {}
     unresolved = 0
     unresolved_specs = []

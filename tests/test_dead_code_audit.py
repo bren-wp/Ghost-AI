@@ -111,3 +111,9 @@ class DeadCodeAuditTests(unittest.TestCase):
         self.assertEqual(len(complete["structural_clone_seed_groups"]), 230)
         self.assertEqual(result["typescript_cycle_candidates"], 1)
         self.assertEqual(complete["typescript_cycle_candidates"], [["src/a.ts", "src/main.ts"]])
+
+    def test_legal_raw_imports_resolve_outside_src(self):
+        self.put("src/main.ts", "import notice from '../legal/NOTICE.md?raw';")
+        self.put("legal/NOTICE.md", "Legal notice")
+        _, _, unresolved = audit.ts_candidates()
+        self.assertEqual(unresolved, 0)

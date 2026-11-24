@@ -64,7 +64,7 @@ export function SidebarNavigation({
       collapsible="none"
       role="navigation"
       aria-label="Ghost AI"
-      className={showLabels ? 'w-full! min-w-0 border-r border-sidebar-border' : 'w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-r'}
+      className={showLabels ? 'w-full! min-w-0 border-e border-sidebar-border' : 'w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-e'}
     >
       <div className={showLabels ? 'flex shrink-0 items-center gap-3 px-5 py-6' : 'flex shrink-0 justify-center py-3'}>
         <img src={appIcon} alt="" className={showLabels ? 'size-12 rounded-[14px]' : 'size-8 rounded-lg'} />

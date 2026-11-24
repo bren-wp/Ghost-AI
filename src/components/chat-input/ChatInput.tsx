@@ -633,6 +633,7 @@ export function ChatInput({ documentMode = false }: { documentMode?: boolean } =
             />
             <InputGroupTextarea
               ref={textareaRef}
+              dir="auto"
               placeholder={t('typeMessage')}
               value={input}
               onChange={(e) => {
