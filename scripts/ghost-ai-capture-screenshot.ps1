@@ -15,6 +15,8 @@ if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
 }
 
 Add-Type -AssemblyName System.Drawing
+# Windows PowerShell 5.1 rejects re-declaring an existing type in one session.
+if (-not ('GhostAiWindowCapture' -as [type])) {
 Add-Type -TypeDefinition @'
 using System;
 using System.Text;
@@ -80,6 +82,7 @@ public static class GhostAiWindowCapture {
   }
 }
 '@
+}
 [void][GhostAiWindowCapture]::SetProcessDPIAware()
 Add-Type -AssemblyName System.Windows.Forms
 
