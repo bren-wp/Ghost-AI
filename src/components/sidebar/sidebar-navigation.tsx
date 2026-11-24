@@ -37,7 +37,7 @@ export function SidebarNavigation({
   showLabels = false,
 }: SidebarNavigationProps) {
   const itemClass = showLabels
-    ? 'h-11 rounded-xl px-3 data-[active=true]:text-primary'
+    ? 'h-[45px] rounded-[10px] px-3 text-[15px] text-[#a6b6ce] hover:text-foreground data-[active=true]:bg-[#223855] data-[active=true]:text-[#00e5ff]'
     : 'px-2.5 md:px-2'
   const renderItem = (item: NavItem) => (
     <SidebarMenuItem key={item.id}>
@@ -52,7 +52,7 @@ export function SidebarNavigation({
         className={itemClass}
       >
         <item.icon />
-        <span className={showLabels ? undefined : 'sr-only'}>{item.title}</span>
+        <span className={showLabels ? 'min-w-0 truncate' : 'sr-only'}>{item.title}</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
   )
@@ -62,14 +62,14 @@ export function SidebarNavigation({
       collapsible="none"
       role="navigation"
       aria-label="Ghost AI"
-      className={showLabels ? 'w-full! min-w-0 border-e border-sidebar-border' : 'w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-e'}
+      className={showLabels ? 'w-full! min-w-0 border-e border-[#2e3c53] bg-[#0c1726]' : 'w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-e'}
     >
       <div className={showLabels ? 'flex shrink-0 items-center gap-3 px-5 py-6' : 'flex shrink-0 justify-center py-3'}>
         <img src={appIcon} alt="" className={showLabels ? 'size-12 rounded-[14px]' : 'size-8 rounded-lg'} />
         {showLabels && (
           <div className="min-w-0">
-            <p className="text-lg font-semibold leading-tight text-foreground">Ghost AI</p>
-            <p className="text-xs text-muted-foreground">by Brendigo</p>
+            <p className="text-xl font-bold leading-tight text-[#f6f8ff]">Ghost AI</p>
+            <p className="text-xs text-[#97a9c4]">by Brendigo</p>
           </div>
         )}
       </div>
@@ -82,7 +82,7 @@ export function SidebarNavigation({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      {showLabels && <p className="shrink-0 px-5 py-4 text-xs text-muted-foreground">Ghost AI · brendigo.com</p>}
+      {showLabels && <p className="shrink-0 px-5 py-4 text-xs text-[#7e91ae]">Ghost AI · brendigo.com</p>}
     </Sidebar>
   )
 }
