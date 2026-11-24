@@ -34,14 +34,16 @@ export function WorkspaceHome({ onConversation, onDocument, onAgents, onProvider
               type="button"
               key={key}
               onClick={run}
+              aria-labelledby={`home-action-${key}-title`}
+              aria-describedby={`home-action-${key}-description`}
               className="group relative flex min-h-[132px] min-w-0 flex-col items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent/35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:min-h-[190px] lg:p-6"
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Icon className="size-5" aria-hidden="true" />
               </span>
               <span className="min-w-0 space-y-1 pr-5">
-                <span className="block break-words text-base font-semibold text-foreground">{t(key)}</span>
-                <span className="block break-words text-sm leading-relaxed text-muted-foreground">{t(`${key}Description`)}</span>
+                <span id={`home-action-${key}-title`} className="block break-words text-base font-semibold text-foreground">{t(key)}</span>
+                <span id={`home-action-${key}-description`} className="block break-words text-sm leading-relaxed text-muted-foreground">{t(`${key}Description`)}</span>
               </span>
               <ArrowUpRight aria-hidden="true" className="absolute right-4 top-4 size-4 text-muted-foreground transition-colors group-hover:text-primary" />
             </button>

@@ -1,5 +1,5 @@
 // Ghost AI by Brendigo
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { ArrowUpRight, Bot, Cloud, FileText, HardDrive, Info, MessageSquare, Paintbrush, Plus, Settings, Shield, Sparkles, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAssistantStore } from '@/stores/assistantStore'
@@ -21,19 +21,20 @@ function Workspace({ title, description, children }: { title: string; descriptio
 
 type CardProps = { title: string; description: string; icon: typeof Bot; onClick?: () => void }
 function WorkspaceCard({ title, description, icon: Icon, onClick }: CardProps) {
+  const id = useId()
   const content = (
     <>
       <Icon aria-hidden="true" className="size-6 shrink-0 text-primary" />
       <span className="min-w-0 space-y-2">
-        <span className="block break-words text-base font-semibold">{title}</span>
-        <span className="block break-words text-sm leading-relaxed text-muted-foreground">{description}</span>
+        <span id={`${id}-title`} className="block break-words text-base font-semibold">{title}</span>
+        <span id={`${id}-description`} className="block break-words text-sm leading-relaxed text-muted-foreground">{description}</span>
       </span>
       {onClick && <ArrowUpRight aria-hidden="true" className="absolute right-4 top-4 size-4 text-muted-foreground" />}
     </>
   )
   const classes = 'relative flex min-h-[132px] min-w-0 flex-col items-start gap-3 rounded-2xl border border-border bg-[#172338] p-4 pr-8 text-left lg:min-h-[170px] lg:p-6'
   return onClick ? (
-    <button type="button" className={classes + ' transition-colors hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'} onClick={onClick}>{content}</button>
+    <button type="button" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`} className={classes + ' transition-colors hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'} onClick={onClick}>{content}</button>
   ) : <div className={classes}>{content}</div>
 }
 

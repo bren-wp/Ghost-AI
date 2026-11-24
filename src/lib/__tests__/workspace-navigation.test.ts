@@ -7,6 +7,11 @@ describe('reference Home navigation', () => {
     expect(sectionAfterConversationChange('home', undefined, 'draft', 'draft')).toBe('home')
   })
 
+  it.each(['agents', 'documents', 'providers', 'settings'])('keeps %s during initialization but follows saved conversations', (section) => {
+    expect(sectionAfterConversationChange(section, undefined, 'draft', 'draft')).toBe(section)
+    expect(sectionAfterConversationChange(section, 'draft', 'saved', 'draft')).toBe('conversations')
+  })
+
   it('opens an explicitly selected saved conversation from Home', () => {
     expect(sectionAfterConversationChange('home', 'draft', 'saved', 'draft')).toBe('conversations')
     expect(sectionAfterConversationChange('home', undefined, 'saved', 'draft')).toBe('conversations')
