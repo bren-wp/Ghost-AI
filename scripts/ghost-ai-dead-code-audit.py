@@ -9,9 +9,13 @@ No files are removed by this tool.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import posixpath
 import re
-from collections import deque
+import tomllib
+import zlib
+from collections import defaultdict, deque
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,24 +51,33 @@ def walk_graph(graph: dict[str, set[str]], roots: set[str]) -> set[str]:
     return reached
 
 
-def ts_candidates() -> tuple[int, list[str], int]:
+def ts_dependency_inventory():
     sources = {
         p.relative_to(ROOT).as_posix(): p
         for p in (ROOT / "src").rglob("*")
         if p.is_file() and p.suffix in TS_EXTENSIONS and not p.name.endswith(".d.ts")
     }
+    known = set(sources)
+    assets = {p.relative_to(ROOT).as_posix() for folder in (ROOT / "src", ROOT / "legal")
+              for p in folder.rglob("*") if p.is_file()}
     graph: dict[str, set[str]] = {}
     unresolved = 0
+    unresolved_specs = []
     for name, path in sorted(sources.items()):
         contents = path.read_text(encoding="utf-8")
         imports = IMPORT_RE.findall(contents)
         targets = set()
         for specifier in imports:
-            target = ts_target(name, specifier, set(sources))
+            target = ts_target(name, specifier, known)
             if target is not None:
                 targets.add(target)
             elif specifier.startswith((".", "@/")):
-                unresolved += 1
+                # Existing non-code assets (JSON, CSS, images, declarations)
+                # are resolved inputs, not missing TS modules.
+                raw = specifier.split("?", 1)[0]
+                if ts_target(name, raw, assets) is None:
+                    unresolved += 1
+                    unresolved_specs.append((name, specifier))
         graph[name] = targets
     # Importing a module from a test does not make it production-reachable.
     production = {
@@ -72,11 +85,71 @@ def ts_candidates() -> tuple[int, list[str], int]:
         if not re.search(r"(?:/__tests__/|\.(?:test|spec)\.[jt]sx?$)", name)
     }
     entrypoints = {x for x in ("src/main.tsx", "src/main.ts", "src/index.tsx", "src/index.ts") if x in sources}
-    # React roots may use imported global CSS and lazy modules. This report
-    # deliberately does not infer live behavior from filenames alone.
+    # The configured Vitest setup is a test entrypoint, not production code
+    # and not a deletion candidate. Only use paths explicitly in setupFiles.
+    config = ROOT / "vitest.config.ts"
+    setup_roots = set()
+    if config.is_file():
+        match = re.search(r"setupFiles\s*:\s*\[([^\]]*)\]", config.read_text(encoding="utf-8"))
+        if match:
+            for path in re.findall(r"['\"]([^'\"]+)['\"]", match.group(1)):
+                normalized = posixpath.normpath(path)
+                if normalized in known:
+                    setup_roots.add(normalized)
+    production -= setup_roots
     reached = walk_graph(graph, entrypoints)
+    # Test-only dependencies are still not production-reachable. Keep them
+    # in the candidate inventory, but never list the explicit setup root.
     candidates = sorted(production - reached)
-    return len(production), candidates, unresolved
+    production_graph = {name: graph[name] & production for name in production}
+    return len(production), candidates, unresolved, production_graph, sorted(set(unresolved_specs))
+
+
+def ts_candidates() -> tuple[int, list[str], int]:
+    total, candidates, unresolved, _, _ = ts_dependency_inventory()
+    return total, candidates, unresolved
+
+
+def cyclic_components(graph: dict[str, set[str]]) -> list[list[str]]:
+    """Iterative strongly connected components; lexical edges include type/lazy imports."""
+    reverse = {name: set() for name in graph}
+    for name, children in graph.items():
+        for child in children & graph.keys():
+            reverse[child].add(name)
+    visited = set()
+    order = []
+    for root in sorted(graph):
+        if root in visited:
+            continue
+        visited.add(root)
+        stack = [(root, iter(sorted(graph[root] & graph.keys())))]
+        while stack:
+            node, children = stack[-1]
+            child = next(children, None)
+            if child is None:
+                order.append(node)
+                stack.pop()
+            elif child not in visited:
+                visited.add(child)
+                stack.append((child, iter(sorted(graph[child] & graph.keys()))))
+    visited.clear()
+    components = []
+    for root in reversed(order):
+        if root in visited:
+            continue
+        group = []
+        pending = [root]
+        visited.add(root)
+        while pending:
+            node = pending.pop()
+            group.append(node)
+            for child in sorted(reverse[node]):
+                if child not in visited:
+                    visited.add(child)
+                    pending.append(child)
+        if len(group) > 1 or root in graph[root]:
+            components.append(sorted(group))
+    return sorted(components, key=lambda group: (-len(group), group))
 
 
 def rust_child(current: str, module: str, known: set[str]) -> str | None:
@@ -98,26 +171,211 @@ def rust_candidates() -> tuple[int, list[str]]:
         for root in roots if root.is_dir()
         for p in root.rglob("*.rs")
     }
+    known = set(files)
     graph: dict[str, set[str]] = {}
     for name, path in sorted(files.items()):
         contents = path.read_text(encoding="utf-8")
         graph[name] = {
             child for module in RUST_MOD_RE.findall(contents)
-            if (child := rust_child(name, module, set(files))) is not None
+            if (child := rust_child(name, module, known)) is not None
         }
     entrypoints = {
         name for name in files
         if name in ("src-tauri/src/lib.rs", "src-tauri/src/main.rs")
         or re.fullmatch(r"vendor/agent/crates/[^/]+/src/(?:lib|main)\.rs", name)
     }
+    # Cargo explicit and auto-discovered binary targets are entrypoints.
+    for root in roots:
+        manifest = root.parent / "Cargo.toml"
+        if not manifest.is_file():
+            continue
+        config = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        for target in config.get("bin", []):
+            path = target.get("path")
+            if path:
+                candidate = (root.parent / path).relative_to(ROOT).as_posix()
+                if candidate in known:
+                    entrypoints.add(candidate)
+        if config.get("package", {}).get("autobins", True):
+            prefix = (root / "bin").relative_to(ROOT).as_posix()
+            entrypoints.update(name for name in known if re.fullmatch(
+                re.escape(prefix) + r"/(?:[^/]+\.rs|[^/]+/main\.rs)", name
+            ))
     reached = walk_graph(graph, entrypoints)
     # Non-module Rust files (examples and build scripts) are outside src roots.
     return len(files), sorted(set(files) - reached)
 
 
+def exact_duplicates() -> list[list[str]]:
+    """Byte-identical source candidates; not semantic clone detection."""
+    groups: dict[str, list[str]] = defaultdict(list)
+    for root in (ROOT / "src", ROOT / "src-tauri" / "src"):
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or path.suffix not in (*TS_EXTENSIONS, ".rs"):
+                continue
+            name = path.relative_to(ROOT).as_posix()
+            if "/types/generated/" in name or path.name.endswith(".d.ts"):
+                continue
+            data = path.read_bytes()
+            if len(data) >= 100:
+                groups[hashlib.sha256(data).hexdigest()].append(name)
+    return sorted(sorted(group) for group in groups.values() if len(group) > 1)
+
+
+
+# Approximate lexical clone detection, not a language parser or equivalence
+# checker. Normalize names and literal values, but retain control flow and
+# operators. Keep source line locations without printing code or secrets.
+CLONE_TOKEN_RE = re.compile(
+    r"(?P<comment>//[^\n]*|/\*[\s\S]*?\*/)"
+    r"|(?P<string>\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\\n])*'|\x60(?:\\.|[^\x60\\])*\x60)"
+    r"|(?P<number>\b(?:0[xX][0-9a-fA-F]+|\d+(?:\.\d+)?)\b)"
+    r"|(?P<identifier>[A-Za-z_$][A-Za-z0-9_$]*)"
+    r"|(?P<operator>===|!==|=>|==|!=|<=|>=|&&|\|\||\?\?|::|->|\+=|-=|\S)"
+)
+CLONE_KEYWORDS = frozenset("""
+    if else match switch case default for while loop break continue return
+    throw try catch finally async await yield fn function let const var mut
+    pub struct enum impl trait type interface class extends implements
+    import export from use mod as in of is new typeof instanceof delete
+    true false null undefined None Some Ok Err unsafe move where ref
+""".split())
+CLONE_TOKENS = 48
+CLONE_WINDOW = 16
+CLONE_MAX_OCCURRENCES = 16
+CLONE_REPORT_LIMIT = 200
+
+
+def clone_tokens(contents: str) -> list[tuple[str, int]]:
+    tokens = []
+    line = 1
+    end = 0
+    for match in CLONE_TOKEN_RE.finditer(contents):
+        line += contents.count("\n", end, match.start())
+        value = match.group()
+        kind = match.lastgroup
+        if kind != "comment":
+            if kind == "identifier" and value not in CLONE_KEYWORDS:
+                value = "<id>"
+            elif kind == "string":
+                value = "<string>"
+            elif kind == "number":
+                value = "<number>"
+            tokens.append((value, line))
+        line += match.group().count("\n")
+        end = match.end()
+    return tokens
+
+
+def clone_fingerprints(tokens: list[tuple[str, int]], width: int = CLONE_TOKENS,
+                       window: int = CLONE_WINDOW):
+    """Rolling hashes + winnowing: linear time, bounded candidate density."""
+    if len(tokens) < width:
+        return
+    mask = (1 << 64) - 1
+    base = 257
+    power = pow(base, width - 1, 1 << 64)
+    values = [zlib.crc32(value.encode("utf-8")) + 1 for value, _ in tokens]
+    rolling = 0
+    for value in values[:width]:
+        rolling = (rolling * base + value) & mask
+    minima = deque()
+    last_index = -1
+    count = len(values) - width + 1
+    window = min(window, count)
+    for index in range(count):
+        if index:
+            rolling = ((rolling - values[index - 1] * power) * base + values[index + width - 1]) & mask
+        while minima and minima[-1][0] >= rolling:
+            minima.pop()
+        minima.append((rolling, index))
+        while minima[0][1] <= index - window:
+            minima.popleft()
+        if index >= window - 1 and minima[0][1] != last_index:
+            _, start = minima[0]
+            last_index = start
+            # Verify sampled rolling matches using a cryptographic digest of
+            # the actual normalized sequence, not raw source code.
+            block = tokens[start:start + width]
+            first, last = block[0][1], block[-1][1]
+            if last - first < 3:
+                continue
+            digest = hashlib.blake2b(
+                "\0".join(value for value, _ in block).encode("utf-8"), digest_size=16
+            ).hexdigest()
+            yield digest, first, last
+
+
+def structural_clone_candidates() -> tuple[int, list[list[tuple[str, int, int]]], int]:
+    """Review seeds with renamed identifiers/literals, within or across files.
+
+    Very common fingerprints are ignored as boilerplate; report explicit
+    counts and limits rather than treating skipped regions as proven clean.
+    """
+    index: dict[tuple[str, str], list[tuple[str, int, int]]] = defaultdict(list)
+    common = set()
+    scanned = 0
+    for root in (ROOT / "src", ROOT / "src-tauri" / "src", ROOT / "vendor" / "agent" / "crates"):
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or path.suffix not in (*TS_EXTENSIONS, ".rs"):
+                continue
+            name = path.relative_to(ROOT).as_posix()
+            if ("/types/generated/" in name or path.name.endswith(".d.ts")
+                    or re.search(r"(?:/(?:__tests__|test|tests|target)/|\.(?:test|spec)\.[jt]sx?$)", name)):
+                continue
+            scanned += 1
+            language = "rust" if path.suffix == ".rs" else "typescript"
+            for digest, first, last in clone_fingerprints(clone_tokens(path.read_text(encoding="utf-8"))):
+                key = (language, digest)
+                if key in common:
+                    continue
+                occurrences = index[key]
+                occurrence = (name, first, last)
+                if occurrence in occurrences:
+                    continue
+                if len(occurrences) >= CLONE_MAX_OCCURRENCES:
+                    common.add(key)
+                    del index[key]
+                else:
+                    occurrences.append(occurrence)
+    groups = []
+    seen = set()
+    for occurrences in index.values():
+        if len(occurrences) < 2:
+            continue
+        distinct = []
+        for occurrence in sorted(occurrences):
+            name, first, last = occurrence
+            if any(name == other[0] and first <= other[2] and last >= other[1] for other in distinct):
+                continue
+            distinct.append(occurrence)
+        if len(distinct) < 2:
+            continue
+        group = tuple(distinct)
+        if group not in seen:
+            seen.add(group)
+            groups.append(distinct)
+    # Deterministic, broadest cross-file candidates first. Adjacent seeds can
+    # still refer to a single larger clone, so the count is not a defect count.
+    groups.sort(key=lambda g: (-len({item[0] for item in g}), -len(g), g))
+    return scanned, groups, len(common)
+
+
 def report(output: Path) -> dict[str, int]:
-    ts_total, unused_ts, unresolved = ts_candidates()
+    ts_total, unused_ts, unresolved, graph, unresolved_specs = ts_dependency_inventory()
+    cycles = cyclic_components(graph)
     rust_total, unused_rust = rust_candidates()
+    duplicates = exact_duplicates()
+    clone_files, clone_groups, common_clones = structural_clone_candidates()
+    complete = output.with_name('ghost-ai-clone-inventory.json')
+    complete.parent.mkdir(parents=True, exist_ok=True)
+    complete.write_text(json.dumps({
+        'schema_version': 1,
+        'structural_clone_seed_groups': clone_groups,
+        'common_fingerprints_skipped': common_clones,
+        'typescript_cycle_candidates': cycles,
+        'unresolved_imports': unresolved_specs,
+    }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     lines = [
         "# Ghost AI by Brendigo — full first-party static dead-code review",
         "",
@@ -131,6 +389,12 @@ def report(output: Path) -> dict[str, int]:
         f"- TS modules without a static path from a production entrypoint: **{len(unused_ts)}**",
         f"- Rust modules without a recognized `mod` path: **{len(unused_rust)}**",
         f"- Unresolved relative/alias import specifiers (review required): **{unresolved}**",
+        f"- Byte-identical first-party source groups (review required): **{len(duplicates)}**",
+        f"- Production lexical-clone source files checked: **{clone_files}**",
+        f"- Normalized structural clone seed groups: **{len(clone_groups)}**",
+        f"- Very common fingerprints skipped: **{common_clones}**",
+        f"- TypeScript lexical cyclic components: **{len(cycles)}**",
+        "- Complete seed, import and cycle inventory: `ghost-ai-clone-inventory.json`",
         "",
         "## TypeScript review candidates",
         "",
@@ -142,6 +406,29 @@ def report(output: Path) -> dict[str, int]:
     lines.extend(f"- `{file}`" for file in unused_rust)
     if not unused_rust:
         lines.append("None identified by the Rust module graph.")
+    lines.extend(["", "## TypeScript circular dependency review candidates", "",
+                  "Includes type-only and lazy imports: not proven runtime cycles."])
+    for group in cycles:
+        lines.append('- ' + '; '.join(f'`{name}`' for name in group))
+    if not cycles:
+        lines.append('No cycles identified in the lexical graph.')
+    lines.extend(["", "## Unresolved import locations", ""])
+    lines.extend(f'- `{name}`: `{specifier}`' for name, specifier in unresolved_specs)
+    lines.extend(["", "## Exact duplicate source candidates", "",
+                  "Generated declarations are excluded. Similar functions and semantic clones need manual review."])
+    for group in duplicates:
+        lines.append("- " + ", ".join(f"`{name}`" for name in group))
+    if not duplicates:
+        lines.append("No byte-identical source groups identified within the checked scope.")
+    lines.extend(["", "## Normalized structural clone candidates", "",
+                  "Heuristic lexical review seeds: identifiers and literals normalized; control flow and operators retained.",
+                  "Not proof of semantic equivalence. Generated declarations, test paths and very common fingerprints excluded.",
+                  f"Showing {min(len(clone_groups), CLONE_REPORT_LIMIT)} of {len(clone_groups)} groups; overlapping seeds may identify the same clone.",
+                  ""])
+    for group in clone_groups[:CLONE_REPORT_LIMIT]:
+        lines.append("- " + "; ".join(f"`{name}:{first}-{last}`" for name, first, last in group))
+    if not clone_groups:
+        lines.append("No normalized clone seeds identified within the checked scope.")
     lines.extend([
         "",
         "## Reviewer procedure",
@@ -154,7 +441,10 @@ def report(output: Path) -> dict[str, int]:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("\n".join(lines), encoding="utf-8")
     return {"typescript": ts_total, "rust": rust_total, "ts_candidates": len(unused_ts),
-            "rust_candidates": len(unused_rust), "unresolved_imports": unresolved}
+            "rust_candidates": len(unused_rust), "unresolved_imports": unresolved,
+            "exact_duplicate_groups": len(duplicates), "clone_files": clone_files,
+            "structural_clone_seed_groups": len(clone_groups), "common_fingerprints_skipped": common_clones,
+            "typescript_cycle_candidates": len(cycles)}
 
 
 def main() -> None:

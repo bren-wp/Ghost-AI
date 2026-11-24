@@ -37,6 +37,13 @@ describe('WelcomeState', () => {
     expect(useConversationStore.getState().pendingInput).toMatch(/^Help me write a short/)
   })
 
+  it('shows document instructions without automatically prefilling or sending', () => {
+    render(<WelcomeState canChat documentMode />)
+    expect(screen.getByRole('heading', { name: 'Your files' })).toBeInTheDocument()
+    expect(screen.queryByText('Help me write')).not.toBeInTheDocument()
+    expect(useConversationStore.getState().pendingInput).toBeNull()
+  })
+
   it('offers to connect a model when none is configured', () => {
     render(<WelcomeState canChat={false} />)
 

@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import i18n from '@/lib/i18n'
 import { isValidProviderEndpoint } from './provider-endpoint'
 import { isSupportedFetchProvider } from './constants'
+import { normalizeDiscoveredModels } from './model-discovery'
 
 export interface UseFetchModelsReturn {
   availableModels: ModelInfo[]
@@ -180,7 +181,7 @@ export function useFetchModels({
       }
 
       if (requestId === activeRequestRef.current) {
-        setAvailableModels(Array.isArray(fetchedModels) ? fetchedModels : [])
+        setAvailableModels(normalizeDiscoveredModels(fetchedModels))
       }
     } catch (error) {
       if (requestId !== activeRequestRef.current) return

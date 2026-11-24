@@ -24,8 +24,8 @@ export function useFolderSelect(
     let selected: string | string[] | null
     try {
       selected = await open({ directory: true, multiple: false })
-    } catch (error) {
-      logger.error('[handleFolderSelect] Failed to open folder dialog:', error)
+    } catch {
+      logger.error('[handleFolderSelect] Failed to open folder dialog')
       return
     }
     if (!selected) return
@@ -44,7 +44,7 @@ export function useFolderSelect(
       }
       setAttachments((prev) => [...prev, attachment])
     } catch (error) {
-      logger.error(`[handleFolderSelect] Failed to list folder: ${folderPath}`, error)
+      logger.error('[handleFolderSelect] Failed to list selected folder')
       toast.error(t('failedToReadFile', { file: folderName }), {
         description: error instanceof Error ? error.message : String(error),
       })

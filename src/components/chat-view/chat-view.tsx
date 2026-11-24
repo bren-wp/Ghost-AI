@@ -23,7 +23,7 @@ import {
   useMessageHandlers,
 } from './hooks'
 
-export function ChatView() {
+export function ChatView({ showInteractionDialogs = true, documentMode = false }: { showInteractionDialogs?: boolean; documentMode?: boolean } = {}) {
   const { t } = useTranslation('chat')
 
   // Get conversation state from stores
@@ -208,7 +208,13 @@ export function ChatView() {
   }, [targetMessageId, conversationId, ensureMessageLoaded])
 
   return (
-    <div ref={rootRef} className="flex flex-col flex-1 overflow-hidden">
+    <div ref={rootRef} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      {documentMode && (
+        <header className="shrink-0 border-b border-border bg-card px-4 py-3 sm:px-6">
+          <h2 className="text-base font-semibold">{t('reference_documentsTitle')}</h2>
+          <p className="mt-1 text-xs text-muted-foreground">{t('documentSessionHint')}</p>
+        </header>
+      )}
       {/* Messages Area */}
       <div
         ref={messagesContainerRef}
@@ -228,7 +234,7 @@ export function ChatView() {
                 <p className="text-sm animate-pulse">{t('loadingMessages')}</p>
               </div>
             ) : (
-              <WelcomeState canChat={!!selectedModel || !!selectedAssistant} />
+              <WelcomeState canChat={!!selectedModel || !!selectedAssistant} documentMode={documentMode} />
             )
           ) : (
             <MessageList
@@ -312,13 +318,17 @@ export function ChatView() {
         </div>
 
         <div className="p-4 flex flex-col h-full overflow-y-auto">
-          <ChatInput />
+          <ChatInput documentMode={documentMode} />
         </div>
       </div>
 
-      <PermissionApprovalDialog />
-      <McpElicitationDialog />
-      <AskUserDialog />
+      {showInteractionDialogs && (
+        <>
+          <PermissionApprovalDialog />
+          <McpElicitationDialog />
+          <AskUserDialog />
+        </>
+      )}
     </div>
   )
 }

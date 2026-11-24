@@ -10,7 +10,8 @@ import {
 } from '@/components/attachment-preview'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { X, Sparkles } from 'lucide-react'
+import { X, Sparkles, FilePlus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 import { useAttachments } from './useAttachments'
 import { useKeyboardHandlers } from './useKeyboardHandlers'
@@ -61,9 +62,7 @@ import {
 } from '@/lib/permission-mode'
 import { COMPOSE_SUBMIT_EVENT, type ComposeSubmitDetail } from '@/stores/autoReviewStore'
 
-// interface ChatInputProps {}
-
-export function ChatInput(/* _props: ChatInputProps */) {
+export function ChatInput({ documentMode = false }: { documentMode?: boolean } = {}) {
   const { t } = useTranslation('chat')
   // State
   const [input, setInput] = useState('')
@@ -613,6 +612,16 @@ export function ChatInput(/* _props: ChatInputProps */) {
         )}
 
         {currentConversation && <McpAuthBanner conversationId={currentConversation.id} />}
+        {documentMode && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={!currentConversation || isSending} onClick={() => void handleFileSelect()}>
+              <FilePlus aria-hidden="true" className="size-4" />{t('documentChooseFiles')}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={!!input.trim() || (!selectedModel && !selectedAssistant)} onClick={() => setInput(t('workspaceDocumentPrompt'))}>
+              {t('reference_documentsSummary')}
+            </Button>
+          </div>
+        )}
 
         <MentionPopup state={mentionState} onPick={pickMention}>
           <InputGroup className="flex-1 relative">
@@ -624,6 +633,7 @@ export function ChatInput(/* _props: ChatInputProps */) {
             />
             <InputGroupTextarea
               ref={textareaRef}
+              dir="auto"
               placeholder={t('typeMessage')}
               value={input}
               onChange={(e) => {

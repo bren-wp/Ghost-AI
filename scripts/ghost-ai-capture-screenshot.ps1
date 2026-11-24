@@ -4,7 +4,8 @@ param(
   [Parameter(Mandatory = $true)][string]$Output,
   [int]$ViewportWidth = 0,
   [int]$ViewportHeight = 0,
-  [switch]$OpenSettings
+  [switch]$OpenSettings,
+  [ValidateSet('home', 'conversations', 'agents', 'documents', 'providers', 'settings')][string]$ReferenceSurface
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,6 +15,8 @@ if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
 }
 
 Add-Type -AssemblyName System.Drawing
+# Windows PowerShell 5.1 rejects re-declaring an existing type in one session.
+if (-not ('GhostAiWindowCapture' -as [type])) {
 Add-Type -TypeDefinition @'
 using System;
 using System.Text;
@@ -23,6 +26,13 @@ public static class GhostAiWindowCapture {
   public struct RECT { public int Left, Top, Right, Bottom; }
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool GetWindowRect(IntPtr handle, out RECT rect);
+  [DllImport("dwmapi.dll")]
+  private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out RECT rect, int size);
+  public static bool GetVisibleFrameRect(IntPtr handle, out RECT rect) {
+    // DWMWA_EXTENDED_FRAME_BOUNDS excludes the invisible resize border.
+    return DwmGetWindowAttribute(handle, 9, out rect, Marshal.SizeOf(typeof(RECT))) == 0
+      && rect.Right > rect.Left && rect.Bottom > rect.Top;
+  }
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool MoveWindow(IntPtr handle, int x, int y, int width, int height, bool repaint);
   [DllImport("user32.dll", SetLastError = true)]
@@ -79,8 +89,112 @@ public static class GhostAiWindowCapture {
   }
 }
 '@
+}
 [void][GhostAiWindowCapture]::SetProcessDPIAware()
 Add-Type -AssemblyName System.Windows.Forms
+
+# Reference-route navigation is verified through the real WebView accessibility
+# tree. No coordinate guesses or synthetic HTML previews are accepted.
+function Get-VisibleUiElement {
+  param([IntPtr]$Window, [string]$Property, [string[]]$Values, [switch]$NavigationButton)
+  $root = [System.Windows.Automation.AutomationElement]::FromHandle($Window)
+  $uiaProperty = if ($Property -eq 'id') {
+    [System.Windows.Automation.AutomationElement]::AutomationIdProperty
+  } else {
+    [System.Windows.Automation.AutomationElement]::NameProperty
+  }
+  foreach ($value in $Values) {
+    $condition = [System.Windows.Automation.PropertyCondition]::new($uiaProperty, $value)
+    if ($NavigationButton) {
+      # Chromium exposes both a button and its label/tooltip text in the
+      # accessibility tree. A text node must never win the name lookup.
+      $buttonCondition = [System.Windows.Automation.PropertyCondition]::new(
+        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [System.Windows.Automation.ControlType]::Button
+      )
+      $condition = [System.Windows.Automation.AndCondition]::new($condition, $buttonCondition)
+    }
+    $matches = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
+    $visible = @()
+    foreach ($element in $matches) {
+      if (-not $element.Current.IsOffscreen -and (-not $NavigationButton -or $element.Current.IsEnabled)) {
+        if (-not $NavigationButton) { return $element }
+        $visible += $element
+      }
+    }
+    # Avoid selecting an unrelated similarly named button; stable ID wins,
+    # otherwise the visible button name must identify exactly one control.
+    if ($NavigationButton -and $visible.Count -eq 1) { return $visible[0] }
+    if ($NavigationButton -and $visible.Count -gt 1) {
+      Write-Host "Ambiguous accessible button match: $Property=$value ($($visible.Count) controls)"
+    }
+  }
+  return $null
+}
+
+function Open-ReferenceSurface {
+  param([IntPtr]$Window, [string]$Surface)
+  Add-Type -AssemblyName UIAutomationClient
+  Add-Type -AssemblyName UIAutomationTypes
+  $labels = @{
+    home = 'Home'; conversations = 'Conversations'; agents = 'Agents'
+    documents = 'Documents'; providers = 'Providers'; settings = 'Settings'
+  }
+  $expected = @{
+    home = @('Your workspace. Your ideas.')
+    conversations = @('Connect an AI model to start', 'Choose a model to start', 'What can I help with?')
+    agents = @('Agents & workflows')
+    documents = @('Document workspace')
+    providers = @('Connect your AI')
+    settings = @('A focused place for your choices.')
+  }
+  $deadline = (Get-Date).AddSeconds(15)
+  $button = $null
+  do {
+    $button = Get-VisibleUiElement -Window $Window -Property id -Values @("ghost-ai-nav-$Surface") -NavigationButton
+    # The Settings header shares the accessible name. Only the navigation
+    # element's stable identifier may select Settings.
+    if (-not $button -and $Surface -ne 'settings') {
+      $button = Get-VisibleUiElement -Window $Window -Property name -Values @($labels[$Surface]) -NavigationButton
+    }
+    if (-not $button) { Start-Sleep -Milliseconds 500 }
+  } while (-not $button -and (Get-Date) -lt $deadline)
+  if (-not $button) { throw "NOT VERIFIED: accessible navigation element for $Surface was not found" }
+  if (-not $button.Current.IsEnabled) { throw "NOT VERIFIED: $Surface navigation is disabled" }
+  Write-Host "Selected navigation button: $Surface; automation ID=$($button.Current.AutomationId)"
+  $pattern = $null
+  if ($button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+    ([System.Windows.Automation.InvokePattern]$pattern).Invoke()
+  } else {
+    # Some WebView2 accessibility providers expose real buttons but not
+    # InvokePattern. Use the same keyboard activation available to a user,
+    # only after proving focus belongs to the chosen button.
+    if (-not $button.Current.IsKeyboardFocusable) {
+      throw "NOT VERIFIED: $Surface navigation is neither invokable nor keyboard focusable"
+    }
+    $button.SetFocus()
+    Start-Sleep -Milliseconds 250
+    $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+    if (-not $focused -or -not [System.Windows.Automation.Automation]::Compare($button, $focused)) {
+      throw "NOT VERIFIED: keyboard focus did not reach $Surface navigation"
+    }
+    if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $Window) {
+      throw "NOT VERIFIED: Ghost AI lost foreground before navigation activation"
+    }
+    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    Write-Host "Activated $Surface using verified keyboard focus"
+  }
+  $deadline = (Get-Date).AddSeconds(15)
+  $heading = $null
+  do {
+    Start-Sleep -Milliseconds 400
+    $heading = Get-VisibleUiElement -Window $Window -Property name -Values $expected[$Surface]
+  } while (-not $heading -and (Get-Date) -lt $deadline)
+  if (-not $heading) { throw "NOT VERIFIED: expected visible $Surface content was not found" }
+  Write-Host "Verified accessible surface: $Surface"
+}
+
+if ($ReferenceSurface -and $OpenSettings) { throw "Choose a reference surface or the Settings dialog, not both" }
 
 $process = $null
 $bitmap = $null
@@ -123,13 +237,21 @@ try {
     throw "NOT VERIFIED: Ghost AI is not foreground; refusing a desktop/console screenshot"
   }
   $rect = New-Object GhostAiWindowCapture+RECT
-  if (-not [GhostAiWindowCapture]::GetWindowRect($window, [ref]$rect)) {
-    throw "Cannot read Ghost AI window dimensions"
+  if (-not [GhostAiWindowCapture]::GetVisibleFrameRect($window, [ref]$rect)) {
+    throw "NOT VERIFIED: cannot read Ghost AI visible frame bounds"
   }
   $width = $rect.Right - $rect.Left
   $height = $rect.Bottom - $rect.Top
   Write-Host ("Verified Ghost AI window bounds: (" + $rect.Left + "," + $rect.Top + ") " + $width + "x" + $height)
   if ($width -lt 680 -or $height -lt 400) { throw "Invalid Ghost AI window dimensions" }
+
+  if ($ReferenceSurface) {
+    Open-ReferenceSurface -Window $window -Surface $ReferenceSurface
+    if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $window) {
+      throw "NOT VERIFIED: Ghost AI lost foreground during reference navigation"
+    }
+    Start-Sleep -Milliseconds 700
+  }
 
   if ($OpenSettings) {
     $beforeBitmap = [System.Drawing.Bitmap]::new($width, $height)
@@ -236,7 +358,7 @@ try {
   [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($destination)) | Out-Null
   $bitmap.Save($destination, [System.Drawing.Imaging.ImageFormat]::Png)
   if ((Get-Item $destination).Length -lt 20000) { throw "Screenshot file appears incomplete" }
-  Write-Host "Ghost AI real Windows screenshot: $destination (viewport ${ViewportWidth}x${ViewportHeight}; Settings: $OpenSettings)"
+  Write-Host "Ghost AI real Windows screenshot: $destination (viewport ${ViewportWidth}x${ViewportHeight}; Settings: $OpenSettings; Reference: $ReferenceSurface)"
 }
 finally {
   if ($graphics) { $graphics.Dispose() }

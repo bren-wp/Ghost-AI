@@ -2,6 +2,7 @@
 import i18n, { type Resource } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { localeOverrides } from './ghost-ai-locale-overrides'
+import { applyInterfaceDirection } from './interface-direction'
 
 import common_en from '@/locales/en/common.json'
 import common_zhCN from '@/locales/zh-CN/common.json'
@@ -119,6 +120,31 @@ for (const { code } of supportedLanguages) {
 export const hasBundledTranslation = (code: string) =>
   code === 'en' || code === 'zh-CN' || Boolean(localeOverrides[code])
 
+export type InterfaceTranslationStatus = 'complete' | 'partial' | 'fallback'
+
+// Compare bundled leaves, not resolved i18next values: English fallback is
+// not a translation. Complete means key coverage only, not linguistic QA.
+function countBundledKeys(base: unknown, candidate: unknown): [number, number] {
+  if (typeof base === 'string') return [1, typeof candidate === 'string' && candidate.trim() ? 1 : 0]
+  if (!base || typeof base !== 'object') return [0, 0]
+  const target =
+    candidate && typeof candidate === 'object' ? (candidate as Record<string, unknown>) : {}
+  let total = 0
+  let translated = 0
+  for (const [key, value] of Object.entries(base)) {
+    const [baseCount, translatedCount] = countBundledKeys(value, target[key])
+    total += baseCount
+    translated += translatedCount
+  }
+  return [total, translated]
+}
+
+export function getInterfaceTranslationStatus(code: string): InterfaceTranslationStatus {
+  const [total, translated] = countBundledKeys(resources.en, resources[code])
+  if (translated === 0) return 'fallback'
+  return translated === total ? 'complete' : 'partial'
+}
+
 const languageDetector = {
   type: 'languageDetector' as const,
   async: true,
@@ -140,6 +166,12 @@ const languageDetector = {
   },
 }
 
+// The root direction also applies to Radix portals outside the React app.
+// Install once before init so restored language and later changes both update it.
+i18n.on('languageChanged', (language) => {
+  if (typeof document !== 'undefined') applyInterfaceDirection(language)
+})
+
 i18n
   .use(languageDetector)
   .use(initReactI18next)
@@ -154,6 +186,7 @@ i18n
       'providers',
       'sidebar',
       'onboarding',
+      'sync',
       'assistants',
       'tools',
       'prompts',

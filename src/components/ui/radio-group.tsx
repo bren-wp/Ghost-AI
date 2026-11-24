@@ -4,13 +4,16 @@ import * as RadioGroupPrimitive from '@radix-ui/react-radio-group'
 import { CircleIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { useInterfaceDirection } from '@/hooks/useInterfaceDirection'
 
 function RadioGroup({
   className,
   ...props
 }: React.ComponentProps<typeof RadioGroupPrimitive.Root>) {
+  const direction = useInterfaceDirection()
   return (
     <RadioGroupPrimitive.Root
+      dir={direction}
       data-slot="radio-group"
       className={cn('grid gap-3', className)}
       {...props}

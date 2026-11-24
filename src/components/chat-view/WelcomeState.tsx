@@ -16,6 +16,7 @@ const STARTERS = [
 interface WelcomeStateProps {
   /** A model or assistant is selected, so the composer can send */
   canChat: boolean
+  documentMode?: boolean
 }
 
 /**
@@ -23,7 +24,7 @@ interface WelcomeStateProps {
  * sending, so the user can read and adjust the prompt first. Without a
  * usable model the composer is disabled, so the way out is offered here.
  */
-export function WelcomeState({ canChat }: WelcomeStateProps) {
+export function WelcomeState({ canChat, documentMode = false }: WelcomeStateProps) {
   const { t } = useTranslation('chat')
   const setPendingInput = useConversationStore((state) => state.setPendingInput)
   const openProviderSettings = useProviderSettingsStore((state) => state.openProviderSettings)
@@ -55,6 +56,16 @@ export function WelcomeState({ canChat }: WelcomeStateProps) {
           {t('welcome.connectModel')}
           <ArrowRight />
         </Button>
+      </div>
+    )
+  }
+
+  if (documentMode) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-6 text-center">
+        <FolderSearch className="size-8 text-primary" aria-hidden="true" />
+        <h2 className="text-xl font-semibold">{t('reference_documentsFiles')}</h2>
+        <p className="max-w-md text-sm text-muted-foreground">{t('documentSessionHint')}</p>
       </div>
     )
   }

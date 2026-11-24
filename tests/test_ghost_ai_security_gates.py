@@ -43,6 +43,18 @@ class SecurityBoundaryTests(unittest.TestCase):
         self.assertIn('#[cfg(debug_assertions)]\nmod ui_automation;', rust)
         self.assertIn('#[cfg(debug_assertions)]\n            ui_automation::start(app.handle());', rust)
 
+    def test_mock_keyring_is_not_compiled_into_production(self):
+        source = (ROOT / "src-tauri/src/keychain.rs").read_text(encoding="utf-8")
+        # Keep both the backend installation and environment switch gated.
+        self.assertIn(
+            "#[cfg(any(test, debug_assertions))]\n    MOCK_KEYRING_INSTALL.call_once",
+            source,
+        )
+        self.assertIn(
+            "#[cfg(any(test, debug_assertions))]\n    if cfg!(test) || std::env::var_os(MOCK_KEYRING_ENV).is_some()",
+            source,
+        )
+
     def test_updater_requires_trusted_key(self):
         rust = (ROOT / "src-tauri/src/lib.rs").read_text(encoding="utf-8")
         self.assertIn('option_env!("GHOST_AI_UPDATER_PUBLIC_KEY")', rust)

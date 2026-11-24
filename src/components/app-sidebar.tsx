@@ -46,7 +46,8 @@ import { useTranslation } from 'react-i18next'
 import { hasBlockingDialog } from '@/lib/blocking-dialog'
 import { usePromptStore } from '@/stores/promptStore'
 import { useProviderSettingsStore } from '@/stores/providerSettingsStore'
-import { SIDEBAR_DATA, getNavItems } from '@/lib/sidebar-data'
+import { getNavItems } from '@/lib/sidebar-data'
+import { isReferenceWorkspace } from '@/lib/workspace-navigation'
 import type { Prompt as PromptListItem } from '@/components/prompt-list'
 import type { Model as ModelListItem } from '@/components/model-list'
 import type { Assistant as AssistantListItem } from '@/components/assistant-list'
@@ -77,7 +78,7 @@ export function AppSidebar({
   const [promptDialogMode, setPromptDialogMode] = React.useState<'create' | 'edit'>('create')
   const activeContactsTab = useContactSelectionStore((state) => state.activeTab)
   const setActiveContactsTab = useContactSelectionStore((state) => state.setActiveTab)
-  const { setOpen, setOpenMobile } = useSidebar()
+  const { state: sidebarState, isMobile, setOpen, setOpenMobile } = useSidebar()
   const providerDialogOpen = useProviderSettingsStore((state) => state.open)
   const providerDialogInitialId = useProviderSettingsStore((state) => state.initialProviderId)
   const openProviderSettings = useProviderSettingsStore((state) => state.openProviderSettings)
@@ -436,10 +437,10 @@ export function AppSidebar({
           setOpen(item.id !== 'translation')
           setOpenMobile(false)
         }}
-        user={SIDEBAR_DATA.user}
+        showLabels={isReferenceWorkspace(activeSection) && (sidebarState === 'expanded' || isMobile)}
       />
 
-      {activeSection !== 'translation' && (
+      {activeSection !== 'translation' && !isReferenceWorkspace(activeSection) && (
         <Sidebar collapsible="none" className="hidden flex-1 md:flex">
           <SidebarHeader className="gap-3.5 border-b p-4">
             <div className="flex w-full items-center justify-between h-7">

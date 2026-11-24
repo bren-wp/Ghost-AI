@@ -245,6 +245,24 @@ describe('useProviderSave security and reliability', () => {
     })
   })
 
+  it('does not update a deleted model or create a deleted draft', async () => {
+    vi.mocked(invoke).mockResolvedValue(existingProvider)
+    const { result } = setup({
+      models: [
+        { id: 'deleted', modelId: 'old', displayName: 'Old', isExisting: true },
+        newModel('draft-deleted'),
+        { ...newModel('keep'), modelId: '  retained-model  ', displayName: '  Retained  ' },
+      ],
+      modelsToDelete: ['deleted', 'deleted', 'draft-deleted'],
+    })
+    await act(async () => { await result.current.handleSave() })
+    expect(invoke).not.toHaveBeenCalledWith('update_model', expect.anything())
+    expect(vi.mocked(invoke).mock.calls.filter(([command]) => command === 'delete_model')).toEqual([['delete_model', { id: 'deleted' }]])
+    expect(vi.mocked(invoke).mock.calls.filter(([command]) => command === 'create_model')).toEqual([
+      ['create_model', { req: expect.objectContaining({ model_id: 'retained-model', name: 'Retained' }) }],
+    ])
+  })
+
   it('rejects duplicate active model identifiers before mutating the provider', async () => {
     const { result } = setup({
       models: [newModel('one'), { ...newModel('two'), modelId: ' one ' }],

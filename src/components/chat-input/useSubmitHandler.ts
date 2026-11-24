@@ -58,7 +58,7 @@ export function useSubmitHandler({
 
   const handleSend = async () => {
     logger.info('handleSend called', {
-      input: input.trim(),
+      inputLength: input.trim().length,
       hasCurrentConversation: !!currentConversation,
       selectedModel: selectedModel?.name,
       selectedAssistant: selectedAssistant?.name,
@@ -174,12 +174,12 @@ export function useSubmitHandler({
       }))
 
       logger.info('Sending message:', {
-        content: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
+        contentLength: content.length,
         conversationId: currentConversation?.id,
         provider: providerType,
         model: modelIdStr,
         hasApiKey: !!apiKey,
-        baseUrl,
+        hasCustomBaseUrl: !!baseUrl,
         hasSystemPrompt: !!systemPrompt,
         hasUserPrompt: !!userPrompt,
         modelDbId: selectedAssistant ? undefined : modelToUse.id,

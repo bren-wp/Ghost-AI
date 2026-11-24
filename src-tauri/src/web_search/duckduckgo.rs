@@ -65,10 +65,7 @@ pub async fn search_duckduckgo(
 
 /// Synchronous DuckDuckGo search implementation via headless Chrome
 fn search_duckduckgo_sync(search_url: &str, max_results: usize) -> Result<Vec<SearchResultItem>> {
-    tracing::info!(
-        "🔍 [web_search] Starting DuckDuckGo search for: {}",
-        search_url
-    );
+    tracing::info!("[web_search] Starting DuckDuckGo search");
 
     let browser = create_new_browser()?;
 
@@ -114,14 +111,9 @@ fn search_duckduckgo_sync(search_url: &str, max_results: usize) -> Result<Vec<Se
     tracing::info!("📄 [web_search] Got {} bytes of HTML", html.len());
 
     // Parse via the shared core parser (single home for extraction semantics)
-    let results: Vec<SearchResultItem> = core_search::parse_duckduckgo_results(&html, max_results)
-        .into_iter()
-        .map(|r| SearchResultItem {
-            title: r.title,
-            url: r.url,
-            snippet: r.snippet,
-        })
-        .collect();
+    let results: Vec<SearchResultItem> = super::utils::map_search_results(
+        core_search::parse_duckduckgo_results(&html, max_results),
+    );
     tracing::info!("✅ [web_search] Found {} results", results.len());
 
     Ok(results)

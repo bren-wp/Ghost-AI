@@ -34,6 +34,21 @@ function renderProviderForm() {
 }
 
 describe('AI provider connection error handling', () => {
+  it('requires an explicit deployment endpoint for Azure', () => {
+    render(
+      <ProviderForm
+        apiKey="sk-test" onApiKeyChange={noop} showApiKey={false} onShowApiKeyChange={noop}
+        apiBaseUrl="" onApiBaseUrlChange={noop}
+        selectedProvider={{ id: 'azure', name: 'Azure OpenAI', baseUrl: '' }}
+        providerName="" onProviderNameChange={noop}
+        apiStyle="chat_completions" onApiStyleChange={noop}
+        compatibilityType="openai" onCompatibilityTypeChange={noop} models={[model]}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Test Connection' })).toBeDisabled()
+    expect(invokeMock).not.toHaveBeenCalled()
+  })
+
   it('does not display secret-bearing provider error responses', async () => {
     invokeMock.mockResolvedValue({
       success: false, latency_ms: 10,
