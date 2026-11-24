@@ -18,7 +18,7 @@ export function Workspace({ title, description, children, headingId }: Workspace
       aria-labelledby={headingId}
       aria-label={headingId ? undefined : title}
     >
-      <div className="mx-auto flex w-full max-w-[930px] min-w-0 flex-col gap-6">
+      <div className="@container/workspace mx-auto flex w-full max-w-[930px] min-w-0 flex-col gap-6">
         <header className="space-y-2">
           <h2 id={headingId} className="text-[clamp(1.4rem,3vw,2.25rem)] font-semibold tracking-tight text-foreground">{title}</h2>
           <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
@@ -30,7 +30,7 @@ export function Workspace({ title, description, children, headingId }: Workspace
 }
 
 export function WorkspaceGrid({ children }: { children: ReactNode }) {
-  return <div className="grid min-w-0 grid-cols-1 gap-4 min-[680px]:grid-cols-2">{children}</div>
+  return <div className="grid min-w-0 grid-cols-1 gap-4 @min-[480px]/workspace:grid-cols-2">{children}</div>
 }
 
 interface WorkspaceCardProps {
@@ -56,16 +56,16 @@ export function WorkspaceCard({ id, title, description, icon: Icon, onClick, var
       ) : (
         <Icon aria-hidden="true" className="size-6 shrink-0 text-primary" />
       )}
-      <span className={home ? 'min-w-0 space-y-1 pe-5' : 'min-w-0 space-y-2'}>
-        <span id={`${labelId}-title`} className={cn('block break-words text-base font-semibold', home && 'text-[#eff5ff] xl:text-[19px]')}>{title}</span>
-        <span id={`${labelId}-description`} className={cn('block break-words text-sm leading-relaxed text-muted-foreground', home && 'text-[#95acc7]')}>{description}</span>
+      <span className={home ? 'w-full min-w-0 space-y-1 pe-5' : 'w-full min-w-0 space-y-2'}>
+        <span id={`${labelId}-title`} className={cn('block [overflow-wrap:anywhere] text-base font-semibold', home && 'text-[#eff5ff] @min-[880px]/workspace:text-[19px]')}>{title}</span>
+        <span id={`${labelId}-description`} className={cn('block [overflow-wrap:anywhere] text-sm leading-relaxed text-muted-foreground', home && 'text-[#95acc7]')}>{description}</span>
       </span>
       {onClick && <ArrowUpRight aria-hidden="true" className={cn('absolute end-4 top-4 size-4 text-muted-foreground', home && 'transition-colors group-hover:text-primary')} />}
     </>
   )
   const classes = cn(
-    'relative flex min-h-[132px] min-w-0 flex-col items-start gap-3 rounded-2xl border border-border p-4 text-start lg:p-6',
-    home ? 'group bg-[#172338] border-[#30465f] lg:min-h-[190px] xl:min-h-[207px]' : 'bg-[#172338] pe-8 lg:min-h-[170px]',
+    'relative flex min-h-[132px] min-w-0 flex-col items-start gap-3 rounded-2xl border border-border p-4 text-start @min-[680px]/workspace:p-6',
+    home ? 'group bg-[#172338] border-[#30465f] @min-[680px]/workspace:min-h-[190px] @min-[880px]/workspace:min-h-[207px]' : 'bg-[#172338] pe-8 @min-[680px]/workspace:min-h-[170px]',
     onClick && 'transition-colors hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
     home && onClick && 'hover:bg-accent/35'
   )
