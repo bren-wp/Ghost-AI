@@ -8,6 +8,8 @@ import { AppSidebar } from '@/components/app-sidebar'
 import { SettingsDialog } from '@/components/settings-dialog'
 import { hasBlockingDialog } from '@/lib/blocking-dialog'
 import { ChatView } from '@/components/chat-view'
+import { WorkspaceHome } from '@/components/workspace-home'
+import { useProviderSettingsStore } from '@/stores/providerSettingsStore'
 import { ContactProfile } from '@/components/contact-profile'
 import { useSelectedContact } from '@/hooks/useContactProfile'
 import { PromptDetail } from '@/components/prompt-detail'
@@ -59,7 +61,8 @@ function CollapsedNewConversationButton({ onClick }: { onClick: () => void }) {
 
 export function ChatPage() {
   const { t } = useTranslation()
-  const [activeSection, setActiveSection] = useState('conversations')
+  const [activeSection, setActiveSection] = useState('home')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
   const isTranslation = activeSection === 'translation'
   // Initialize app (load agents, conversations, settings)
@@ -178,6 +181,24 @@ export function ChatPage() {
     void openNewConversation()
   }, [openNewConversation])
 
+  const openAgents = () => {
+    useContactSelectionStore.getState().setActiveTab('assistants')
+    setActiveSection('contacts')
+    setSidebarOpen(true)
+  }
+  const openDocumentConversation = async () => {
+    const previousDraft = useConversationStore.getState().draftConversation?.id
+    setActiveSection('conversations')
+    await openNewConversation()
+    const { currentConversation, draftConversation, setPendingInput } = useConversationStore.getState()
+    // Prefill only a newly created, currently selected draft. Never replace
+    // the text of an already open draft or send a message automatically.
+    if (draftConversation && currentConversation?.id === draftConversation.id && draftConversation.id !== previousDraft) {
+      setPendingInput(t('chat:workspaceDocumentPrompt'))
+    }
+  }
+  const openProviders = useProviderSettingsStore((state) => state.openProviderSettings)
+
   // Search, translation continuation and detail pages can select a
   // conversation outside the conversation list; follow it there so the chat
   // is not hidden behind the translation view or a detail page.
@@ -185,7 +206,7 @@ export function ChatPage() {
     return useConversationStore.subscribe((state, previous) => {
       if (state.currentConversation?.id !== previous.currentConversation?.id) {
         setActiveSection((section) =>
-          section === 'translation' || section === 'contacts' || section === 'library'
+          section === 'home' || section === 'translation' || section === 'contacts' || section === 'library'
             ? 'conversations'
             : section
         )
@@ -228,10 +249,11 @@ export function ChatPage() {
   return (
     <>
       <SidebarProvider
-        defaultOpen={false}
+        open={sidebarOpen}
+        onOpenChange={setSidebarOpen}
         style={
           {
-            '--sidebar-width': '350px',
+            '--sidebar-width': activeSection === 'home' ? '255px' : '350px',
           } as React.CSSProperties
         }
       >
@@ -239,6 +261,7 @@ export function ChatPage() {
           activeSection={activeSection}
           onSectionChange={setActiveSection}
           onNewConversation={startNewConversation}
+          onOpenSettings={() => setSettingsDialogOpen(true)}
         />
         <SidebarInset className="flex min-w-0 flex-col h-screen overflow-hidden">
           <header
@@ -249,10 +272,12 @@ export function ChatPage() {
             }
           >
             <SidebarTrigger className={isTranslation ? '-ml-1 md:hidden' : '-ml-1'} />
-            {!isTranslation && <CollapsedNewConversationButton onClick={startNewConversation} />}
+            {!isTranslation && activeSection !== 'home' && <CollapsedNewConversationButton onClick={startNewConversation} />}
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
             <h1 className="min-w-0 truncate text-sm font-medium">
-              {isTranslation
+              {activeSection === 'home'
+                ? t('sidebar:home')
+                : isTranslation
                 ? t('sidebar:translation')
                 : showContactProfile
                   ? contactName
@@ -294,7 +319,14 @@ export function ChatPage() {
               </button>
             </div>
           )}
-          {isTranslation ? (
+          {activeSection === 'home' ? (
+            <WorkspaceHome
+              onConversation={startNewConversation}
+              onDocument={() => void openDocumentConversation()}
+              onAgents={openAgents}
+              onProviders={() => openProviders()}
+            />
+          ) : isTranslation ? (
             <TranslationContent />
           ) : showContactProfile && selectedContact ? (
             <ContactProfile

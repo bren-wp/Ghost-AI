@@ -10,7 +10,9 @@ use std::sync::RwLock;
 /// wrong — unit tests, integration tests, doc tests, sandboxed CI runners.
 ///
 /// Unit tests install it automatically via `cfg!(test)`; the env var remains
-/// as an escape hatch for external runners that link this crate.
+/// as an escape hatch for debug-profile external runners that link this crate.
+/// Release binaries ignore it even if inherited from the process environment.
+#[cfg(any(test, debug_assertions))]
 const MOCK_KEYRING_ENV: &str = "GHOST_AI_TEST_MOCK_KEYRING";
 
 /// Service name for keychain entries
@@ -27,6 +29,7 @@ fn cache() -> &'static RwLock<HashMap<String, String>> {
 }
 
 /// One-shot guard that swaps in the in-process mock credential builder.
+#[cfg(any(test, debug_assertions))]
 static MOCK_KEYRING_INSTALL: std::sync::Once = std::sync::Once::new();
 
 /// Installs the in-process mock credential builder so subsequent
@@ -40,6 +43,8 @@ static MOCK_KEYRING_INSTALL: std::sync::Once = std::sync::Once::new();
 /// entry point), so the real keychain backend remains the default in
 /// shipped builds.
 pub fn install_mock_keyring() {
+    // The mock implementation is not compiled into a production binary.
+    #[cfg(any(test, debug_assertions))]
     MOCK_KEYRING_INSTALL.call_once(|| {
         let builder = keyring::mock::default_credential_builder();
         keyring::set_default_credential_builder(builder);
@@ -59,6 +64,7 @@ fn install_mock_keyring_if_needed() {
     // exported via .cargo/config.toml [env]: that table applies to every
     // cargo invocation, including `tauri dev`, where the mock would silently
     // replace the real keychain and break decryption of persisted secrets.
+    #[cfg(any(test, debug_assertions))]
     if cfg!(test) || std::env::var_os(MOCK_KEYRING_ENV).is_some() {
         install_mock_keyring();
     }

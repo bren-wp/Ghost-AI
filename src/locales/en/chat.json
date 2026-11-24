@@ -246,6 +246,17 @@
     "failedTools_one": "{{count}} tool failed",
     "failedTools_other": "{{count}} tools failed"
   },
+  "workspaceTitle": "Your workspace. Your ideas.",
+  "workspaceSubtitle": "Choose a starting point to get more done with your preferred AI.",
+  "workspaceConversation": "Start a conversation",
+  "workspaceConversationDescription": "Ideas, writing, research and answers",
+  "workspaceDocument": "Analyze a document",
+  "workspaceDocumentDescription": "Start a conversation and attach a file",
+  "workspaceDocumentPrompt": "Help me analyze a document I will attach. Summarize its key points and ask me about anything unclear.",
+  "workspaceAgents": "Run an agent",
+  "workspaceAgentsDescription": "Choose an assistant and review its permissions",
+  "workspaceProviders": "Your AI providers",
+  "workspaceProvidersDescription": "Connect compatible cloud or local models",
   "welcome": {
     "title": "What can I help with?",
     "subtitle": "Ask anything. Ghost AI can search the web, read your files, and get things done on your computer.",

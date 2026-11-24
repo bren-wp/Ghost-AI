@@ -2,6 +2,20 @@
 // Curated core UI translations. Missing keys fall back to the English source.
 export const localeOverrides: Record<string, Record<string, Record<string, string>>> = {
   "hr": {
+    "sidebar": { "home": "Početna" },
+    "chat": {
+      "workspaceTitle": "Tvoj radni prostor. Tvoje ideje.",
+      "workspaceSubtitle": "Odaberi početnu točku za rad s omiljenim AI modelom.",
+      "workspaceConversation": "Započni razgovor",
+      "workspaceConversationDescription": "Ideje, pisanje, istraživanje i odgovori",
+      "workspaceDocument": "Analiziraj dokument",
+      "workspaceDocumentDescription": "Započni razgovor i priloži datoteku",
+      "workspaceDocumentPrompt": "Pomozi mi analizirati dokument koji ću priložiti. Sažmi ključne točke i pitaj me za nejasnoće.",
+      "workspaceAgents": "Pokreni agenta",
+      "workspaceAgentsDescription": "Odaberi asistenta i pregledaj njegove dozvole",
+      "workspaceProviders": "Tvoji AI pružatelji",
+      "workspaceProvidersDescription": "Poveži kompatibilne oblačne ili lokalne modele"
+    },
     "common": {
       "save": "Spremi",
       "cancel": "Odustani",
@@ -41,6 +55,20 @@ export const localeOverrides: Record<string, Record<string, Record<string, strin
     }
   },
   "de": {
+    "sidebar": { "home": "Startseite" },
+    "chat": {
+      "workspaceTitle": "Dein Arbeitsbereich. Deine Ideen.",
+      "workspaceSubtitle": "Wähle einen Einstieg für die Arbeit mit deiner bevorzugten KI.",
+      "workspaceConversation": "Unterhaltung beginnen",
+      "workspaceConversationDescription": "Ideen, Schreiben, Recherche und Antworten",
+      "workspaceDocument": "Dokument analysieren",
+      "workspaceDocumentDescription": "Beginne eine Unterhaltung und füge eine Datei hinzu",
+      "workspaceDocumentPrompt": "Hilf mir, ein Dokument zu analysieren, das ich anhängen werde. Fasse die wichtigsten Punkte zusammen und frage bei Unklarheiten nach.",
+      "workspaceAgents": "Agenten starten",
+      "workspaceAgentsDescription": "Wähle einen Assistenten und prüfe seine Berechtigungen",
+      "workspaceProviders": "Deine KI-Anbieter",
+      "workspaceProvidersDescription": "Verbinde kompatible Cloud- oder lokale Modelle"
+    },
     "common": {
       "save": "Speichern",
       "cancel": "Abbrechen",

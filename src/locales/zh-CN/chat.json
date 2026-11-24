@@ -244,6 +244,17 @@
     "steps_other": "{{count}} 个步骤",
     "failedTools_other": "{{count}} 个工具失败"
   },
+  "workspaceTitle": "你的工作空间，你的创意。",
+  "workspaceSubtitle": "选择一个起点，使用你偏好的 AI 完成更多工作。",
+  "workspaceConversation": "开始对话",
+  "workspaceConversationDescription": "创意、写作、研究和答案",
+  "workspaceDocument": "分析文档",
+  "workspaceDocumentDescription": "开始对话并添加文件",
+  "workspaceDocumentPrompt": "请帮我分析接下来附加的文档，总结要点，并询问不明确的内容。",
+  "workspaceAgents": "运行智能体",
+  "workspaceAgentsDescription": "选择助手并检查其权限",
+  "workspaceProviders": "你的 AI 提供商",
+  "workspaceProvidersDescription": "连接兼容的云端或本地模型",
   "welcome": {
     "title": "有什么可以帮你？",
     "subtitle": "随便问。Ghost AI 可以搜索网页、读取你的文件，并在电脑上帮你完成任务。",

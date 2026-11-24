@@ -1,5 +1,5 @@
 // Ghost AI by Brendigo
-import { MessagesSquare, Users, Library, Package, Languages } from 'lucide-react'
+import { MessagesSquare, Users, Library, Package, Languages, House } from 'lucide-react'
 import type { PromptGroup } from '@/components/prompt-list'
 import type { NavItem } from '@/components/sidebar/sidebar-navigation'
 import type { TFunction } from 'i18next'
@@ -330,6 +330,13 @@ export const SIDEBAR_DATA: {
 
 export function getNavItems(t: TFunction): NavItem[] {
   return [
+    {
+      id: 'home',
+      title: t('sidebar:home'),
+      url: '#',
+      icon: House,
+      isActive: false,
+    },
     {
       id: 'conversations',
       title: t('sidebar:conversations'),

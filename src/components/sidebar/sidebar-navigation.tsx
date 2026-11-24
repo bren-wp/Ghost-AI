@@ -1,4 +1,7 @@
 // Ghost AI by Brendigo
+import { Plug, Settings } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import appIcon from '@/assets/app-icon.png'
 import {
   Sidebar,
   SidebarContent,
@@ -26,14 +29,23 @@ interface SidebarNavigationProps {
   navItems: NavItem[]
   activeItem: NavItem
   onItemClick: (item: NavItem) => void
-  user: { name: string; email: string; avatar: string }
+  showLabels?: boolean
+  onOpenProviders?: () => void
+  onOpenSettings?: () => void
 }
 
 export function SidebarNavigation({
   navItems,
   activeItem,
   onItemClick,
+  showLabels = false,
+  onOpenProviders,
+  onOpenSettings,
 }: SidebarNavigationProps) {
+  const { t } = useTranslation()
+  const itemClass = showLabels
+    ? 'h-11 rounded-xl px-3 data-[active=true]:text-primary'
+    : 'px-2.5 md:px-2'
   const renderItem = (item: NavItem) => (
     <SidebarMenuItem key={item.id}>
       <SidebarMenuButton
@@ -43,23 +55,58 @@ export function SidebarNavigation({
         }}
         onClick={() => onItemClick(item)}
         isActive={activeItem?.id === item.id}
-        className="px-2.5 md:px-2"
+        aria-current={activeItem?.id === item.id ? 'page' : undefined}
+        aria-label={item.title}
+        className={itemClass}
       >
         <item.icon />
-        <span>{item.title}</span>
+        <span className={showLabels ? undefined : 'sr-only'}>{item.title}</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
   )
 
   return (
-    <Sidebar collapsible="none" className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r">
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent className="px-1.5 md:px-0">
-            <SidebarMenu>{navItems.map(renderItem)}</SidebarMenu>
+    <Sidebar
+      collapsible="none"
+      role="navigation"
+      aria-label="Ghost AI"
+      className={showLabels ? 'w-full! min-w-0 border-r border-sidebar-border' : 'w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-r'}
+    >
+      <div className={showLabels ? 'flex shrink-0 items-center gap-3 px-5 py-6' : 'flex shrink-0 justify-center py-3'}>
+        <img src={appIcon} alt="" className={showLabels ? 'size-12 rounded-[14px]' : 'size-8 rounded-lg'} />
+        {showLabels && (
+          <div className="min-w-0">
+            <p className="text-lg font-semibold leading-tight text-foreground">Ghost AI</p>
+            <p className="text-xs text-muted-foreground">by Brendigo</p>
+          </div>
+        )}
+      </div>
+      <SidebarContent className="overflow-x-hidden">
+        <SidebarGroup className={showLabels ? 'px-3' : undefined}>
+          <SidebarGroupContent className={showLabels ? undefined : 'px-1.5 md:px-0'}>
+            <SidebarMenu>
+              {navItems.map(renderItem)}
+              {onOpenProviders && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton className={itemClass} tooltip={{ children: t('providers:providers'), hidden: false }} aria-label={t('providers:providers')} onClick={onOpenProviders}>
+                    <Plug />
+                    <span className={showLabels ? undefined : 'sr-only'}>{t('providers:providers')}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {onOpenSettings && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton className={itemClass} tooltip={{ children: t('common:settings'), hidden: false }} aria-label={t('common:settings')} onClick={onOpenSettings}>
+                    <Settings />
+                    <span className={showLabels ? undefined : 'sr-only'}>{t('common:settings')}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+            </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      {showLabels && <p className="shrink-0 px-5 py-4 text-xs text-muted-foreground">Ghost AI · brendigo.com</p>}
     </Sidebar>
   )
 }
