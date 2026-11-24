@@ -21,6 +21,8 @@ const SERVICE_NAME: &str = "app.ghost_ai.desktop";
 /// In-memory cache for secrets read from the OS keychain.
 /// Avoids repeated keychain access which triggers macOS authorization dialogs,
 /// especially during development where the binary signature changes on rebuild.
+/// Hold the write guard across keychain I/O and cache updates to prevent a
+/// concurrent cache miss from reintroducing a rotated or deleted credential.
 static SECRET_CACHE: std::sync::OnceLock<RwLock<HashMap<String, String>>> =
     std::sync::OnceLock::new();
 
@@ -74,6 +76,9 @@ fn install_mock_keyring_if_needed() {
 pub fn set_secret(key: &str, secret: &str) -> Result<()> {
     install_mock_keyring_if_needed();
 
+    let mut c = cache()
+        .write()
+        .map_err(|_| anyhow!("Keychain cache lock poisoned"))?;
     let entry = Entry::new(SERVICE_NAME, key)
         .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
 
@@ -81,11 +86,9 @@ pub fn set_secret(key: &str, secret: &str) -> Result<()> {
         .set_password(secret)
         .map_err(|e| anyhow!("Failed to store secret: {}", e))?;
 
-    if let Ok(mut c) = cache().write() {
-        c.insert(key.to_string(), secret.to_string());
-    }
+    c.insert(key.to_string(), secret.to_string());
 
-    tracing::info!("🔐 [keychain] Stored secret for key: {}", key);
+    tracing::info!("[keychain] Stored secret");
     Ok(())
 }
 
@@ -94,9 +97,21 @@ pub fn set_secret(key: &str, secret: &str) -> Result<()> {
 pub fn get_secret(key: &str) -> Result<Option<String>> {
     install_mock_keyring_if_needed();
 
-    if let Ok(c) = cache().read()
-        && let Some(v) = c.get(key)
     {
+        let c = cache()
+            .read()
+            .map_err(|_| anyhow!("Keychain cache lock poisoned"))?;
+        if let Some(v) = c.get(key) {
+            return Ok(Some(v.clone()));
+        }
+    }
+
+    // Upgrade by dropping the read guard first, then recheck: another
+    // operation may have populated or invalidated the entry in between.
+    let mut c = cache()
+        .write()
+        .map_err(|_| anyhow!("Keychain cache lock poisoned"))?;
+    if let Some(v) = c.get(key) {
         return Ok(Some(v.clone()));
     }
 
@@ -105,9 +120,7 @@ pub fn get_secret(key: &str) -> Result<Option<String>> {
 
     match entry.get_password() {
         Ok(password) => {
-            if let Ok(mut c) = cache().write() {
-                c.insert(key.to_string(), password.clone());
-            }
+            c.insert(key.to_string(), password.clone());
             Ok(Some(password))
         }
         Err(keyring::Error::NoEntry) => Ok(None),
@@ -120,16 +133,19 @@ pub fn get_secret(key: &str) -> Result<Option<String>> {
 pub fn delete_secret(key: &str) -> Result<()> {
     install_mock_keyring_if_needed();
 
-    if let Ok(mut c) = cache().write() {
-        c.remove(key);
-    }
+    let mut c = cache()
+        .write()
+        .map_err(|_| anyhow!("Keychain cache lock poisoned"))?;
+    // Invalidate even on a backend error; do not return a stale cached
+    // credential after an unsuccessful delete attempt.
+    c.remove(key);
 
     let entry = Entry::new(SERVICE_NAME, key)
         .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
 
     match entry.delete_credential() {
         Ok(()) => {
-            tracing::info!("🔐 [keychain] Deleted secret for key: {}", key);
+            tracing::info!("[keychain] Deleted secret");
             Ok(())
         }
         Err(keyring::Error::NoEntry) => Ok(()),
@@ -168,6 +184,28 @@ mod tests {
 
         // Clean up
         delete_secret(test_key).expect("Failed to delete secret");
+    }
+
+    #[test]
+    fn test_rotation_and_deletion_invalidate_cached_credentials() {
+        let key = "test_keychain_rotation_cache";
+        let other = "test_keychain_rotation_unrelated";
+        delete_secret(key).unwrap();
+        delete_secret(other).unwrap();
+
+        set_secret(key, "old").unwrap();
+        set_secret(other, "unrelated").unwrap();
+        assert_eq!(get_secret(key).unwrap().as_deref(), Some("old"));
+
+        set_secret(key, "new").unwrap();
+        assert_eq!(get_secret(key).unwrap().as_deref(), Some("new"));
+        delete_secret(key).unwrap();
+        assert!(!cache().read().unwrap().contains_key(key));
+        assert_eq!(get_secret(key).unwrap(), None);
+        assert_eq!(get_secret(other).unwrap().as_deref(), Some("unrelated"));
+
+        delete_secret(key).unwrap();
+        delete_secret(other).unwrap();
     }
 
     #[test]
