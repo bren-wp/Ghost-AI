@@ -57,15 +57,15 @@ export function WorkspaceCard({ id, title, description, icon: Icon, onClick, var
         <Icon aria-hidden="true" className="size-6 shrink-0 text-primary" />
       )}
       <span className={home ? 'min-w-0 space-y-1 pe-5' : 'min-w-0 space-y-2'}>
-        <span id={`${labelId}-title`} className={cn('block break-words text-base font-semibold', home && 'text-foreground')}>{title}</span>
-        <span id={`${labelId}-description`} className="block break-words text-sm leading-relaxed text-muted-foreground">{description}</span>
+        <span id={`${labelId}-title`} className={cn('block break-words text-base font-semibold', home && 'text-[#eff5ff] xl:text-[19px]')}>{title}</span>
+        <span id={`${labelId}-description`} className={cn('block break-words text-sm leading-relaxed text-muted-foreground', home && 'text-[#95acc7]')}>{description}</span>
       </span>
       {onClick && <ArrowUpRight aria-hidden="true" className={cn('absolute end-4 top-4 size-4 text-muted-foreground', home && 'transition-colors group-hover:text-primary')} />}
     </>
   )
   const classes = cn(
     'relative flex min-h-[132px] min-w-0 flex-col items-start gap-3 rounded-2xl border border-border p-4 text-start lg:p-6',
-    home ? 'group bg-card lg:min-h-[190px]' : 'bg-[#172338] pe-8 lg:min-h-[170px]',
+    home ? 'group bg-[#172338] border-[#30465f] lg:min-h-[190px] xl:min-h-[207px]' : 'bg-[#172338] pe-8 lg:min-h-[170px]',
     onClick && 'transition-colors hover:border-primary/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
     home && onClick && 'hover:bg-accent/35'
   )
