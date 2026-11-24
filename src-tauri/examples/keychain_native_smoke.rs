@@ -7,6 +7,8 @@ mod keychain;
 
 use anyhow::{bail, ensure, Context, Result};
 use std::process::Command;
+use std::sync::Barrier;
+use std::time::{Duration, Instant};
 
 const PREFIX: &str = "ghost-ai-native-smoke-";
 const INITIAL: &str = "synthetic-initial-value";
@@ -32,12 +34,71 @@ fn check_value(key: &str, phase: &str) -> Result<()> {
 }
 
 fn fresh_process(key: &str, phase: &str) -> Result<()> {
-    let status = Command::new(std::env::current_exe()?)
+    let mut child = Command::new(std::env::current_exe()?)
         .args(["--verify", key, phase])
-        .status()
+        .spawn()
         .context("Unable to start independent credential reader")?;
-    ensure!(status.success(), "Independent native credential verification failed");
-    Ok(())
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                ensure!(status.success(), "Independent native credential verification failed");
+                return Ok(());
+            }
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(25));
+            }
+            result => {
+                let _ = child.kill();
+                child.wait().context("Unable to reap credential reader")?;
+                match result {
+                    Err(_) => bail!("Unable to inspect credential reader"),
+                    _ => bail!("Independent credential verification timed out"),
+                }
+            }
+        }
+    }
+}
+
+// Exercise overlapping reads and rotations of the same synthetic credential.
+// Final verification uses a new process, not just the shared cache.
+fn concurrent_rotation(key: &str) -> Result<()> {
+    const READERS: usize = 4;
+    const READS: usize = 32;
+    const ROTATIONS: usize = 8;
+    let barrier = Barrier::new(READERS + 1);
+    std::thread::scope(|scope| -> Result<()> {
+        let mut readers = Vec::with_capacity(READERS);
+        for _ in 0..READERS {
+            let barrier = &barrier;
+            readers.push(scope.spawn(move || -> Result<()> {
+                barrier.wait();
+                for _ in 0..READS {
+                    let value = keychain::get_secret(key)
+                        .map_err(|_| anyhow::anyhow!("Concurrent native read failed"))?;
+                    ensure!(
+                        matches!(value.as_deref(), Some(INITIAL) | Some(ROTATED)),
+                        "Unexpected credential during rotation"
+                    );
+                    std::thread::yield_now();
+                }
+                Ok(())
+            }));
+        }
+        barrier.wait();
+        for index in 0..ROTATIONS {
+            let value = if index % 2 == 0 { INITIAL } else { ROTATED };
+            keychain::set_secret(key, value)
+                .map_err(|_| anyhow::anyhow!("Concurrent native rotation failed"))?;
+            std::thread::yield_now();
+        }
+        for reader in readers {
+            reader.join().map_err(|_| anyhow::anyhow!("Credential reader panicked"))??;
+        }
+        Ok(())
+    })?;
+    check_value(key, "rotated")?;
+    fresh_process(key, "rotated")
 }
 
 fn smoke(key: &str) -> Result<()> {
@@ -49,6 +110,7 @@ fn smoke(key: &str) -> Result<()> {
     keychain::set_secret(key, ROTATED).map_err(|_| anyhow::anyhow!("Native rotation failed"))?;
     check_value(key, "rotated")?;
     fresh_process(key, "rotated")?;
+    concurrent_rotation(key)?;
 
     keychain::delete_secret(key).map_err(|_| anyhow::anyhow!("Native delete failed"))?;
     check_value(key, "deleted")?;
@@ -72,7 +134,7 @@ fn main() -> Result<()> {
             }
             result?;
             cleanup?;
-            println!("Native credential write, cross-process read, rotation and deletion passed");
+            println!("Native credential write, cross-process read, concurrent rotation and deletion passed");
             Ok(())
         }
         _ => bail!("Explicit --run opt-in required"),
