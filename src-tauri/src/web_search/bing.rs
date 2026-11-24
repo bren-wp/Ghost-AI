@@ -71,7 +71,7 @@ pub async fn search_bing(query: &str, max_results: usize) -> Result<WebSearchRes
 
 /// Synchronous Bing search implementation via headless Chrome
 fn search_bing_sync(search_url: &str, max_results: usize) -> Result<Vec<SearchResultItem>> {
-    tracing::info!("🔍 [web_search] Starting Bing search for: {}", search_url);
+    tracing::info!("[web_search] Starting Bing search");
 
     let browser = create_new_browser()?;
 
@@ -99,7 +99,7 @@ fn search_bing_sync(search_url: &str, max_results: usize) -> Result<Vec<SearchRe
 
     tracing::info!("🛡️ [web_search] Stealth mode enabled, navigating to Bing...");
 
-    tracing::info!("🌐 [web_search] Navigating to: {}", search_url);
+    tracing::info!("[web_search] Navigating to search provider");
 
     // Navigate to search URL
     tab.navigate_to(search_url)
@@ -120,14 +120,9 @@ fn search_bing_sync(search_url: &str, max_results: usize) -> Result<Vec<SearchRe
     tracing::info!("📄 [web_search] Got {} bytes of HTML", html.len());
 
     // Parse via the shared core parser (single home for extraction semantics)
-    let results: Vec<SearchResultItem> = core_search::parse_bing_results(&html, max_results)
-        .into_iter()
-        .map(|r| SearchResultItem {
-            title: r.title,
-            url: r.url,
-            snippet: r.snippet,
-        })
-        .collect();
+    let results: Vec<SearchResultItem> = super::utils::map_search_results(
+        core_search::parse_bing_results(&html, max_results),
+    );
     tracing::info!("✅ [web_search] Found {} results", results.len());
 
     Ok(results)

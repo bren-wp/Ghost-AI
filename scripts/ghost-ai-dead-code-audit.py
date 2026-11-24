@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import posixpath
 import re
 import tomllib
@@ -50,7 +51,7 @@ def walk_graph(graph: dict[str, set[str]], roots: set[str]) -> set[str]:
     return reached
 
 
-def ts_candidates() -> tuple[int, list[str], int]:
+def ts_dependency_inventory():
     sources = {
         p.relative_to(ROOT).as_posix(): p
         for p in (ROOT / "src").rglob("*")
@@ -60,6 +61,7 @@ def ts_candidates() -> tuple[int, list[str], int]:
     assets = {p.relative_to(ROOT).as_posix() for p in (ROOT / "src").rglob("*") if p.is_file()}
     graph: dict[str, set[str]] = {}
     unresolved = 0
+    unresolved_specs = []
     for name, path in sorted(sources.items()):
         contents = path.read_text(encoding="utf-8")
         imports = IMPORT_RE.findall(contents)
@@ -74,6 +76,7 @@ def ts_candidates() -> tuple[int, list[str], int]:
                 raw = specifier.split("?", 1)[0]
                 if ts_target(name, raw, assets) is None:
                     unresolved += 1
+                    unresolved_specs.append((name, specifier))
         graph[name] = targets
     # Importing a module from a test does not make it production-reachable.
     production = {
@@ -97,7 +100,55 @@ def ts_candidates() -> tuple[int, list[str], int]:
     # Test-only dependencies are still not production-reachable. Keep them
     # in the candidate inventory, but never list the explicit setup root.
     candidates = sorted(production - reached)
-    return len(production), candidates, unresolved
+    production_graph = {name: graph[name] & production for name in production}
+    return len(production), candidates, unresolved, production_graph, sorted(set(unresolved_specs))
+
+
+def ts_candidates() -> tuple[int, list[str], int]:
+    total, candidates, unresolved, _, _ = ts_dependency_inventory()
+    return total, candidates, unresolved
+
+
+def cyclic_components(graph: dict[str, set[str]]) -> list[list[str]]:
+    """Iterative strongly connected components; lexical edges include type/lazy imports."""
+    reverse = {name: set() for name in graph}
+    for name, children in graph.items():
+        for child in children & graph.keys():
+            reverse[child].add(name)
+    visited = set()
+    order = []
+    for root in sorted(graph):
+        if root in visited:
+            continue
+        visited.add(root)
+        stack = [(root, iter(sorted(graph[root] & graph.keys())))]
+        while stack:
+            node, children = stack[-1]
+            child = next(children, None)
+            if child is None:
+                order.append(node)
+                stack.pop()
+            elif child not in visited:
+                visited.add(child)
+                stack.append((child, iter(sorted(graph[child] & graph.keys()))))
+    visited.clear()
+    components = []
+    for root in reversed(order):
+        if root in visited:
+            continue
+        group = []
+        pending = [root]
+        visited.add(root)
+        while pending:
+            node = pending.pop()
+            group.append(node)
+            for child in sorted(reverse[node]):
+                if child not in visited:
+                    visited.add(child)
+                    pending.append(child)
+        if len(group) > 1 or root in graph[root]:
+            components.append(sorted(group))
+    return sorted(components, key=lambda group: (-len(group), group))
 
 
 def rust_child(current: str, module: str, known: set[str]) -> str | None:
@@ -310,10 +361,20 @@ def structural_clone_candidates() -> tuple[int, list[list[tuple[str, int, int]]]
 
 
 def report(output: Path) -> dict[str, int]:
-    ts_total, unused_ts, unresolved = ts_candidates()
+    ts_total, unused_ts, unresolved, graph, unresolved_specs = ts_dependency_inventory()
+    cycles = cyclic_components(graph)
     rust_total, unused_rust = rust_candidates()
     duplicates = exact_duplicates()
     clone_files, clone_groups, common_clones = structural_clone_candidates()
+    complete = output.with_name('ghost-ai-clone-inventory.json')
+    complete.parent.mkdir(parents=True, exist_ok=True)
+    complete.write_text(json.dumps({
+        'schema_version': 1,
+        'structural_clone_seed_groups': clone_groups,
+        'common_fingerprints_skipped': common_clones,
+        'typescript_cycle_candidates': cycles,
+        'unresolved_imports': unresolved_specs,
+    }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     lines = [
         "# Ghost AI by Brendigo — full first-party static dead-code review",
         "",
@@ -331,6 +392,8 @@ def report(output: Path) -> dict[str, int]:
         f"- Production lexical-clone source files checked: **{clone_files}**",
         f"- Normalized structural clone seed groups: **{len(clone_groups)}**",
         f"- Very common fingerprints skipped: **{common_clones}**",
+        f"- TypeScript lexical cyclic components: **{len(cycles)}**",
+        "- Complete seed, import and cycle inventory: `ghost-ai-clone-inventory.json`",
         "",
         "## TypeScript review candidates",
         "",
@@ -342,6 +405,14 @@ def report(output: Path) -> dict[str, int]:
     lines.extend(f"- `{file}`" for file in unused_rust)
     if not unused_rust:
         lines.append("None identified by the Rust module graph.")
+    lines.extend(["", "## TypeScript circular dependency review candidates", "",
+                  "Includes type-only and lazy imports: not proven runtime cycles."])
+    for group in cycles:
+        lines.append('- ' + '; '.join(f'`{name}`' for name in group))
+    if not cycles:
+        lines.append('No cycles identified in the lexical graph.')
+    lines.extend(["", "## Unresolved import locations", ""])
+    lines.extend(f'- `{name}`: `{specifier}`' for name, specifier in unresolved_specs)
     lines.extend(["", "## Exact duplicate source candidates", "",
                   "Generated declarations are excluded. Similar functions and semantic clones need manual review."])
     for group in duplicates:
@@ -371,7 +442,8 @@ def report(output: Path) -> dict[str, int]:
     return {"typescript": ts_total, "rust": rust_total, "ts_candidates": len(unused_ts),
             "rust_candidates": len(unused_rust), "unresolved_imports": unresolved,
             "exact_duplicate_groups": len(duplicates), "clone_files": clone_files,
-            "structural_clone_seed_groups": len(clone_groups), "common_fingerprints_skipped": common_clones}
+            "structural_clone_seed_groups": len(clone_groups), "common_fingerprints_skipped": common_clones,
+            "typescript_cycle_candidates": len(cycles)}
 
 
 def main() -> None:

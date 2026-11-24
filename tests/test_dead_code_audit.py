@@ -94,3 +94,20 @@ class DeadCodeAuditTests(unittest.TestCase):
         self.assertEqual(count, audit.CLONE_MAX_OCCURRENCES + 1)
         self.assertGreater(skipped, 0)
         self.assertEqual(groups, [])
+
+    def test_cycle_inventory_distinguishes_components_from_one_way_edges(self):
+        graph = {"a": {"b"}, "b": {"a", "c"}, "c": {"d"}, "d": set(), "e": {"e"}}
+        self.assertEqual(audit.cyclic_components(graph), [["a", "b"], ["e"]])
+
+    def test_complete_inventory_preserves_all_seed_groups(self):
+        self.put("src/main.ts", "import './a';")
+        self.put("src/a.ts", "import './main';")
+        groups = [[("src/a.ts", i, i+3), ("src/main.ts", i, i+3)] for i in range(230)]
+        with patch.object(audit, "structural_clone_candidates", return_value=(2, groups, 0)):
+            output = self.root / "reports" / "audit.md"
+            result = audit.report(output)
+        import json
+        complete = json.loads(output.with_name("ghost-ai-clone-inventory.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(complete["structural_clone_seed_groups"]), 230)
+        self.assertEqual(result["typescript_cycle_candidates"], 1)
+        self.assertEqual(complete["typescript_cycle_candidates"], [["src/a.ts", "src/main.ts"]])

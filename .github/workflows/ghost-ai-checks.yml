@@ -134,6 +134,7 @@ jobs:
           path: |
             reports/ghost-ai-code-audit.md
             reports/ghost-ai-dead-code-audit.md
+            reports/ghost-ai-clone-inventory.json
             reports/ghost-ai-localization-audit.md
           if-no-files-found: error
       - name: Verify legal notices and brand assets

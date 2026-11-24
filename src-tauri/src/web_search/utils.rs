@@ -35,7 +35,7 @@ pub(super) async fn scrape_search_results(
     }
 
     if obscura_is_configured() {
-        tracing::info!("🔄 [web_search] Trying obscura tier for: {}", search_url);
+        tracing::info!("[web_search] Trying obscura tier");
         if let Some(results) = parse_tier_html(
             obscura_fetch_html(search_url).await.ok(),
             parse,
@@ -49,10 +49,7 @@ pub(super) async fn scrape_search_results(
         }
     }
     if webview_is_available() {
-        tracing::info!(
-            "🔄 [web_search] Trying system webview tier for: {}",
-            search_url
-        );
+        tracing::info!("[web_search] Trying system webview tier");
         if let Some(results) = parse_tier_html(
             webview_fetch_html(search_url).await.ok(),
             parse,
@@ -68,6 +65,18 @@ pub(super) async fn scrape_search_results(
     None
 }
 
+/// Convert the shared parser's results without changing order or content.
+pub(super) fn map_search_results(results: Vec<SearchResult>) -> Vec<SearchResultItem> {
+    results
+        .into_iter()
+        .map(|r| SearchResultItem {
+            title: r.title,
+            url: r.url,
+            snippet: r.snippet,
+        })
+        .collect()
+}
+
 /// Parse one tier's HTML into result items; `None` means the tier produced
 /// nothing usable and the chain should continue.
 async fn parse_tier_html(
@@ -75,28 +84,18 @@ async fn parse_tier_html(
     parse: fn(&str, usize) -> Vec<SearchResult>,
     max_results: usize,
     tier: &str,
-    search_url: &str,
+    _search_url: &str,
 ) -> Option<Vec<SearchResultItem>> {
     let html = html?;
     let results = parse(&html, max_results);
     if results.is_empty() {
         tracing::warn!(
-            "⚠️ [web_search] {} tier yielded no results for {}",
-            tier,
-            search_url
+            "[web_search] {} tier yielded no results",
+            tier
         );
         return None;
     }
-    Some(
-        results
-            .into_iter()
-            .map(|r| SearchResultItem {
-                title: r.title,
-                url: r.url,
-                snippet: r.snippet,
-            })
-            .collect(),
-    )
+    Some(map_search_results(results))
 }
 
 /// Cheapest tier: plain HTTP GET of the SERP URL. Works for engines that
@@ -120,8 +119,7 @@ async fn try_http_serp(search_url: &str) -> Option<String> {
         return None;
     }
     tracing::info!(
-        "⚡ [web_search] SERP fetched via plain HTTP: {} ({} bytes)",
-        search_url,
+        "[web_search] SERP fetched via plain HTTP ({} bytes)",
         body.len()
     );
     Some(body)
@@ -238,6 +236,16 @@ mod tests {
                 snippet: format!("snippet {i}"),
             })
             .collect()
+    }
+
+    #[test]
+    fn shared_result_mapping_preserves_order_and_values() {
+        let results = map_search_results(canned_parse("marker", 3));
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].title, "marker #0");
+        assert_eq!(results[2].url, "https://example.com/2");
+        assert_eq!(results[2].snippet, "snippet 2");
+        assert!(map_search_results(Vec::new()).is_empty());
     }
 
     fn empty_parse(_html: &str, _max_results: usize) -> Vec<SearchResult> {
