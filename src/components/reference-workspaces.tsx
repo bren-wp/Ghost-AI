@@ -63,7 +63,7 @@ export function AgentsWorkspace({ onSelect, onCreate }: { onSelect: (id: string)
   )
 }
 
-export function DocumentsWorkspace({ onStart }: { onStart: () => void }) {
+export function DocumentsWorkspace({ onStart, starting = false }: { onStart: () => void; starting?: boolean }) {
   const { t } = useTranslation('chat')
   return (
     <Workspace title={t('reference_documentsTitle')} description={t('reference_documentsSubtitle')}>
@@ -71,7 +71,7 @@ export function DocumentsWorkspace({ onStart }: { onStart: () => void }) {
         <FileText aria-hidden="true" className="mb-3 size-7 text-primary" />
         <h3 className="font-semibold">{t('reference_documentsFiles')}</h3>
         <p className="my-3 text-sm leading-relaxed text-muted-foreground">{t('reference_documentsFilesDescription')}</p>
-        <Button onClick={onStart}>{t('reference_documentsStart')}</Button>
+        <Button onClick={onStart} disabled={starting}>{starting ? t('common:loading') : t('reference_documentsStart')}</Button>
       </section>
       <div className={gridClass}>
         <WorkspaceCard icon={Sparkles} title={t('reference_documentsSummary')} description={t('reference_documentsSummaryDescription')} />

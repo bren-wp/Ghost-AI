@@ -289,6 +289,8 @@
   "reference_settingsAboutDescription": "Brendigo · 官方信息",
   "reference_settingsAll": "所有设置",
   "reference_settingsAllDescription": "语言、工具、模型、同步与高级偏好",
+  "documentChooseFiles": "选择文件",
+  "documentSessionHint": "在下方选择或拖入文档，选择 AI 模型后发送问题。结果和后续问题会显示在此对话中。",
   "welcome": {
     "title": "有什么可以帮你？",
     "subtitle": "随便问。Ghost AI 可以搜索网页、读取你的文件，并在电脑上帮你完成任务。",

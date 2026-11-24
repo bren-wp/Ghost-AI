@@ -33,7 +33,6 @@ export function useFileSelect(
         ],
       })
 
-      logger.info('[handleFileSelect] Dialog result:', selected)
 
       if (!selected) {
         logger.info('[handleFileSelect] No file selected')
@@ -41,13 +40,12 @@ export function useFileSelect(
       }
 
       const files = Array.isArray(selected) ? selected : [selected]
-      logger.info('[handleFileSelect] Files to process:', files)
+      logger.info('[handleFileSelect] File count:', files.length)
 
       const rejected: RejectedFile[] = []
       for (const filePath of files) {
         const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'file'
         try {
-          logger.info('[handleFileSelect] Reading file:', filePath)
           const result = await readDocumentFromPath(t, filePath, fileName)
           if (isRejected(result)) {
             rejected.push(result)
@@ -55,7 +53,7 @@ export function useFileSelect(
           }
           setAttachments((prev) => [...prev, result])
         } catch (error) {
-          logger.error(`[handleFileSelect] Failed to read file: ${filePath}`, error)
+          logger.error('[handleFileSelect] Failed to read selected file')
           toast.error(t('failedToReadFile', { file: fileName }), {
             description: error instanceof Error ? error.message : String(error),
           })
@@ -63,8 +61,8 @@ export function useFileSelect(
       }
       reportRejected(t, rejected)
       logger.info('[handleFileSelect] Done processing files')
-    } catch (error) {
-      logger.error('[handleFileSelect] Failed to select file:', error)
+    } catch {
+      logger.error('[handleFileSelect] Failed to select file')
     }
   }, [setAttachments, t])
 

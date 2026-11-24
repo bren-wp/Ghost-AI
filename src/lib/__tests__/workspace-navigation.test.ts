@@ -12,6 +12,10 @@ describe('reference Home navigation', () => {
     expect(sectionAfterConversationChange(section, 'draft', 'saved', 'draft')).toBe('conversations')
   })
 
+  it('keeps Documents when its explicit action opens a new draft', () => {
+    expect(sectionAfterConversationChange('documents', 'saved', 'new-draft', 'new-draft')).toBe('documents')
+  })
+
   it('opens an explicitly selected saved conversation from Home', () => {
     expect(sectionAfterConversationChange('home', 'draft', 'saved', 'draft')).toBe('conversations')
     expect(sectionAfterConversationChange('home', undefined, 'saved', 'draft')).toBe('conversations')

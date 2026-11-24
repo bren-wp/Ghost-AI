@@ -68,6 +68,8 @@ function CollapsedNewConversationButton({ onClick }: { onClick: () => void }) {
 export function ChatPage() {
   const { t } = useTranslation()
   const [activeSection, setActiveSection] = useState('home')
+  const [documentConversationId, setDocumentConversationId] = useState<string | null>(null)
+  const [startingDocument, setStartingDocument] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
   const [settingsInitialSection, setSettingsInitialSection] = useState<string | undefined>()
@@ -169,6 +171,7 @@ export function ChatPage() {
   }, [])
 
   const currentConversation = useConversationStore((state) => state.currentConversation)
+  const documentMode = activeSection === 'documents' && documentConversationId !== null && currentConversation?.id === documentConversationId
   const selectedContact = useSelectedContact()
   const showContactProfile = activeSection === 'contacts' && selectedContact !== null
   const contactName =
@@ -203,14 +206,16 @@ export function ChatPage() {
     openWorkspace('contacts')
   }
   const openDocumentConversation = async () => {
-    const previousDraft = useConversationStore.getState().draftConversation?.id
-    setActiveSection('conversations')
-    await openNewConversation()
-    const { currentConversation, draftConversation, setPendingInput } = useConversationStore.getState()
-    // Prefill only a newly created, currently selected draft. Never replace
-    // the text of an already open draft or send a message automatically.
-    if (draftConversation && currentConversation?.id === draftConversation.id && draftConversation.id !== previousDraft) {
-      setPendingInput(t('chat:workspaceDocumentPrompt'))
+    if (startingDocument) return
+    setStartingDocument(true)
+    try {
+      await openNewConversation()
+      const { currentConversation, draftConversation } = useConversationStore.getState()
+      if (draftConversation && currentConversation?.id === draftConversation.id) {
+        setDocumentConversationId(draftConversation.id)
+      }
+    } finally {
+      setStartingDocument(false)
     }
   }
   const openProviders = useProviderSettingsStore((state) => state.openProviderSettings)
@@ -344,8 +349,8 @@ export function ChatPage() {
             />
           ) : activeSection === 'agents' ? (
             <AgentsWorkspace onSelect={openAgentProfile} onCreate={() => setCreateAssistantOpen(true)} />
-          ) : activeSection === 'documents' ? (
-            <DocumentsWorkspace onStart={() => void openDocumentConversation()} />
+          ) : activeSection === 'documents' && !documentMode ? (
+            <DocumentsWorkspace onStart={() => void openDocumentConversation()} starting={startingDocument} />
           ) : activeSection === 'providers' ? (
             <ProvidersWorkspace onConfigure={openProviders} />
           ) : activeSection === 'settings' ? (
@@ -378,7 +383,7 @@ export function ChatPage() {
           ) : showSkillDetail && selectedSkill ? (
             <SkillDetail key={selectedSkill.id} skill={selectedSkill} />
           ) : (
-            <ChatView showInteractionDialogs={false} />
+            <ChatView showInteractionDialogs={false} documentMode={documentMode} />
           )}
         </SidebarInset>
       </SidebarProvider>

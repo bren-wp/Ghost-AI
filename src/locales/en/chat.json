@@ -291,6 +291,8 @@
   "reference_settingsAboutDescription": "Brendigo · official information",
   "reference_settingsAll": "All settings",
   "reference_settingsAllDescription": "Languages, tools, models, sync and advanced preferences",
+  "documentChooseFiles": "Choose files",
+  "documentSessionHint": "Choose or drop documents below, select an AI model, and send your question. Results and follow-ups appear in this conversation.",
   "welcome": {
     "title": "What can I help with?",
     "subtitle": "Ask anything. Ghost AI can search the web, read your files, and get things done on your computer.",

@@ -13,6 +13,8 @@ export function sectionAfterConversationChange(
   draftId: string | undefined
 ): string {
   if (previousId === nextId) return section
+  // A document session opens the same real draft and transcript, not a separate data store.
+  if (section === 'documents' && nextId && nextId === draftId) return section
   if (isReferenceWorkspace(section) && (!nextId || (!previousId && nextId === draftId))) return section
   if (isReferenceWorkspace(section) || ['translation', 'contacts', 'library'].includes(section)) return 'conversations'
   return section
