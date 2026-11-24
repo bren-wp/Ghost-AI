@@ -87,20 +87,46 @@ use super::{ChatMessage, call_provider};
 use ghost_ai_agent_core::tools::ImageQuestionResponder as _;
 use ghost_ai_agent_core::tools::image_question::ImageInput;
 
-/// Turn a transport failure against the local mock into an actionable hint.
-fn explain_if_mock_unreachable(base_url: &str, message: &str) -> String {
-    let local =
-        base_url.starts_with("http://127.0.0.1") || base_url.starts_with("http://localhost");
-    let transport = message.contains("error sending request")
-        || message.to_lowercase().contains("connection refused");
-    if local && transport {
-        return format!(
-            "{message} — the local httpcan mock at {base_url} is unreachable; start the \
-             container (docker start httpcan / OrbStack) or export GHOST_AI_SMOKE_* to \
-             target a real provider"
-        );
+/// Validate explicit smoke targets without revealing the endpoint in logs.
+fn smoke_endpoint(base_url: &str) -> Result<bool> {
+    let url = url::Url::parse(base_url).map_err(|_| anyhow!("Invalid smoke endpoint"))?;
+    if !matches!(url.scheme(), "http" | "https")
+        || url.host().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(anyhow!("Smoke endpoint must be an HTTP(S) base URL without credentials, query or fragment"));
     }
-    message.to_string()
+    let local = match url.host() {
+        Some(url::Host::Domain(host)) => host.eq_ignore_ascii_case("localhost"),
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        None => false,
+    };
+    if !local && url.scheme() != "https" {
+        return Err(anyhow!("Non-loopback smoke endpoints must use HTTPS"));
+    }
+    Ok(local)
+}
+
+#[test]
+fn smoke_endpoint_validation() {
+    for url in ["http://localhost:18080/v1", "http://127.0.0.1:18080/v1", "http://[::1]:18080/v1"] {
+        assert!(smoke_endpoint(url).unwrap());
+    }
+    assert!(!smoke_endpoint("https://api.example.com/v1").unwrap());
+    assert!(!smoke_endpoint("https://localhost.example.com/v1").unwrap());
+    for url in [
+        "http://localhost.example.com/v1",
+        "http://127.0.0.1.example.com/v1",
+        "https://user:secret@api.example.com/v1",
+        "https://api.example.com/v1?key=secret",
+        "file:///tmp/test",
+    ] {
+        assert!(smoke_endpoint(url).is_err());
+    }
 }
 
 struct SmokeConfig {
@@ -109,6 +135,7 @@ struct SmokeConfig {
     base_url: String,
     api_key: String,
     api_style: Option<String>,
+    mock_target: bool,
 }
 
 impl SmokeConfig {
@@ -121,8 +148,9 @@ impl SmokeConfig {
         // never mistaken for a real-provider one. Any explicit override
         // switches to strict mode so a real run can never silently hit
         // localhost.
+        let mock_target = provider.is_none() && model.is_none() && base_url.is_none();
         let (provider, model, base_url) =
-            if provider.is_none() && model.is_none() && base_url.is_none() {
+            if mock_target {
                 println!(
                     "no GHOST_AI_SMOKE_* variables detected — targeting the local httpcan \
                      mock; export GHOST_AI_SMOKE_PROVIDER/MODEL/BASE_URL/API_KEY to hit a \
@@ -142,17 +170,15 @@ impl SmokeConfig {
                 (provider, model, base_url)
             };
 
+        let local = smoke_endpoint(&base_url)?;
         let api_key = match std::env::var("GHOST_AI_SMOKE_API_KEY") {
-            Ok(key) => key,
-            Err(_)
-                if base_url.starts_with("http://127.0.0.1")
-                    || base_url.starts_with("http://localhost") =>
-            {
+            Ok(key) if !key.trim().is_empty() => key,
+            _ if local => {
                 "smoke-key".to_string()
             }
             // The placeholder once leaked to a real provider and cost a
             // confusing 401; refuse instead of sending it off-box.
-            Err(_) => {
+            _ => {
                 return Err(anyhow!(
                     "GHOST_AI_SMOKE_API_KEY is required for non-local base URLs (refusing to send the placeholder 'smoke-key')"
                 ));
@@ -164,6 +190,7 @@ impl SmokeConfig {
             model,
             base_url,
             api_key,
+            mock_target,
             api_style: std::env::var("GHOST_AI_SMOKE_API_STYLE")
                 .ok()
                 .or_else(|| Some("chat_completions".to_string())),
@@ -212,8 +239,8 @@ fn tiny_red_png() -> Vec<u8> {
 async fn provider_smoke_text_roundtrip() {
     let config = SmokeConfig::from_env().expect("smoke config");
     println!(
-        "smoke target: provider={} model={} base_url={}",
-        config.provider, config.model, config.base_url
+        "smoke target: provider={} model={}",
+        config.provider, config.model
     );
 
     let response = call_provider(
@@ -228,15 +255,10 @@ async fn provider_smoke_text_roundtrip() {
         config.api_style.clone(),
     )
     .await
-    .unwrap_or_else(|error| {
-        panic!(
-            "text roundtrip failed: {}",
-            explain_if_mock_unreachable(&config.base_url, &error.to_string())
-        )
-    });
+    .unwrap_or_else(|_| panic!("Text smoke failed; verify configuration, model permissions and network"));
 
     let content = response.content;
-    println!("smoke reply: {content}");
+    println!("Text reply received: {} bytes", content.len());
     assert!(!content.trim().is_empty(), "reply must be non-empty");
 }
 
@@ -245,8 +267,8 @@ async fn provider_smoke_text_roundtrip() {
 async fn provider_smoke_vision_question() {
     let config = SmokeConfig::from_env().expect("smoke config");
     println!(
-        "smoke target: provider={} model={} base_url={}",
-        config.provider, config.model, config.base_url
+        "smoke target: provider={} model={}",
+        config.provider, config.model
     );
 
     let responder = VisionQuestionResponder::new(
@@ -266,14 +288,9 @@ async fn provider_smoke_vision_question() {
             "What color is this image?".to_string(),
         )
         .await
-        .unwrap_or_else(|error| {
-            panic!(
-                "vision question failed: {}",
-                explain_if_mock_unreachable(&config.base_url, &error)
-            )
-        });
+        .unwrap_or_else(|_| panic!("Vision smoke failed; verify image capability and configuration"));
 
-    println!("smoke vision answer: {answer}");
+    println!("Vision reply received: {} bytes", answer.len());
     assert!(!answer.trim().is_empty(), "answer must be non-empty");
 }
 
@@ -282,15 +299,11 @@ async fn provider_smoke_vision_question() {
 async fn provider_smoke_openai_responses_wire() {
     let config = SmokeConfig::from_env().expect("smoke config");
     if !matches!(config.provider.as_str(), "openai" | "custom_openai") {
-        println!(
-            "skipping responses-wire smoke: provider {} is not OpenAI Responses-flavored",
-            config.provider
-        );
-        return;
+        panic!("Select an OpenAI Responses-compatible provider for this test");
     }
     println!(
-        "smoke target: provider={} model={} base_url={} (responses wire)",
-        config.provider, config.model, config.base_url
+        "smoke target: provider={} model={} (responses wire)",
+        config.provider, config.model
     );
 
     // api_style None steers custom_openai away from chat_completions onto the
@@ -312,29 +325,14 @@ async fn provider_smoke_openai_responses_wire() {
         Ok(response) => response,
         Err(error) => {
             let message = error.to_string();
-            // A gateway without a Responses implementation answers
-            // POST {base}/responses with 404/405 — a capability report,
-            // not a wire defect; the hermetic httpcan run covers our wire.
-            // Decode errors stay hard failures: an endpoint streaming a
-            // nonconformant frame shape (e.g. `"tools": null` inside
-            // response.created) is a real compatibility finding.
-            let unsupported = message.contains("404")
-                || message.contains("405")
-                || message.to_lowercase().contains("not found");
-            if unsupported {
-                println!(
-                    "responses wire: endpoint does not implement the OpenAI Responses API ({message}); skipping — expected for chat-completions-only gateways"
-                );
-                return;
-            }
-            panic!(
-                "responses-wire roundtrip failed: {}",
-                explain_if_mock_unreachable(&config.base_url, &message)
-            );
+            // A missing Responses endpoint is not a successful smoke test.
+            // Never print raw provider responses, which can contain credentials.
+            let _ = message;
+            panic!("Responses smoke failed; verify protocol support and configuration");
         }
     };
 
-    println!("smoke reply: {}", response.content);
+    println!("Responses reply received: {} bytes", response.content.len());
     assert!(
         !response.content.trim().is_empty(),
         "reply must be non-empty"
@@ -353,15 +351,16 @@ async fn provider_smoke_agent_tool_loop() {
     use super::agent_builder::{AgentConfig, create_provider_agent};
 
     let config = SmokeConfig::from_env().expect("smoke config");
-    if config.base_url.starts_with("http://127.0.0.1")
-        || config.base_url.starts_with("http://localhost")
-    {
-        println!(
-            "skipping agent-loop smoke: the local mock cannot issue tool calls; \
-             point GHOST_AI_SMOKE_* at a real provider to exercise the loop"
-        );
-        return;
+    if config.mock_target {
+        panic!("Agent-loop smoke requires an explicitly configured tool-capable model");
     }
+    // The test executes a model-generated shell tool call. Never run it on
+    // a routine CI host with real credentials or without explicit consent.
+    assert_eq!(
+        std::env::var("GHOST_AI_SMOKE_ALLOW_TOOL_EXECUTION").ok().as_deref(),
+        Some("1"),
+        "Run only in an isolated disposable environment with explicit tool execution opt-in"
+    );
     let wire = match (config.provider.as_str(), config.api_style.as_deref()) {
         ("custom_anthropic", _) => "anthropic",
         ("openai" | "custom_openai", Some("chat_completions")) => "openai-chat-completions",
@@ -369,8 +368,8 @@ async fn provider_smoke_agent_tool_loop() {
         (provider, _) => provider,
     };
     println!(
-        "smoke target: provider={} model={} base_url={} wire={wire} (agent tool loop)",
-        config.provider, config.model, config.base_url
+        "smoke target: provider={} model={} wire={wire} (agent tool loop)",
+        config.provider, config.model
     );
 
     // The model must drive bash to drop a marker file whose content it has
@@ -412,16 +411,15 @@ async fn provider_smoke_agent_tool_loop() {
                     delta,
                 ))) => text.push_str(&delta.text),
                 Ok(_) => {}
-                Err(error) => panic!("agent loop stream error: {error}"),
+                Err(_) => panic!("Agent-loop stream failed"),
             }
         }
     })
     .await
     .expect("agent loop must finish within the timeout");
 
-    println!("agent final text: {text}");
+    println!("Agent final reply received: {} bytes", text.len());
     let marker_content = std::fs::read_to_string(&marker).unwrap_or_default();
-    println!("marker.txt content: {marker_content}");
     assert_eq!(
         marker_content.trim(),
         token,
@@ -429,6 +427,6 @@ async fn provider_smoke_agent_tool_loop() {
     );
     assert!(
         text.contains(&token),
-        "the model must have read the tool result back: {text}"
+        "the model must have read the tool result back"
     );
 }

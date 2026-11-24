@@ -82,3 +82,5 @@ Added stable accessibility IDs to existing navigation, optional real Windows UI 
 
 ## Iteration 8 — screenshot evidence and RTL foundation
 Windows CI 45491890701 artifact 14966333384 contains eight actual Home/Settings screenshots. Manual contact-sheet inspection confirms branded Home is visible at 820×580, 940×640, 1160×760 and 1440×900; navigation and provider form need scrolling at smaller sizes, and native frame edges include desktop pixels on some captures. No pixel-equivalence pass. The new RTL root and common controls preserve LTR credentials/code; Arabic acceptance still pending. All 35 dialog surfaces remain open.
+
+Windows visible screenshot frame now uses DWM extended frame bounds rather than the invisible resize border. Actual screenshots from 2684f49 are linked in README; no claim of updated capture success. Linux/macOS native build and tests added to PR workflow, not GUI captures.

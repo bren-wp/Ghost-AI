@@ -26,6 +26,13 @@ public static class GhostAiWindowCapture {
   public struct RECT { public int Left, Top, Right, Bottom; }
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool GetWindowRect(IntPtr handle, out RECT rect);
+  [DllImport("dwmapi.dll")]
+  private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out RECT rect, int size);
+  public static bool GetVisibleFrameRect(IntPtr handle, out RECT rect) {
+    // DWMWA_EXTENDED_FRAME_BOUNDS excludes the invisible resize border.
+    return DwmGetWindowAttribute(handle, 9, out rect, Marshal.SizeOf(typeof(RECT))) == 0
+      && rect.Right > rect.Left && rect.Bottom > rect.Top;
+  }
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool MoveWindow(IntPtr handle, int x, int y, int width, int height, bool repaint);
   [DllImport("user32.dll", SetLastError = true)]
@@ -193,8 +200,8 @@ try {
     throw "NOT VERIFIED: Ghost AI is not foreground; refusing a desktop/console screenshot"
   }
   $rect = New-Object GhostAiWindowCapture+RECT
-  if (-not [GhostAiWindowCapture]::GetWindowRect($window, [ref]$rect)) {
-    throw "Cannot read Ghost AI window dimensions"
+  if (-not [GhostAiWindowCapture]::GetVisibleFrameRect($window, [ref]$rect)) {
+    throw "NOT VERIFIED: cannot read Ghost AI visible frame bounds"
   }
   $width = $rect.Right - $rect.Left
   $height = $rect.Bottom - $rect.Top
