@@ -287,3 +287,36 @@ jobs:
       - name: Run all Rust library regression tests on Windows
         timeout-minutes: 40
         run: 'cargo test --release --manifest-path src-tauri/Cargo.toml --lib -- --nocapture --test-threads=1'
+
+      - name: Capture all six reference workspaces in the real Windows app
+        id: reference_screens
+        shell: powershell
+        continue-on-error: true
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force 'smoke/reference-screens' | Out-Null
+          $coverage = @()
+          $captured = 0
+          foreach ($surface in @('home', 'conversations', 'agents', 'documents', 'providers', 'settings')) {
+            try {
+              ./scripts/ghost-ai-capture-screenshot.ps1 -Executable 'smoke/Portable/Ghost-AI.exe' -Output "smoke/reference-screens/ghost-ai-$surface-1160x760.png" -ViewportWidth 1160 -ViewportHeight 760 -ReferenceSurface $surface
+              $coverage += "CAPTURED $surface (1160x760; accessible route verified)"
+              $captured++
+            } catch {
+              $coverage += "NOT VERIFIED $surface - $($_.Exception.Message)"
+            }
+          }
+          $coverage | Set-Content 'smoke/reference-screens/coverage-report.txt'
+          $coverage | ForEach-Object { Write-Host $_ }
+          if ($captured -ne 6) { throw "Only $captured of six reference surfaces verified" }
+      - name: Preserve all reference workspace evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ghost-AI-PR-Reference-Screens
+          path: smoke/reference-screens/
+          if-no-files-found: warn
+      - name: Reject incomplete reference workspace capture
+        if: steps.reference_screens.outcome == 'failure'
+        shell: pwsh
+        run: throw 'Ghost AI reference workspace capture incomplete; inspect the evidence report'

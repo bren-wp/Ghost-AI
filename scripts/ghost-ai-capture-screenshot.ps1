@@ -4,7 +4,8 @@ param(
   [Parameter(Mandatory = $true)][string]$Output,
   [int]$ViewportWidth = 0,
   [int]$ViewportHeight = 0,
-  [switch]$OpenSettings
+  [switch]$OpenSettings,
+  [ValidateSet('home', 'conversations', 'agents', 'documents', 'providers', 'settings')][string]$ReferenceSurface
 )
 
 $ErrorActionPreference = 'Stop'
@@ -82,6 +83,72 @@ public static class GhostAiWindowCapture {
 [void][GhostAiWindowCapture]::SetProcessDPIAware()
 Add-Type -AssemblyName System.Windows.Forms
 
+# Reference-route navigation is verified through the real WebView accessibility
+# tree. No coordinate guesses or synthetic HTML previews are accepted.
+function Get-VisibleUiElement {
+  param([IntPtr]$Window, [string]$Property, [string[]]$Values)
+  $root = [System.Windows.Automation.AutomationElement]::FromHandle($Window)
+  $uiaProperty = if ($Property -eq 'id') {
+    [System.Windows.Automation.AutomationElement]::AutomationIdProperty
+  } else {
+    [System.Windows.Automation.AutomationElement]::NameProperty
+  }
+  foreach ($value in $Values) {
+    $condition = [System.Windows.Automation.PropertyCondition]::new($uiaProperty, $value)
+    $matches = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
+    foreach ($element in $matches) {
+      if (-not $element.Current.IsOffscreen) { return $element }
+    }
+  }
+  return $null
+}
+
+function Open-ReferenceSurface {
+  param([IntPtr]$Window, [string]$Surface)
+  Add-Type -AssemblyName UIAutomationClient
+  Add-Type -AssemblyName UIAutomationTypes
+  $labels = @{
+    home = 'Home'; conversations = 'Conversations'; agents = 'Agents'
+    documents = 'Documents'; providers = 'Providers'; settings = 'Settings'
+  }
+  $expected = @{
+    home = @('Your workspace. Your ideas.')
+    conversations = @('Connect an AI model to start', 'Choose a model to start', 'What can I help with?')
+    agents = @('Agents & workflows')
+    documents = @('Document workspace')
+    providers = @('Connect your AI')
+    settings = @('A focused place for your choices.')
+  }
+  $deadline = (Get-Date).AddSeconds(15)
+  $button = $null
+  do {
+    $button = Get-VisibleUiElement -Window $Window -Property id -Values @("ghost-ai-nav-$Surface")
+    # The Settings header shares the accessible name. Only the navigation
+    # element's stable identifier may select Settings.
+    if (-not $button -and $Surface -ne 'settings') {
+      $button = Get-VisibleUiElement -Window $Window -Property name -Values @($labels[$Surface])
+    }
+    if (-not $button) { Start-Sleep -Milliseconds 500 }
+  } while (-not $button -and (Get-Date) -lt $deadline)
+  if (-not $button) { throw "NOT VERIFIED: accessible navigation element for $Surface was not found" }
+  if (-not $button.Current.IsEnabled) { throw "NOT VERIFIED: $Surface navigation is disabled" }
+  $pattern = $null
+  if (-not $button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+    throw "NOT VERIFIED: $Surface navigation does not expose an invokable control"
+  }
+  $pattern.Invoke()
+  $deadline = (Get-Date).AddSeconds(15)
+  $heading = $null
+  do {
+    Start-Sleep -Milliseconds 400
+    $heading = Get-VisibleUiElement -Window $Window -Property name -Values $expected[$Surface]
+  } while (-not $heading -and (Get-Date) -lt $deadline)
+  if (-not $heading) { throw "NOT VERIFIED: expected visible $Surface content was not found" }
+  Write-Host "Verified accessible surface: $Surface"
+}
+
+if ($ReferenceSurface -and $OpenSettings) { throw "Choose a reference surface or the Settings dialog, not both" }
+
 $process = $null
 $bitmap = $null
 $graphics = $null
@@ -130,6 +197,14 @@ try {
   $height = $rect.Bottom - $rect.Top
   Write-Host ("Verified Ghost AI window bounds: (" + $rect.Left + "," + $rect.Top + ") " + $width + "x" + $height)
   if ($width -lt 680 -or $height -lt 400) { throw "Invalid Ghost AI window dimensions" }
+
+  if ($ReferenceSurface) {
+    Open-ReferenceSurface -Window $window -Surface $ReferenceSurface
+    if ([GhostAiWindowCapture]::GetForegroundWindow() -ne $window) {
+      throw "NOT VERIFIED: Ghost AI lost foreground during reference navigation"
+    }
+    Start-Sleep -Milliseconds 700
+  }
 
   if ($OpenSettings) {
     $beforeBitmap = [System.Drawing.Bitmap]::new($width, $height)
@@ -236,7 +311,7 @@ try {
   [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($destination)) | Out-Null
   $bitmap.Save($destination, [System.Drawing.Imaging.ImageFormat]::Png)
   if ((Get-Item $destination).Length -lt 20000) { throw "Screenshot file appears incomplete" }
-  Write-Host "Ghost AI real Windows screenshot: $destination (viewport ${ViewportWidth}x${ViewportHeight}; Settings: $OpenSettings)"
+  Write-Host "Ghost AI real Windows screenshot: $destination (viewport ${ViewportWidth}x${ViewportHeight}; Settings: $OpenSettings; Reference: $ReferenceSurface)"
 }
 finally {
   if ($graphics) { $graphics.Dispose() }

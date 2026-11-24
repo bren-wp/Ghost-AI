@@ -50,6 +50,7 @@ export function SidebarNavigation({
         isActive={activeItem?.id === item.id}
         aria-current={activeItem?.id === item.id ? 'page' : undefined}
         aria-label={item.title}
+        id={`ghost-ai-nav-${item.id}`}
         className={itemClass}
       >
         <item.icon />
