@@ -1,6 +1,8 @@
 // Ghost AI by Brendigo
 import { describe, expect, it } from 'vitest'
-import { getInterfaceTranslationStatus, supportedLanguages } from '@/lib/i18n'
+import i18n, { getInterfaceTranslationStatus, supportedLanguages } from '@/lib/i18n'
+import providerEnglish from '@/locales/en/providers.json'
+import { localeOverrides } from '@/lib/ghost-ai-locale-overrides'
 
 describe('bundled interface translation status', () => {
   it('reports English source resources as complete', () => {
@@ -22,6 +24,11 @@ describe('bundled interface translation status', () => {
     for (const { code } of supportedLanguages) {
       expect(getInterfaceTranslationStatus(code)).not.toBe('fallback')
     }
+  })
+
+  it.each(['hr', 'de'])('covers every provider key in %s without fallback', (code) => {
+    expect(Object.keys(localeOverrides[code].providers).sort()).toEqual(Object.keys(providerEnglish).sort())
+    expect(i18n.getResource(code, 'providers', 'testConnection')).toBe(localeOverrides[code].providers.testConnection)
   })
 
   it('returns a supported status for every declared locale', () => {

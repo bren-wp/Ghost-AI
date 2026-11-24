@@ -267,7 +267,7 @@ export function ProviderForm({
                 variant="ghost"
                 size="icon"
                 className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                aria-label={showApiKey ? t('hideApiKey') : t('showApiKey')}
                 aria-pressed={showApiKey}
                 onClick={() => onShowApiKeyChange(!showApiKey)}
               >
@@ -347,7 +347,7 @@ export function ProviderForm({
           id="api-base-url"
           type="url"
           required={isCustom}
-          aria-required={isCustom}
+          aria-required={endpointRequired}
           aria-invalid={invalidEndpoint}
           aria-describedby={invalidEndpoint ? 'api-base-url-error' : undefined}
           placeholder="https://api.example.com/v1"

@@ -117,5 +117,7 @@
   "localNoApiKeyDescription": "This local runtime connects directly to your configured endpoint. Add a model below before testing the connection.",
   "testModel": "Model to test",
   "optionalApiKey": "API key (optional)",
-  "optionalLocalApiKeyDescription": "Leave empty for a keyless local server, or enter the key required by your server."
+  "optionalLocalApiKeyDescription": "Leave empty for a keyless local server, or enter the key required by your server.",
+  "showApiKey": "Show API key",
+  "hideApiKey": "Hide API key"
 }

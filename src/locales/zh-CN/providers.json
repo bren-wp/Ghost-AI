@@ -113,5 +113,7 @@
   "localNoApiKeyDescription": "此本地运行环境直接连接所配置的服务地址。请先添加模型，再测试连接。",
   "testModel": "要测试的模型",
   "optionalApiKey": "API 密钥（可选）",
-  "optionalLocalApiKeyDescription": "无需密钥的本地服务器可留空，或输入服务器要求的密钥。"
+  "optionalLocalApiKeyDescription": "无需密钥的本地服务器可留空，或输入服务器要求的密钥。",
+  "showApiKey": "显示 API 密钥",
+  "hideApiKey": "隐藏 API 密钥"
 }
