@@ -103,7 +103,20 @@ pub fn set_secret(key: &str, secret: &str) -> Result<()> {
 /// to avoid triggering the macOS keychain authorization dialog repeatedly.
 pub fn get_secret(key: &str) -> Result<Option<String>> {
     install_mock_keyring_if_needed();
+    get_secret_with(key, || {
+        let entry = Entry::new(SERVICE_NAME, key)
+            .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
+        read_password(&entry)
+    })
+}
 
+// The loader runs only on a cache miss, under the same exclusive guard
+// used for rotation and deletion. Tests can retain a single mock Entry
+// because keyring's mock backend stores passwords per Entry instance.
+fn get_secret_with(
+    key: &str,
+    load: impl FnOnce() -> Result<Option<String>>,
+) -> Result<Option<String>> {
     {
         let c = cache()
             .read()
@@ -122,16 +135,20 @@ pub fn get_secret(key: &str) -> Result<Option<String>> {
         return Ok(Some(v.as_str().to_owned()));
     }
 
-    let entry = Entry::new(SERVICE_NAME, key)
-        .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
-
-    match entry.get_password() {
-        Ok(password) => {
+    match load()? {
+        Some(password) => {
             let password = Zeroizing::new(password);
             let result = password.as_str().to_owned();
             c.insert(key.to_string(), password);
             Ok(Some(result))
         }
+        None => Ok(None),
+    }
+}
+
+fn read_password(entry: &Entry) -> Result<Option<String>> {
+    match entry.get_password() {
+        Ok(password) => Ok(Some(password)),
         Err(keyring::Error::NoEntry) => Ok(None),
         Err(e) => Err(anyhow!("Failed to retrieve secret: {}", e)),
     }
@@ -229,12 +246,46 @@ mod tests {
         }
         set_secret(key, "second").unwrap();
         assert_eq!(get_secret(key).unwrap().as_deref(), Some("second"));
-        // Simulate an ordinary cache miss without changing the OS entry.
+        // keyring::mock is per Entry, not a persistent OS keychain.
+        // Retain a seeded mock entry and exercise the actual cache-miss
+        // loader and password decoding instead of relying on persistence
+        // between independent mock instances.
+        let backend = Entry::new(SERVICE_NAME, key).unwrap();
+        backend.set_password("second").unwrap();
         cache().write().unwrap().remove(key);
-        assert_eq!(get_secret(key).unwrap().as_deref(), Some("second"));
+        assert_eq!(
+            get_secret_with(key, || read_password(&backend)).unwrap().as_deref(),
+            Some("second")
+        );
+        {
+            let guard = cache().read().unwrap();
+            let value: &Zeroizing<String> = guard.get(key).unwrap();
+            assert_eq!(value.as_str(), "second");
+        }
+        assert_eq!(
+            get_secret_with(key, || panic!("cache hit must not invoke backend"))
+                .unwrap().as_deref(),
+            Some("second")
+        );
+        backend.delete_credential().unwrap();
         delete_secret(key).unwrap();
         assert!(!cache().read().unwrap().contains_key(key));
         assert_eq!(get_secret(key).unwrap(), None);
+    }
+
+    #[test]
+    fn test_cache_miss_does_not_store_absent_or_failed_reads() {
+        let key = "test_zeroizing_cache_miss_error";
+        delete_secret(key).unwrap();
+        assert_eq!(get_secret_with(key, || Ok(None)).unwrap(), None);
+        assert!(get_secret_with(key, || Err(anyhow!("synthetic backend error"))).is_err());
+        assert!(!cache().read().unwrap().contains_key(key));
+        assert_eq!(
+            get_secret_with(key, || Ok(Some("recovered".to_owned())))
+                .unwrap().as_deref(),
+            Some("recovered")
+        );
+        delete_secret(key).unwrap();
     }
 
     #[test]
