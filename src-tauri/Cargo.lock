@@ -3728,6 +3728,7 @@ dependencies = [
  "urlencoding",
  "uuid",
  "whatlang",
+ "zeroize",
  "zstd 0.13.5",
 ]
 

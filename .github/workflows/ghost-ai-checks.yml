@@ -171,6 +171,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build production Windows binary
         run: pnpm tauri build --no-bundle
+      - name: Verify real Windows credential storage in release profile
+        timeout-minutes: 15
+        env:
+          # A production-profile build must ignore this debug-only override.
+          GHOST_AI_TEST_MOCK_KEYRING: '1'
+        run: cargo run --release --locked --manifest-path src-tauri/Cargo.toml --example keychain_native_smoke -- --run
       - name: Stage packaged resources as in Portable.zip
         shell: pwsh
         run: |

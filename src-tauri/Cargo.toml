@@ -47,6 +47,7 @@ thiserror = "2"
 
 # Cryptography
 aes-gcm = "0.10"
+zeroize = "1"
 rand = "0.8"
 base64 = "0.21"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
