@@ -3,13 +3,12 @@ name: Ghost AI — Release Packages
 
 on:
   push:
-    tags: ['v*']
     branches: ['release/v*']
   workflow_dispatch:
 
 concurrency:
   group: ghost-ai-release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -34,10 +33,11 @@ jobs:
         id: version
         shell: bash
         run: |
+          [[ "$GITHUB_REF_TYPE" == "branch" && "$GITHUB_REF_NAME" == release/v* ]] || { echo "::error::Release must originate from a versioned release branch"; exit 1; }
           tag="${GITHUB_REF_NAME#release/}"
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid release reference: $tag"; exit 1; }
           version="${tag#v}"
-          python3 -c 'import json,sys; v=sys.argv[1]; assert json.load(open("package.json"))["version"] == v; assert json.load(open("src-tauri/tauri.conf.json"))["version"] == v' "$version"
+          python3 scripts/verify_release_version.py "$version"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Verify legal and brand files
         run: |
@@ -329,6 +329,10 @@ jobs:
     name: Publish versioned Ghost AI release
     runs-on: ubuntu-24.04
     needs: [validate, windows, linux, macos]
+    timeout-minutes: 60
+    concurrency:
+      group: ghost-ai-release-publication
+      cancel-in-progress: false
     if: always() && needs.validate.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && needs.macos.result == 'success'
     steps:
       # Release builds alone are insufficient: the same commit must pass the
@@ -368,6 +372,24 @@ jobs:
                 ;;
             esac
           done
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify release branch and existing tag still target the tested commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ needs.validate.outputs.release_tag }}"
+          branch_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/$tag" --jq '.object.sha')
+          [[ "$branch_sha" == "$GITHUB_SHA" ]] || { echo '::error::Release branch moved after validation'; exit 1; }
+          refs=$(git ls-remote --tags origin "refs/tags/$tag" "refs/tags/$tag^{}")
+          if [[ -n "$refs" ]]; then
+            tag_sha=$(git ls-remote --tags origin "refs/tags/$tag^{}" | cut -f1)
+            if [[ -z "$tag_sha" ]]; then tag_sha=$(printf '%s\n' "$refs" | cut -f1); fi
+            [[ "$tag_sha" == "$GITHUB_SHA" ]] || { echo '::error::Existing tag points to another commit'; exit 1; }
+          fi
       - name: Refuse to overwrite an already-published version
         shell: bash
         env:
@@ -415,6 +437,8 @@ jobs:
         with:
           tag_name: ${{ needs.validate.outputs.release_tag }}
           target_commitish: ${{ github.sha }}
-          prerelease: true
+          prerelease: false
+          draft: false
+          fail_on_unmatched_files: true
           generate_release_notes: true
           files: release/*

@@ -1,7 +1,7 @@
 # Ghost AI by Brendigo
 [package]
 name = "ghost-ai-desktop"
-version = "0.1.4"
+version = "0.1.5"
 description = "Ghost AI desktop assistant"
 authors = ["Brendigo"]
 edition = "2024"

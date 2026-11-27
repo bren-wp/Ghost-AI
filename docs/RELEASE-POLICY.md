@@ -1,12 +1,12 @@
 # Ghost AI release and distribution policy
 
-The first release line starts at **v0.1.0**. Subsequent builds use semantic versions. GitHub releases remain **prereleases** until clean-machine launch, package integrity, platform signing and security checks have been independently verified. A successful build is not evidence that the application launches correctly.
+The first release line starts at **v0.1.0**. Subsequent builds use semantic versions. Completed, functionally verified releases are published as **Stable** (`prerelease: false`, `draft: false`). Missing platform signatures or notarization alone do not prevent stable manual distribution. Disclose unsigned packages and potential OS warnings. A successful build is not evidence that the application launches correctly.
 
 ## Expected deliverables
 
 | Platform | Installer | Portable | Update |
 |---|---|---|---|
-| Windows x64 | Ghost-AI-vX.Y.Z-Setup.exe | Ghost-AI-vX.Y.Z-Portable.exe and ZIP with required resources | Signed Tauri updater for installed build; standalone Update.exe only if it can validate the publisher signature |
+| Windows x64 | Ghost-AI-vX.Y.Z-Setup.exe | Ghost-AI-vX.Y.Z-Portable.exe and ZIP with required resources | Signed Tauri updater when provisioned; standalone Update.exe is a tested manual maintenance package, not an authenticated automatic updater |
 | Linux x86_64 | .deb installer | .AppImage standalone portable package | Signed AppImage update when configured |
 | macOS | .dmg installer | .app wrapped in a verified .zip portable archive | Signed/notarized app updates when provisioned |
 
@@ -14,7 +14,7 @@ A portable Windows executable can require companion resources, model catalogs or
 
 ## Mandatory release on each completed iteration
 
-Continue changes in the currently open PR until merged. Each **completed and verified** development iteration increments the application version and triggers a versioned `release/vX.Y.Z` pipeline with all supported platform packages. If any mandatory build, signing configuration, security, startup or packaging check fails, **keep the candidate unannounced and fix it; do not publish incomplete assets or bypass checks**. A release candidate is not a published release. 
+Continue changes in the currently open PR until merged. Each **completed and verified** development iteration increments the application version and triggers a versioned `release/vX.Y.Z` pipeline with all supported platform packages. If any mandatory build, security, startup or packaging check fails, **keep the candidate unannounced and fix it; do not publish incomplete assets or bypass checks**. A release candidate is not a published release. 
 
 ## CI checks and current limits
 
@@ -27,7 +27,7 @@ Continue changes in the currently open PR until merged. Each **completed and ver
 - Windows release jobs check installed, portable and update packages, and save diagnostics even when a check fails.
 - Linux and macOS release jobs currently build their packages, but do **not** yet prove a visible application window or operation on a clean user device. Their build failures must block publication rather than silently omit an artifact.
 - A release requires all expected platform files and a regenerated SHA-256 list covering the actual uploaded packages.
-- GitHub CI does not by itself establish antivirus cleanliness, Authenticode signing, macOS notarization, functional AI provider coverage, or accessibility compliance. Record these independently before promoting any build from prerelease to stable.
+- GitHub CI does not by itself establish antivirus cleanliness, Authenticode signing, macOS notarization, functional AI provider coverage, or accessibility compliance. Disclose these limits independently; absence of platform signing or notarization does not by itself block verified stable manual packages.
 
 ## Static site without database
 
@@ -42,7 +42,7 @@ A Tauri-compatible manifest needs per-platform versions, HTTPS download URLs and
 - Strict permissions, no broad shell access by default.
 - No separate EULA acceptance screen in the desktop app or installer. The EULA, commercial terms, privacy policy and required third-party notices remain bundled and available in Settings > About. Removal of click-through acceptance requires legal review before commercial distribution.
 - Installer and update paths checked for rollback and tamper resistance.
-- Windows signing certificate and macOS signing/notarization are needed for trusted production distribution.
+- Windows signing and macOS signing/notarization are recommended for OS publisher trust. Automatic updating remains disabled without trusted signing keys; never bypass signature, integrity, manifest or downgrade checks.
 - Product and screenshot claims must be verified against the built binary.
 
-No published build should be called production-ready until these checks pass.
+Release publication starts from `release/vX.Y.Z`; a tag push does not start a second release build. Manual dispatch must target that release branch. The release requires successful same-SHA Quality Gates, matching versions, all platform assets and checksums. Existing published versions and conflicting tags must not be overwritten. No published build should be called production-ready until mandatory functional and security checks pass.

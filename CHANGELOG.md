@@ -1,5 +1,14 @@
 # Ghost AI by Brendigo — release history
 
+## v0.1.5 — Release recovery and credential cache hardening
+
+- Run mandatory Quality Gates on versioned release branches and require the exact tested commit before publication.
+- Serialize release publication, prevent tag-triggered duplicate builds and reject a moved release branch or mismatched tag.
+- Verify synchronized JavaScript, Tauri and Rust package versions, including the root Cargo.lock entry.
+- Keep verified manual packages eligible for stable distribution without platform certificates; automatic updates still require trusted cryptographic signing.
+- Include the merged credential-cache coherence, rotation and production-keychain regression changes.
+- Release verification is pending until the versioned pipeline and all platform packages pass.
+
 ## v0.1.4 — Provider workspace and connection reliability
 
 - Redesigned provider settings with searchable cloud/local/custom navigation, responsive model cards and consistent Ghost AI dialogs.
