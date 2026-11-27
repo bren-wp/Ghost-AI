@@ -46,3 +46,5 @@ A Tauri-compatible manifest needs per-platform versions, HTTPS download URLs and
 - Product and screenshot claims must be verified against the built binary.
 
 Release publication starts from `release/vX.Y.Z`; a tag push does not start a second release build. Manual dispatch must target that release branch. The release requires successful same-SHA Quality Gates, matching versions, all platform assets and checksums. Existing published versions and conflicting tags must not be overwritten. No published build should be called production-ready until mandatory functional and security checks pass.
+
+Publication uses a non-public, commit-owned staging draft; the final public release is Stable, never a draft. Uploaded asset sizes and SHA-256 digests must match the generated inventory before promotion. Rerunning the publication job can resume an owned draft with identical assets; unexpected or mismatched assets require explicit review and are never silently overwritten. A previously published identical release is an idempotent no-op. Missing digest metadata fails closed.

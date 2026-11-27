@@ -11,13 +11,14 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
   actions: read
 
 jobs:
   validate:
     name: Validate source and legal assets
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     outputs:
       release_tag: ${{ steps.version.outputs.tag }}
     steps:
@@ -329,7 +330,10 @@ jobs:
     name: Publish versioned Ghost AI release
     runs-on: ubuntu-24.04
     needs: [validate, windows, linux, macos]
-    timeout-minutes: 60
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      actions: read
     concurrency:
       group: ghost-ai-release-publication
       cancel-in-progress: false
@@ -390,55 +394,36 @@ jobs:
             if [[ -z "$tag_sha" ]]; then tag_sha=$(printf '%s\n' "$refs" | cut -f1); fi
             [[ "$tag_sha" == "$GITHUB_SHA" ]] || { echo '::error::Existing tag points to another commit'; exit 1; }
           fi
-      - name: Refuse to overwrite an already-published version
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          tag="${{ needs.validate.outputs.release_tag }}"
-          status=$(curl --silent --show-error --location --output release-lookup.json \
-            --write-out '%{http_code}' \
-            --header "Accept: application/vnd.github+json" \
-            --header "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$tag")
-          if [[ "$status" == "200" ]]; then
-            echo "::error::$tag is already published. Increment the version and create a new release branch."
-            exit 1
-          fi
-          if [[ "$status" != "404" ]]; then
-            echo "::error::Could not securely verify release uniqueness (HTTP $status)"
-            exit 1
-          fi
       - uses: actions/download-artifact@v8
         with:
           name: Ghost-AI-Windows
-          path: release
+          path: staging/windows
       - uses: actions/download-artifact@v8
         with:
           name: Ghost-AI-Linux
-          path: release
+          path: staging/linux
       - uses: actions/download-artifact@v8
         with:
           name: Ghost-AI-macOS
-          path: release
-      - name: Verify all platform assets and complete checksums
+          path: staging/macos
+      - name: Assemble all platform assets without silent overwrites
         shell: bash
         run: |
-          tag="${{ needs.validate.outputs.release_tag }}"
-          for suffix in Setup.exe Portable.exe Portable.zip Update.exe Linux.AppImage Linux.deb macOS.dmg macOS-Portable.zip; do
-            test -s "release/Ghost-AI-$tag-$suffix" || { echo "Missing release asset: $suffix"; exit 1; }
+          set -euo pipefail
+          mkdir release
+          for platform in windows linux macos; do
+            for file in staging/"$platform"/*; do
+              [[ -f "$file" && ! -L "$file" ]] || exit 1
+              name=$(basename "$file")
+              [[ "$name" == SHA256SUMS.txt ]] && continue
+              [[ ! -e "release/$name" ]] || { echo "::error::Duplicate asset $name"; exit 1; }
+              cp "$file" "release/$name"
+            done
           done
-          cd release
-          sha256sum Ghost-AI-* > SHA256SUMS.txt
-          test "$(wc -l < SHA256SUMS.txt)" -ge 8
-      - name: Publish release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ needs.validate.outputs.release_tag }}
-          target_commitish: ${{ github.sha }}
-          prerelease: false
-          draft: false
-          fail_on_unmatched_files: true
-          generate_release_notes: true
-          files: release/*
+          cp CHANGELOG.md release/CHANGELOG.md
+      - name: Verify all platform assets and publish stable release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Final published state: prerelease: false, draft: false.
+        run: python3 scripts/publish_verified_release.py "${{ needs.validate.outputs.release_tag }}" release

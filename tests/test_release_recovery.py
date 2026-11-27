@@ -44,7 +44,10 @@ class ReleaseRecoveryTests(unittest.TestCase):
         self.assertIn("prerelease: false", release)
         self.assertIn("draft: false", release)
         self.assertIn("group: ghost-ai-release-publication", release)
-        self.assertIn("Refuse to overwrite an already-published version", release)
+        self.assertIn("scripts/publish_verified_release.py", release)
+        publication = (ROOT / "scripts/publish_verified_release.py").read_text()
+        self.assertIn('"draft": False, "prerelease": False', publication)
+        self.assertIn("Refuse to overwrite an already-published version", publication)
         self.assertIn("No unsigned auto-updater fallback", (ROOT / "scripts/configure_updater.py").read_text())
 
 

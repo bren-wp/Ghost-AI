@@ -7,7 +7,7 @@
 - Verify synchronized JavaScript, Tauri and Rust package versions, including the root Cargo.lock entry.
 - Keep verified manual packages eligible for stable distribution without platform certificates; automatic updates still require trusted cryptographic signing.
 - Include the merged credential-cache coherence, rotation and production-keychain regression changes.
-- Release verification is pending until the versioned pipeline and all platform packages pass.
+- Verify uploaded asset sizes and SHA-256 digests before public stable release; resume identical partial uploads without overwriting published versions.
 
 ## v0.1.4 — Provider workspace and connection reliability
 
