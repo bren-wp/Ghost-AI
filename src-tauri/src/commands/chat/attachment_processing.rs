@@ -8,6 +8,22 @@ use tauri::Emitter;
 
 use super::types::{FileAttachmentInput, ImageAttachmentInput};
 
+const MAX_TEXT_BYTES: usize = 10 * 1024 * 1024;
+const MAX_BINARY_BYTES: usize = 50 * 1024 * 1024;
+const MAX_VIDEO_BYTES: usize = 100 * 1024 * 1024;
+
+fn max_binary_bytes(name: &str) -> usize {
+    let extension = name.rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase());
+    match extension.as_deref() {
+        Some("mp4" | "mov" | "m4v" | "webm" | "mkv" | "avi") => MAX_VIDEO_BYTES,
+        _ => MAX_BINARY_BYTES,
+    }
+}
+
+fn base64_within_limit(encoded_len: usize, byte_limit: usize) -> bool {
+    encoded_len <= byte_limit.div_ceil(3) * 4
+}
+
 /// Parsed image data with filename
 pub(crate) struct ParsedImage {
     pub name: String,
@@ -83,6 +99,10 @@ pub(crate) fn parse_image_attachments(
 /// through. Undecodable images are dropped with an error log.
 fn fit_for_provider(name: &str, base64_data: String) -> Option<ImageData> {
     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+    if !base64_within_limit(base64_data.len(), MAX_BINARY_BYTES) {
+        tracing::warn!("[attachment] Image exceeds backend size limit");
+        return None;
+    }
     let bytes = match BASE64.decode(&base64_data) {
         Ok(bytes) => bytes,
         Err(e) => {
@@ -90,6 +110,10 @@ fn fit_for_provider(name: &str, base64_data: String) -> Option<ImageData> {
             return None;
         }
     };
+    if bytes.len() > MAX_BINARY_BYTES {
+        tracing::warn!("[attachment] Decoded image exceeds backend size limit");
+        return None;
+    }
     fit_bytes_for_provider(name, &bytes, Some(base64_data))
 }
 
@@ -140,6 +164,17 @@ pub(crate) fn parse_file_attachments(files: Option<Vec<FileAttachmentInput>>) ->
             files.len()
         );
         for file in files.iter() {
+            if file.content.len() > MAX_TEXT_BYTES {
+                tracing::warn!("[attachment] Text exceeds backend size limit");
+                continue;
+            }
+            let byte_limit = max_binary_bytes(&file.name);
+            if file.base64.as_ref().is_some_and(|encoded| {
+                !base64_within_limit(encoded.len(), byte_limit)
+            }) {
+                tracing::warn!("[attachment] Encoded file exceeds backend size limit");
+                continue;
+            }
             // Binary documents arrive as base64: decoding here keeps the
             // bytes intact all the way to the persisted attachment, where
             // the read tool can parse the container.
@@ -147,7 +182,11 @@ pub(crate) fn parse_file_attachments(files: Option<Vec<FileAttachmentInput>>) ->
                 Some(encoded) => {
                     use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
                     match BASE64.decode(encoded) {
-                        Ok(bytes) => Some(bytes),
+                        Ok(bytes) if bytes.len() <= byte_limit => Some(bytes),
+                        Ok(_) => {
+                            tracing::warn!("[attachment] Decoded file exceeds backend size limit");
+                            continue;
+                        }
                         Err(e) => {
                             tracing::error!(
                                 "📄 [attachment] Invalid base64 for {}: {}",
@@ -641,6 +680,16 @@ mod tests {
             mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 .to_string(),
         }
+    }
+
+    #[test]
+    fn backend_attachment_limits_are_bounded() {
+        assert_eq!(max_binary_bytes("document.docx"), MAX_BINARY_BYTES);
+        assert_eq!(max_binary_bytes("clip.MP4"), MAX_VIDEO_BYTES);
+        assert_eq!(max_binary_bytes("mp4"), MAX_BINARY_BYTES);
+        assert!(base64_within_limit(4, 3));
+        assert!(!base64_within_limit(5, 3));
+        assert!(!base64_within_limit(usize::MAX, MAX_BINARY_BYTES));
     }
 
     #[test]

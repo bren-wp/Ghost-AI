@@ -20,8 +20,8 @@
 ## Component spec
 
 - Startup: centered Ghost AI symbol and label with reduced-motion support.
-- Main window: 1220 × 790 initial dimensions; not maximized; minimum 800 × 560.
-- Sidebar: responsive conversation and tools navigation; no clipped controls at 800 × 560.
+- Main window: 1160 × 760 initial dimensions; not maximized; minimum 820 × 580 (current production Tauri window contract).
+- Sidebar: responsive conversation and tools navigation; no clipped controls at 820 × 580.
 - Settings: scrollable main area and mobile-width section selector; keyboard operable.
 - AI providers: clear service names where needed to select compatible models; not confused with product publisher.
 - Files and analysis: explicit permission prompts before accessing local documents.
@@ -31,6 +31,6 @@
 
 ## Acceptance matrix
 
-Test all screens and states at 800 × 560, 1024 × 768, 1366 × 768, 1920 × 1080 and 2560 × 1440, including 125%, 150% and 200% scaling; verify keyboard focus, assistive technologies and high-contrast modes.
+Test all screens and states at 820 × 580, 940 × 640, 1024 × 768, 1160 × 760, 1366 × 768, 1440 × 900, 1920 × 1080, 2560 × 1440 and 3840 × 2160, including 100%, 125%, 150%, 175% and 200% scaling; verify keyboard focus, assistive technologies and high-contrast modes.
 
 **Pixel-perfect comparison remains pending.** The design concept is not evidence of a matching compiled application. Provide screen captures from real builds and compare before calling UI work complete.

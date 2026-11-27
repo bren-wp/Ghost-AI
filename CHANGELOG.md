@@ -2,6 +2,10 @@
 
 ## v0.1.5 — Release recovery and credential cache hardening
 
+- Zeroize cached fallback API credentials when removed or replaced; caller-owned copies remain a separate audit concern.
+- Open SQLite files using literal filesystem paths instead of interpolated URI strings.
+- Enforce backend attachment size limits before base64 decoding and after decoding; full MIME/container validation remains separate.
+
 - Run mandatory Quality Gates on versioned release branches and require the exact tested commit before publication.
 - Serialize release publication, prevent tag-triggered duplicate builds and reject a moved release branch or mismatched tag.
 - Verify synchronized JavaScript, Tauri and Rust package versions, including the root Cargo.lock entry.

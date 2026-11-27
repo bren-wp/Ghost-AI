@@ -26,7 +26,7 @@ mod translation_history;
 mod users;
 
 use anyhow::Result;
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -52,9 +52,19 @@ pub fn local_db_path(db_path: &Path) -> PathBuf {
 }
 
 async fn open_pool(path: &str) -> Result<SqlitePool> {
+    // Treat a filesystem path as data, not a SQLite connection URI. In
+    // particular, percent escapes and query delimiters must not change
+    // which database is opened.
+    let options = if path == ":memory:" {
+        "sqlite::memory:".parse::<SqliteConnectOptions>()?
+    } else {
+        SqliteConnectOptions::new()
+            .filename(path)
+            .create_if_missing(true)
+    };
     Ok(SqlitePoolOptions::new()
         .max_connections(5)
-        .connect(&format!("sqlite:{}?mode=rwc", path))
+        .connect_with(options)
         .await?)
 }
 
@@ -106,6 +116,20 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn database_path_percent_sequences_are_literal() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("ghost%20data.db");
+        let pool = open_pool(path.to_str().unwrap()).await.unwrap();
+        sqlx::query("CREATE TABLE path_regression (id INTEGER PRIMARY KEY)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool.close().await;
+        assert!(path.is_file());
+        assert!(!directory.path().join("ghost data.db").exists());
+    }
 
     #[test]
     fn local_db_sits_next_to_the_canonical_db() {
