@@ -2,6 +2,12 @@
 
 ## v0.1.5 — Release recovery and credential cache hardening
 
+- Bound the OS credential cache to 256 entries and five-minute freshness, with zeroization on eviction and a per-entry byte cap.
+- Reject unsafe public-to-private and HTTPS-downgrade HTTP redirects in the direct fetch client; browser and DNS enforcement remain separate.
+- Validate MCP argument shape, nesting and text size before scanning.
+- Validate actual Office archive decompression and reject traversal paths.
+- Refuse to migrate a database created by a newer schema version.
+
 - Zeroize cached fallback API credentials when removed or replaced; caller-owned copies remain a separate audit concern.
 - Open SQLite files using literal filesystem paths instead of interpolated URI strings.
 - Enforce backend attachment size limits before base64 decoding and after decoding; full MIME/container validation remains separate.

@@ -3,6 +3,7 @@ use anyhow::{Result, anyhow};
 use keyring::Entry;
 use std::collections::HashMap;
 use std::sync::RwLock;
+use std::time::{Duration, Instant};
 use zeroize::Zeroizing;
 
 /// Environment variable that opts every public function in this module into
@@ -26,7 +27,38 @@ const SERVICE_NAME: &str = "app.ghost_ai.desktop";
 /// concurrent cache miss from reintroducing a rotated or deleted credential.
 /// Cached values are zeroized on removal or replacement. The public API still
 /// returns owned Strings; their consumers must manage those lifetimes separately.
-type SecretCache = HashMap<String, Zeroizing<String>>;
+const CACHE_TTL: Duration = Duration::from_secs(300);
+const MAX_CACHE_ENTRIES: usize = 256;
+const MAX_CACHED_SECRET_BYTES: usize = 64 * 1024;
+
+struct CachedSecret {
+    secret: Zeroizing<String>,
+    inserted: Instant,
+}
+type SecretCache = HashMap<String, CachedSecret>;
+
+fn prune_cache(cache: &mut SecretCache, now: Instant) {
+    cache.retain(|_, entry| now.saturating_duration_since(entry.inserted) < CACHE_TTL);
+}
+
+fn insert_cached(cache: &mut SecretCache, key: String, secret: Zeroizing<String>, now: Instant) {
+    prune_cache(cache, now);
+    cache.remove(&key);
+    // Oversize credentials still live in the authoritative OS keychain.
+    if secret.len() > MAX_CACHED_SECRET_BYTES || key.len() > 1024 {
+        return;
+    }
+    while cache.len() >= MAX_CACHE_ENTRIES {
+        let oldest = cache.iter().min_by_key(|(_, entry)| entry.inserted)
+            .map(|(key, _)| key.clone());
+        if let Some(oldest) = oldest {
+            cache.remove(&oldest);
+        } else {
+            break;
+        }
+    }
+    cache.insert(key, CachedSecret { secret, inserted: now });
+}
 static SECRET_CACHE: std::sync::OnceLock<RwLock<SecretCache>> = std::sync::OnceLock::new();
 
 fn cache() -> &'static RwLock<SecretCache> {
@@ -93,7 +125,7 @@ pub fn set_secret(key: &str, secret: &str) -> Result<()> {
         .set_password(secret)
         .map_err(|e| anyhow!("Failed to store secret: {}", e))?;
 
-    c.insert(key.to_string(), Zeroizing::new(secret.to_owned()));
+    insert_cached(&mut c, key.to_string(), Zeroizing::new(secret.to_owned()), Instant::now());
 
     tracing::info!("[keychain] Stored secret");
     Ok(())
@@ -117,29 +149,21 @@ fn get_secret_with(
     key: &str,
     load: impl FnOnce() -> Result<Option<String>>,
 ) -> Result<Option<String>> {
-    {
-        let c = cache()
-            .read()
-            .map_err(|_| anyhow!("Keychain cache lock poisoned"))?;
-        if let Some(v) = c.get(key) {
-            return Ok(Some(v.as_str().to_owned()));
-        }
-    }
-
-    // Upgrade by dropping the read guard first, then recheck: another
-    // operation may have populated or invalidated the entry in between.
+    // Prune expired secrets even when the requested entry is a cache hit.
+    // The exclusive guard also preserves rotation/deletion ordering.
     let mut c = cache()
         .write()
         .map_err(|_| anyhow!("Keychain cache lock poisoned"))?;
+    prune_cache(&mut c, Instant::now());
     if let Some(v) = c.get(key) {
-        return Ok(Some(v.as_str().to_owned()));
+        return Ok(Some(v.secret.as_str().to_owned()));
     }
 
     match load()? {
         Some(password) => {
             let password = Zeroizing::new(password);
             let result = password.as_str().to_owned();
-            c.insert(key.to_string(), password);
+            insert_cached(&mut c, key.to_string(), password, Instant::now());
             Ok(Some(result))
         }
         None => Ok(None),
@@ -241,7 +265,7 @@ mod tests {
         set_secret(key, "first").unwrap();
         {
             let guard = cache().read().unwrap();
-            let value: &Zeroizing<String> = guard.get(key).unwrap();
+            let value: &Zeroizing<String> = &guard.get(key).unwrap().secret;
             assert_eq!(value.as_str(), "first");
         }
         set_secret(key, "second").unwrap();
@@ -259,7 +283,7 @@ mod tests {
         );
         {
             let guard = cache().read().unwrap();
-            let value: &Zeroizing<String> = guard.get(key).unwrap();
+            let value: &Zeroizing<String> = &guard.get(key).unwrap().secret;
             assert_eq!(value.as_str(), "second");
         }
         assert_eq!(
@@ -286,6 +310,22 @@ mod tests {
             Some("recovered")
         );
         delete_secret(key).unwrap();
+    }
+
+    #[test]
+    fn bounded_cache_expiration_and_eviction() {
+        let mut entries = SecretCache::new();
+        let now = Instant::now();
+        insert_cached(&mut entries, "expired".into(), Zeroizing::new("secret".into()), now);
+        prune_cache(&mut entries, now + CACHE_TTL);
+        assert!(entries.is_empty());
+        for i in 0..=MAX_CACHE_ENTRIES {
+            insert_cached(&mut entries, i.to_string(), Zeroizing::new("value".into()), now);
+        }
+        assert_eq!(entries.len(), MAX_CACHE_ENTRIES);
+        insert_cached(&mut entries, "oversized".into(),
+            Zeroizing::new("x".repeat(MAX_CACHED_SECRET_BYTES + 1)), now);
+        assert!(!entries.contains_key("oversized"));
     }
 
     #[test]

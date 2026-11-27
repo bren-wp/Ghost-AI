@@ -16,3 +16,12 @@ Scope: Master Development Prompt 3.0, single PR #69, candidate v0.1.5. This regi
 | 10 — Native acceptance | Existing Windows launch, first-paint and screenshot gates; Linux/macOS builds and unit tests. | Clean-device GUI, installer/portable/update/uninstall, data preservation, DPI and platform-specific verification. |
 
 The full release and runtime status is pending CI. See the existing security and visual audit registers for individual findings. Do not claim pixel equality, complete localization, production hosting or stable publication without evidence.
+
+## Additional hardening iteration
+- OS-backed credential cache: five-minute freshness, maximum 256 cached entries, maximum 64 KiB per cached secret, zeroization on eviction. Expired entries are removed during cache access; idle proactive wiping and caller-owned copies remain open. Ephemeral fallback credentials retain their existing session behavior.
+- Direct HTTP redirect policy: block public-to-private transitions, HTTPS downgrade, credentials in redirect URL and excessive redirects. No browser fallback on a denied redirect in the main fetch entry. Expanded lexical IP classification. Actual DNS pinning, alternate transports and browser containment remain open.
+- MCP: argument object/size/depth/node validation added; full authorization and OS sandbox isolation remain open.
+- OOXML: verify actual streamed decompression against per-entry and aggregate bounds and reject unsafe archive paths. General MIME validation remains open.
+- Database: reject schema versions newer than supported, without downgrade. Backup/restore and crash recovery still need implementation and native tests.
+- Localization: report empty translations as defects; no fabricated translation completion. Visual criteria include 175% DPI.
+- Regression tests added; all new code requires CI verification. No stable publication claimed.

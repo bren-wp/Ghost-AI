@@ -112,12 +112,32 @@ impl FetchedWebResource {
     }
 }
 
+/// Do not let an ordinary public HTTP fetch redirect into a private
+/// destination, downgrade HTTPS, or switch to a non-HTTP scheme.
+fn redirect_allowed(previous: &url::Url, next: &url::Url) -> bool {
+    use ghost_ai_agent_core::net_policy::is_private_url;
+    matches!(next.scheme(), "http" | "https")
+        && next.username().is_empty()
+        && next.password().is_none()
+        && !(previous.scheme() == "https" && next.scheme() == "http")
+        && (is_private_url(previous.as_str()) || !is_private_url(next.as_str()))
+}
+
 lazy_static! {
     /// Shared HTTP client with connection pooling
     pub static ref HTTP_CLIENT: Client = Client::builder()
         .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(10))
         .user_agent("Mozilla/5.0 (compatible; Ghost AI/1.0)")
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= 10 {
+                return attempt.error("Too many redirects");
+            }
+            if attempt.previous().last().is_some_and(|previous| !redirect_allowed(previous, attempt.url())) {
+                return attempt.error("Blocked unsafe HTTP redirect");
+            }
+            attempt.follow()
+        }))
         .build()
         .expect("Failed to create HTTP client");
 
@@ -172,4 +192,17 @@ lazy_static! {
             );
         }
     "#.to_string();
+}
+
+#[cfg(test)]
+mod redirect_security_tests {
+    use super::*;
+    #[test]
+    fn blocks_public_to_private_and_https_downgrade() {
+        let public = url::Url::parse("https://example.com").unwrap();
+        for target in ["https://127.0.0.1", "https://[::1]", "http://example.org", "https://user@example.org"] {
+            assert!(!redirect_allowed(&public, &url::Url::parse(target).unwrap()));
+        }
+        assert!(redirect_allowed(&public, &url::Url::parse("https://example.org").unwrap()));
+    }
 }

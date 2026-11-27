@@ -91,6 +91,10 @@ fn is_private_ipv4(ip: Ipv4Addr) -> bool {
         || ip.is_link_local()
         || ip.is_unspecified()
         || ip.is_broadcast()
+        || ip.is_multicast()
+        || a == 0
+        || a >= 240
+        || (a == 198 && (b == 18 || b == 19))
         // CGNAT 100.64.0.0/10
         || (a == 100 && (64..=127).contains(&b))
 }
@@ -102,6 +106,10 @@ fn is_private_ipv6(ip: Ipv6Addr) -> bool {
     let first = ip.segments()[0];
     ip.is_loopback()
         || ip.is_unspecified()
+        || ip.is_multicast()
+        // Deprecated site-local and IPv4-compatible addresses.
+        || (first & 0xffc0) == 0xfec0
+        || ip.segments()[..6] == [0; 6]
         // Unique local fc00::/7
         || (first & 0xfe00) == 0xfc00
         // Link-local fe80::/10
@@ -400,6 +408,12 @@ mod tests {
             "http://172.16.0.1/",
             "http://169.254.169.254/latest/meta-data",
             "http://100.64.1.1/",
+            "http://0.1.2.3/",
+            "http://224.0.0.1/",
+            "http://198.18.0.1/",
+            "http://[ff02::1]/",
+            "http://[fec0::1]/",
+            "http://[::192.168.1.1]/",
             "http://[::1]/",
             "http://[fd00::1]/",
             "http://[fe80::1]/",

@@ -26,7 +26,7 @@ These six editable SVGs are **design concepts**, not captured application screen
 
 ## Acceptance criteria
 
-1. Capture **real screenshots** for Windows 100%, 125%, 150% and 200% scale, plus supported Linux and macOS.
+1. Capture **real screenshots** for Windows 100%, 125%, 150%, 175% and 200% scale, plus supported Linux and macOS.
 2. Compare every state against approved references: default, empty, loading, errors, focus, dialogs, narrow windows and localization.
 3. Verify keyboard-only navigation, screen readers, focus outlines, contrast and text scaling.
 4. Validate chat, files, providers, agents, settings, account-free first run, EULA, installers, updates, and restart behavior.
