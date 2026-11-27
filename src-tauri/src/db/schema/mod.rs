@@ -51,6 +51,11 @@ pub async fn init_schema(pool: &SqlitePool) -> Result<()> {
         CURRENT_SCHEMA_VERSION
     );
 
+    // A previous application version must not mutate a newer database.
+    if current_version > CURRENT_SCHEMA_VERSION {
+        anyhow::bail!("Database schema {current_version} is newer than supported schema {CURRENT_SCHEMA_VERSION}");
+    }
+
     // Run migrations based on current version
     if current_version < 1 {
         migrate_v0_to_v1(pool).await?;
@@ -782,6 +787,14 @@ mod tests {
             .connect("sqlite::memory:")
             .await
             .expect("in-memory pool")
+    }
+
+    #[tokio::test]
+    async fn newer_database_schema_is_not_downgraded() {
+        let pool = fresh_pool().await;
+        set_user_version(&pool, CURRENT_SCHEMA_VERSION + 1).await.unwrap();
+        assert!(init_schema(&pool).await.is_err());
+        assert_eq!(get_user_version(&pool).await.unwrap(), CURRENT_SCHEMA_VERSION + 1);
     }
 
     async fn columns(pool: &SqlitePool, table: &str) -> Vec<String> {

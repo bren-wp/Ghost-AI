@@ -1,5 +1,24 @@
 # Ghost AI by Brendigo — release history
 
+## v0.1.5 — Release recovery and credential cache hardening
+
+- Bound the OS credential cache to 256 entries and five-minute freshness, with zeroization on eviction and a per-entry byte cap.
+- Reject unsafe public-to-private and HTTPS-downgrade HTTP redirects in the direct fetch client; browser and DNS enforcement remain separate.
+- Validate MCP argument shape, nesting and text size before scanning.
+- Validate actual Office archive decompression and reject traversal paths.
+- Refuse to migrate a database created by a newer schema version.
+
+- Zeroize cached fallback API credentials when removed or replaced; caller-owned copies remain a separate audit concern.
+- Open SQLite files using literal filesystem paths instead of interpolated URI strings.
+- Enforce backend attachment size limits before base64 decoding and after decoding; full MIME/container validation remains separate.
+
+- Run mandatory Quality Gates on versioned release branches and require the exact tested commit before publication.
+- Serialize release publication, prevent tag-triggered duplicate builds and reject a moved release branch or mismatched tag.
+- Verify synchronized JavaScript, Tauri and Rust package versions, including the root Cargo.lock entry.
+- Keep verified manual packages eligible for stable distribution without platform certificates; automatic updates still require trusted cryptographic signing.
+- Include the merged credential-cache coherence, rotation and production-keychain regression changes.
+- Verify uploaded asset sizes and SHA-256 digests before public stable release; resume identical partial uploads without overwriting published versions.
+
 ## v0.1.4 — Provider workspace and connection reliability
 
 - Redesigned provider settings with searchable cloud/local/custom navigation, responsive model cards and consistent Ghost AI dialogs.

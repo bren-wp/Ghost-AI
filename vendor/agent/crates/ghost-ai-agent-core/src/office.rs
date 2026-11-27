@@ -93,7 +93,7 @@ pub fn validate_container(bytes: &[u8]) -> Result<(), OfficeError> {
 
     let mut total = 0u64;
     for index in 0..archive.len() {
-        let file = archive
+        let mut file = archive
             .by_index(index)
             .map_err(|e| err(format!("Invalid ZIP entry {index}: {e}")))?;
         if file.size() > MAX_ENTRY_UNCOMPRESSED {
@@ -107,7 +107,25 @@ pub fn validate_container(bytes: &[u8]) -> Result<(), OfficeError> {
                 MAX_ENTRY_UNCOMPRESSED
             )));
         }
-        total = total.saturating_add(file.size());
+        let name = file.name().map_err(|_| err("Invalid ZIP entry name"))?.into_owned();
+        if name.starts_with(['/', '\\']) || name.contains('\\')
+            || name.split('/').any(|part| part == ".." || part.contains(':')) {
+            return Err(err("Unsafe ZIP entry path"));
+        }
+        let declared = file.size();
+        // Validate the actual stream too: a dishonest central directory must
+        // not bypass the size limits used before spreadsheet parsing.
+        let remaining = MAX_TOTAL_UNCOMPRESSED.saturating_sub(total);
+        let limit = remaining.min(MAX_ENTRY_UNCOMPRESSED);
+        if declared > limit {
+            return Err(err("ZIP package exceeds uncompressed size limit"));
+        }
+        let actual = std::io::copy(&mut file.by_ref().take(limit + 1), &mut std::io::sink())
+            .map_err(|e| err(format!("Invalid ZIP entry data: {e}")))?;
+        if actual > limit || actual != declared {
+            return Err(err("ZIP entry size does not match bounded decompression"));
+        }
+        total = total.saturating_add(actual);
     }
     if total > MAX_TOTAL_UNCOMPRESSED {
         return Err(err(format!(
@@ -872,6 +890,12 @@ mod tests {
             ("xl/_rels/workbook.xml.rels", workbook_rels),
             ("xl/worksheets/sheet1.xml", sheet_xml),
         ])
+    }
+
+    #[test]
+    fn office_container_rejects_traversal_entry() {
+        let bytes = zip_bytes(&[("../outside.xml", "untrusted")]);
+        assert!(validate_container(&bytes).is_err());
     }
 
     #[test]

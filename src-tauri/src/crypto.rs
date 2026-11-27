@@ -4,6 +4,7 @@ use base64::{Engine as _, engine::general_purpose};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{LazyLock, OnceLock};
+use zeroize::Zeroizing;
 
 use crate::keychain;
 
@@ -63,7 +64,8 @@ static PUBLISH_MASTER_KEY: OnceLock<bool> = OnceLock::new();
 
 /// In-memory cache for API keys when keychain is unavailable
 /// Key: provider_id, Value: plaintext API key
-static EPHEMERAL_API_KEY_CACHE: LazyLock<parking_lot::RwLock<HashMap<String, String>>> =
+type EphemeralApiKeyCache = HashMap<String, Zeroizing<String>>;
+static EPHEMERAL_API_KEY_CACHE: LazyLock<parking_lot::RwLock<EphemeralApiKeyCache>> =
     LazyLock::new(|| parking_lot::RwLock::new(HashMap::new()));
 
 /// Track whether keychain is available for secure storage
@@ -218,7 +220,7 @@ pub fn is_keychain_available() -> bool {
 pub fn cache_api_key(provider_id: &str, api_key: &str) {
     EPHEMERAL_API_KEY_CACHE
         .write()
-        .insert(provider_id.to_string(), api_key.to_string());
+        .insert(provider_id.to_string(), Zeroizing::new(api_key.to_owned()));
     tracing::info!(
         "🔐 [crypto] Cached API key in memory for provider: {}",
         provider_id
@@ -227,7 +229,10 @@ pub fn cache_api_key(provider_id: &str, api_key: &str) {
 
 /// Get an API key from the ephemeral in-memory cache
 pub fn get_cached_api_key(provider_id: &str) -> Option<String> {
-    EPHEMERAL_API_KEY_CACHE.read().get(provider_id).cloned()
+    EPHEMERAL_API_KEY_CACHE
+        .read()
+        .get(provider_id)
+        .map(|secret| secret.as_str().to_owned())
 }
 
 /// Remove an API key from the ephemeral in-memory cache
@@ -336,6 +341,17 @@ pub(crate) fn clear_current_key_for_tests() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ephemeral_api_key_rotation_and_removal() {
+        let id = "ephemeral-api-key-rotation-regression";
+        cache_api_key(id, "first");
+        assert_eq!(get_cached_api_key(id).as_deref(), Some("first"));
+        cache_api_key(id, "second");
+        assert_eq!(get_cached_api_key(id).as_deref(), Some("second"));
+        remove_cached_api_key(id);
+        assert!(get_cached_api_key(id).is_none());
+    }
 
     #[test]
     fn test_keypair_generation() {

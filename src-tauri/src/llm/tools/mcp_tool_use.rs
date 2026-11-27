@@ -7,8 +7,8 @@
 //!
 //! For STDIO-transport servers the arguments are scanned for dangerous
 //! patterns (path blocklist + bash command analysis) before the call is
-//! forwarded.  HTTP-transport servers are exempt because they cannot access
-//! the local filesystem.
+//! forwarded. The same argument policy applies to HTTP transport, which
+//! can bridge to sensitive resources too.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -160,7 +160,48 @@ fn collect_string_values(value: &serde_json::Value, out: &mut Vec<String>) {
 /// Scan MCP tool arguments for blocked paths and dangerous commands.
 /// Applies to every transport: an HTTP server can act on its arguments
 /// just as a STDIO one can (a remote shell, a filesystem bridge).
+fn validate_mcp_shape(args: &serde_json::Value) -> Result<(), String> {
+    // Null represents omitted arguments. Explicit non-object inputs are not
+    // silently replaced with an empty map.
+    if !args.is_null() && !args.is_object() {
+        return Err("MCP arguments must be an object".into());
+    }
+    let mut stack = vec![(args, 0usize)];
+    let mut nodes = 0usize;
+    let mut bytes = 0usize;
+    while let Some((value, depth)) = stack.pop() {
+        nodes += 1;
+        if depth > 32 || nodes > 4096 {
+            return Err("MCP argument structure exceeds limits".into());
+        }
+        match value {
+            serde_json::Value::String(s) => bytes = bytes.saturating_add(s.len()),
+            serde_json::Value::Array(items) => {
+                if items.len() > 4096 || stack.len() + items.len() > 4096 {
+                    return Err("MCP argument array exceeds limits".into());
+                }
+                stack.extend(items.iter().map(|item| (item, depth + 1)));
+            }
+            serde_json::Value::Object(items) => {
+                if items.len() > 4096 || stack.len() + items.len() > 4096 {
+                    return Err("MCP argument object exceeds limits".into());
+                }
+                for (key, item) in items {
+                    bytes = bytes.saturating_add(key.len());
+                    stack.push((item, depth + 1));
+                }
+            }
+            _ => {}
+        }
+        if bytes > 1024 * 1024 {
+            return Err("MCP argument text exceeds size limit".into());
+        }
+    }
+    Ok(())
+}
+
 fn scan_mcp_arguments(tool_name: &str, args: &serde_json::Value) -> Result<(), String> {
+    validate_mcp_shape(args)?;
     let context = security_context_for_tool(tool_name);
     let mut strings = Vec::new();
     collect_string_values(args, &mut strings);
@@ -392,6 +433,19 @@ mod tests {
     fn scan_stdio_blocks_dangerous_command() {
         let result = scan_mcp_arguments("run_shell", &json!({"command": "rm -rf /"}));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn mcp_argument_shape_and_size_limits() {
+        assert!(validate_mcp_shape(&json!(null)).is_ok());
+        assert!(validate_mcp_shape(&json!({"query": "safe"})).is_ok());
+        assert!(validate_mcp_shape(&json!(["unexpected"])).is_err());
+        let mut nested = json!("value");
+        for _ in 0..34 {
+            nested = json!({"nested": nested});
+        }
+        assert!(validate_mcp_shape(&nested).is_err());
+        assert!(validate_mcp_shape(&json!({"text": "x".repeat(1024 * 1024 + 1)})).is_err());
     }
 
     #[test]

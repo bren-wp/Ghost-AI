@@ -68,6 +68,9 @@ def evaluate() -> tuple[list[dict[str, object]], list[str]]:
             for key, value in local_values.items():
                 if key not in source_values:
                     continue
+                if source_values[key].strip() and not value.strip():
+                    problems.append(f"{code}/{namespace}.{key}: empty translation")
+                    continue
                 original_params = set(PLACEHOLDER.findall(source_values[key]))
                 actual_params = set(PLACEHOLDER.findall(value))
                 if original_params != actual_params:

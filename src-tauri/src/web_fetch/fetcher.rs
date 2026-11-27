@@ -85,6 +85,10 @@ pub async fn fetch_web_resource(url: &str, max_chars: Option<usize>) -> FetchedW
         .await
     {
         Ok(r) => r,
+        Err(e) if e.is_redirect() => {
+            // A denied redirect must never be retried in a less restricted browser tier.
+            return FetchedWebResource::error(url, String::new(), "Unsafe or excessive redirect".into(), None);
+        }
         Err(e) => {
             // Network error - try headless browser fallback
             tracing::info!(
